@@ -1,0 +1,16 @@
+import enum
+
+
+class OrderStatus(enum.StrEnum):
+    NEW = "new"  # Создан клиентом
+    ASSIGNED = "assigned"  # Админ назначил курьера
+    IN_TRANSIT = "in_transit"  # Курьер взял в работу
+    ARRIVED = "arrived"  # Курьер у двери
+    DELIVERED = "delivered"  # Вода отдана, цикл закрыт
+    CANCELLED = "cancelled"  # Отмена
+
+
+class PaymentMethod(enum.StrEnum):
+    CASH = "cash"  # Наличные
+    CARD = "card"  # Перевод на карту / QR
+    CONTRACT = "contract"  # По договору (Перечисление)

@@ -1,0 +1,2 @@
+[build]
+dockerfilePath = "deploy/docker/Dockerfile"

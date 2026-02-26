@@ -1,0 +1,12 @@
+from fastapi import APIRouter
+
+from src.api.v1.courier.catalog import catalog_router
+from src.api.v1.courier.profile import profile_router
+
+courier_router = APIRouter()
+courier_router.include_router(
+    profile_router, prefix="/profile", tags=["Courier | Profile"]
+)
+courier_router.include_router(
+    catalog_router, prefix="/catalog", tags=["Courier | Catalog"]
+)

@@ -1,0 +1,74 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# --- Environments (Virtual Envs) ---
+.venv/
+venv/
+ENV/
+env/
+
+# --- Environment Variables (Secrets!) ---
+# Мы игнорируем реальные файлы с паролями, но ОСТАВЛЯЕМ .env.example
+.env
+.env.*
+!.env.example
+
+# --- IDE & Editors ---
+.vscode/
+!.vscode/extensions.json
+!.vscode/launch.json
+.idea/
+*.swp
+*.swo
+
+# --- Testing & Quality ---
+.ruff_cache/
+.pytest_cache/
+.mypy_cache/
+.pyre_configuration
+.coverage
+htmlcov/
+nosetests.xml
+coverage.xml
+*.cover
+*.pyo
+
+# --- Database & Migrations ---
+# Локальные файлы SQLite (если вдруг появятся)
+*.db
+*.sqlite3
+
+# ВАЖНО: Мы НЕ игнорируем alembic/versions/*.py! 
+# Они должны быть в Git, чтобы база данных на сервере знала, как обновляться.
+
+# --- Docker & System ---
+.dockerignore
+# Игнорируем логи и временные файлы Docker
+docker-compose.override.yml
+*.log
+.DS_Store
+Thumbs.db
+
+# --- Project Specific ---
+# Если ты создаешь временные папки для генерации изображений или других артефактов, добавь их сюда

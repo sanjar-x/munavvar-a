@@ -1,0 +1,82 @@
+# src/modules/orders/schemas.py
+import uuid
+from datetime import datetime
+
+from pydantic import BaseModel, ConfigDict, Field
+
+from src.modules.orders.models import OrderStatus, PaymentMethod
+
+
+class CartItemDTO(BaseModel):
+    """Элемент корзины, который присылает клиент."""
+
+    product_id: uuid.UUID = Field(
+        ...,
+        description="ID воды, тары или оборудования из каталога",
+    )
+    quantity: int = Field(
+        ...,
+        gt=0,  # Строгая валидация: количество должно быть больше 0!
+        title="Количество",
+        examples=[2],
+    )
+
+
+class OrderCreateRequest(BaseModel):
+    items: list[CartItemDTO] = Field(
+        ...,
+        min_length=1,
+        title="Корзина товаров",
+    )
+    payment_method: PaymentMethod = Field(
+        ...,
+        title="Способ оплаты",
+        description="Намерение клиента по оплате: Наличные, Карта ",
+        examples=[PaymentMethod.CARD],
+    )
+
+
+class OrderAssignCourierRequest(BaseModel):
+    """Схема для диспетчера: назначить курьера на заказ."""
+
+    courier_id: uuid.UUID = Field(..., title="ID Курьера")
+
+
+class OrderStatusUpdateRequest(BaseModel):
+    """Схема для курьера: изменить статус заказа (например, на DELIVERED)."""
+
+    status: OrderStatus = Field(..., title="Новый статус заказа")
+
+
+# =====================================================================
+# 3. СХЕМЫ ОТВЕТОВ (RESPONSES)
+# =====================================================================
+
+
+class OrderItemResponse(BaseModel):
+    """Как выглядит одна позиция в заказе при выдаче клиенту."""
+
+    id: uuid.UUID
+    product_id: uuid.UUID
+    quantity: int =  Field(description="Количество")
+    unit_price: int = Field(description="Историческая цена на момент покупки")
+    total: int = Field(description="quantity * unit_price")
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class OrderResponse(BaseModel):
+    """Полная модель заказа для Личного Кабинета или Дашборда."""
+
+    id: uuid.UUID
+    client_id: uuid.UUID
+    courier_id: uuid.UUID | None
+    status: OrderStatus
+    total_amount: int
+
+    items: list[OrderItemResponse]
+
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
