@@ -12,16 +12,31 @@ ENV UV_PYTHON_DOWNLOADS=0
 WORKDIR /app
 
 # Кэшируем и устанавливаем только зависимости
-RUN --mount=type=cache,target=/root/.cache/uv \
+# RUN --mount=type=cache,target=/root/.cache/uv \
+#     --mount=type=bind,source=uv.lock,target=uv.lock \
+#     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
+#     uv sync --locked --no-install-project
+
+
+# Кэшируем и устанавливаем только зависимости с явным ID для Railway
+RUN --mount=type=cache,id=s/201c4983-6333-4eed-8b1a-92688f29c823-/root/.cache/uv,target=/root/.cache/uv \
     --mount=type=bind,source=uv.lock,target=uv.lock \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
     uv sync --locked --no-install-project
 
+
+
+# # Копируем код и "доустанавливаем" проект
+# COPY . /app
+# RUN --mount=type=cache,target=/root/.cache/uv \
+#     uv sync --locked --no-editable
+
+
+
 # Копируем код и "доустанавливаем" проект
 COPY . /app
-RUN --mount=type=cache,target=/root/.cache/uv \
+RUN --mount=type=cache,id=s/201c4983-6333-4eed-8b1a-92688f29c823-/root/.cache/uv,target=/root/.cache/uv \
     uv sync --locked --no-editable
-
 
 # ==========================================
 # СТАДИЯ 2: Финальный образ (Production)
