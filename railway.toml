@@ -1,4 +1,3 @@
 [build]
-# ЯВНО говорим Railway использовать Docker-движок, а не встроенный Railpack
 builder = "DOCKERFILE"
 dockerfilePath = "deploy/docker/Dockerfile.railway"
