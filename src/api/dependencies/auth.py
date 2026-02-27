@@ -23,7 +23,7 @@ swagger_scopes = {
 
 oauth2_scheme = OAuth2PasswordBearer(
     tokenUrl=f"{settings.API_V1_STR}/auth/login/",
-    scopes=swagger_scopes,  # Теперь Swagger всегда знает все права!
+    scopes=swagger_scopes,
 )
 
 

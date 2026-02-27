@@ -13,6 +13,7 @@ from src.modules.orders.enums import OrderStatus, PaymentMethod
 if TYPE_CHECKING:
     from src.modules.catalog.models import Product
     from src.modules.finances.models import Transaction
+    from src.modules.logistics.inventory.models import StockTransaction
     from src.modules.users.models import User
 
 
@@ -45,6 +46,9 @@ class Order(BaseModel):
     courier: Mapped["User | None"] = relationship(foreign_keys=[courier_id])
     items: Mapped[list["OrderItem"]] = relationship(
         back_populates="order", cascade="all, delete-orphan"
+    )
+    stock_transactions: Mapped[list["StockTransaction"]] = relationship(
+        back_populates="order"
     )
     transactions: Mapped[list["Transaction"]] = relationship(
         back_populates="order"
