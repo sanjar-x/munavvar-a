@@ -12,7 +12,7 @@ register__router = APIRouter()
 
 
 @register__router.post(
-    "/",
+    "",
     response_model=UserResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Регистрация нового клиента",

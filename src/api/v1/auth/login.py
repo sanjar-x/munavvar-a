@@ -13,7 +13,7 @@ login_router = APIRouter()
 
 
 @login_router.post(
-    "/",
+    "",
     response_model=TokenResponse,
     status_code=status.HTTP_200_OK,
     summary="Вход в систему (Получение Access Token)",
