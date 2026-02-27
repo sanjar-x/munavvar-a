@@ -16,10 +16,6 @@ class OrderRepository(BaseRepository[Order]):
         super().__init__(model=Order, session=session)
 
     async def get_with_details(self, order_id: uuid.UUID) -> Order | None:
-        """
-        МАГИЯ ORM: Вытаскивает Заказ + Позиции заказа + Информацию о товарах.
-        Идеально для UseCase'ов биллинга и списания со склада.
-        """
         query = (
             select(Order)
             .where(Order.id == order_id, Order.is_active.is_(True))
@@ -28,19 +24,15 @@ class OrderRepository(BaseRepository[Order]):
         result: Result = await self.session.execute(query)
         return result.scalar_one_or_none()
 
-    async def get_client_history(
+    async def get_client_orders(
         self, client_id: uuid.UUID, skip: int = 0, limit: int = 50
     ) -> Sequence[Order]:
-        """
-        История заказов для личного кабинета клиента.
-        """
         query = (
             select(Order)
             .where(Order.client_id == client_id, Order.is_active.is_(True))
             .order_by(Order.created_at.desc())
             .offset(skip)
             .limit(limit)
-            # Подтягиваем items, чтобы фронтенд мог показать превью: "Вода 19Л x 2 шт"
             .options(selectinload(Order.items))
         )
         result: Result = await self.session.execute(query)
@@ -49,22 +41,15 @@ class OrderRepository(BaseRepository[Order]):
     async def get_courier_tasks(
         self, courier_id: uuid.UUID, statuses: list[OrderStatus] | None = None
     ) -> Sequence[Order]:
-        """
-        Поиск заказов для мобильного приложения курьера.
-        Можно фильтровать по статусу (например, показать только IN_TRANSIT).
-        """
         query = select(Order).where(
             Order.courier_id == courier_id, Order.is_active.is_(True)
         )
 
         if statuses:
-            # Используем оператор IN для фильтрации по списку статусов
             query = query.where(Order.status.in_(statuses))
 
-        query = (
-            query.order_by(Order.created_at.desc())
-            # Курьеру тоже нужно знать, что везти
-            .options(selectinload(Order.items).joinedload(OrderItem.product))
+        query = query.order_by(Order.created_at.desc()).options(
+            selectinload(Order.items).joinedload(OrderItem.product)
         )
 
         result: Result = await self.session.execute(query)
@@ -80,4 +65,3 @@ class OrderItemRepository(BaseRepository[OrderItem]):
         if not items_data:
             return
         await self.session.execute(insert(self.model).values(items_data))
-
