@@ -48,7 +48,6 @@ PasswordStr = Annotated[
 # ==========================================
 class UserBase(BaseModel):
     full_name: FullNameStr
-    phone: PhoneStr
 
 
 # ==========================================
@@ -58,10 +57,12 @@ class UserBase(BaseModel):
 
 class UserCreate(UserBase):
     password: PasswordStr
+    phone: PhoneStr
 
 
 # 2. Схема для администратора (Управление доступом)
 class UserAdminCreate(UserBase):
+    phone: PhoneStr
     password: PasswordStr
     role: Role
 
