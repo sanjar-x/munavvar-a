@@ -38,7 +38,9 @@ def create_access_token(
 
     # 4. Подписываем
     encoded_jwt: str = jwt.encode(
-        to_encode, key=settings.SECRET_KEY, algorithm=settings.ALGORITHM
+        to_encode,
+        key=settings.SECRET_KEY.get_secret_value(),
+        algorithm=settings.ALGORITHM,
     )
     return encoded_jwt
 
@@ -49,7 +51,9 @@ def decode_access_token(token: str) -> dict[str, Any]:
     """
     try:
         decoded_token: dict[str, Any] = jwt.decode(
-            jwt=token, key=settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
+            jwt=token,
+            key=settings.SECRET_KEY.get_secret_value(),
+            algorithms=[settings.ALGORITHM],
         )
         return decoded_token
 
