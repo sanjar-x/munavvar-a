@@ -124,7 +124,7 @@ class InventoryProduct(BaseModel):
 
 class UsersDashboard(BaseModel):
     id: uuid.UUID
-    role: Literal[Role.CLIENT_B2C, Role.CLIENT_B2B]
+    role: Role
     full_name: FullNameStr
     phone: PhoneStr
     model_config = ConfigDict(from_attributes=True)
