@@ -5,8 +5,28 @@ from typing import Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from src.modules.catalog.schemas import ProductResponse
 from src.modules.inventory.enums import InventoryType
 from src.modules.inventory.models import TransferStatus, TransferType
+from src.modules.users.schemas import UserResponse
+
+
+class InventoryResponse(BaseModel):
+    id: uuid.UUID
+    name: str
+    type: InventoryType
+    user: UserResponse
+    is_active: bool
+
+
+class InventoryBalance(BaseModel):
+    quantity: int
+    product: ProductResponse
+
+
+class InventoriesResponse(BaseModel):
+    inventory: InventoryResponse
+    balances: list[InventoryBalance]
 
 
 class CreateLocation(BaseModel):
@@ -16,14 +36,6 @@ class CreateLocation(BaseModel):
     )
     type: InventoryType
     user_id: uuid.UUID = Field(description="Владелец (Клиент или Курьер)")
-
-
-class LocationResponse(BaseModel):
-    id: uuid.UUID
-    name: str
-    type: InventoryType
-    user_id: uuid.UUID | None
-    is_active: bool
 
 
 class InventoryBalanceResponse(BaseModel):

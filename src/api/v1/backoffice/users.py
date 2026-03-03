@@ -33,7 +33,6 @@ async def create_user(
 ):
     """
     Создание пользователя вручную через админ-панель.
-    Позволяет администратору сразу назначать роли (например, ACCOUNTANT).
     """
     user = await user_service.register_local_user(schema)
     return user

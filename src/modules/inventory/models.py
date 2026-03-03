@@ -48,7 +48,7 @@ class Inventory(BaseModel):
         nullable=False,
     )
 
-    user: Mapped["User | None"] = relationship(back_populates="inventories")
+    user: Mapped["User"] = relationship(back_populates="inventories")
 
     outgoing_transactions: Mapped[list["StockTransaction"]] = relationship(
         foreign_keys="StockTransaction.from_id",

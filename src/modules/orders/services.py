@@ -112,6 +112,115 @@ class OrderService(BaseService[Order, OrderCreate, OrderUnitOfWork]):
 
             return order
 
+    async def add_product_to_order(
+        self, order_id: uuid.UUID, product_id: uuid.UUID, quantity: int
+    ) -> Order:
+        """
+        Добавляет товар в существующий заказ или увеличивает количество,
+        если товар уже в корзине. Пересчитывает итоговую сумму.
+        """
+        if quantity <= 0:
+            raise ValueError("Количество должно быть строго больше нуля")
+
+        # 1. Забираем актуальную цену из Каталога
+        products = await self.catalog_service.get_by_ids([product_id])
+        if not products:
+            raise ProductsUnavailableError(missing_product_ids=[product_id])
+        current_price = products[0].price
+
+        async with self.uow:
+            # 2. Блокируем заказ от параллельных изменений сумм
+            order = await self.uow.orders.get_with_details(
+                order_id, with_for_update=True
+            )
+            if not order:
+                raise OrderNotFoundError(order_id=order_id)
+
+            # Бизнес-проверка: менять можно только новые заказы
+            if order.status != OrderStatus.NEW:
+                raise ValueError(
+                    "Нельзя менять состав заказа в текущем статусе"
+                )
+
+            # 3. Ищем, есть ли уже такой товар в заказе
+            existing_item = (
+                await self.uow.order_items.get_by_order_and_product(
+                    order_id=order_id, product_id=product_id
+                )
+            )
+
+            if existing_item:
+                new_quantity = existing_item.quantity + quantity
+                await self.uow.order_items.update_quantity(
+                    order_item_id=existing_item.id, new_quantity=new_quantity
+                )
+            else:
+                await self.uow.order_items.add(
+                    {
+                        "order_id": order_id,
+                        "product_id": product_id,
+                        "quantity": quantity,
+                        "unit_price": current_price,
+                    }
+                )
+
+            amount_to_add = current_price * quantity
+            new_total = order.total_amount + amount_to_add
+            updated_order = await self.uow.orders.update(
+                order_id, {"total_amount": new_total}
+            )
+
+            await self.uow.commit()
+            return updated_order
+
+    async def remove_product_from_order(
+        self, order_id: uuid.UUID, product_id: uuid.UUID
+    ) -> Order:
+        """
+        Полностью удаляет позицию товара из заказа и пересчитывает сумму.
+        """
+        async with self.uow:
+            # 1. Блокируем заказ
+            order = await self.uow.orders.get_with_details(
+                order_id, with_for_update=True
+            )
+            if not order:
+                raise OrderNotFoundError(order_id=order_id)
+
+            if order.status != OrderStatus.NEW:
+                raise ValueError(
+                    "Нельзя менять состав заказа в текущем статусе"
+                )
+
+            existing_item = (
+                await self.uow.order_items.get_by_order_and_product(
+                    order_id=order_id, product_id=product_id
+                )
+            )
+
+            # Если товара и так нет, просто отдаем текущий заказ
+            if not existing_item:
+                return order
+
+            # 3. Высчитываем сумму для вычета до удаления
+            amount_to_subtract = (
+                existing_item.unit_price * existing_item.quantity
+            )
+
+            # 4. Удаляем строку
+            await self.uow.order_items.delete_by_order_and_product(
+                order_id=order_id, product_id=product_id
+            )
+
+            new_total = max(0, order.total_amount - amount_to_subtract)
+
+            updated_order = await self.uow.orders.update(
+                order_id, {"total_amount": new_total}
+            )
+
+            await self.uow.commit()
+            return updated_order
+
     async def assign_courier(
         self, order_id: uuid.UUID, courier_id: uuid.UUID
     ) -> Order:

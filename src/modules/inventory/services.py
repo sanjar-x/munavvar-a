@@ -23,9 +23,9 @@ from src.modules.inventory.exceptions import (
 from src.modules.inventory.schemas import (
     AdjustmentItem,
     CreateLocation,
-    InventoryBalanceResponse,
+    InventoriesResponse,
+    InventoryResponse,
     Item,
-    LocationResponse,
     StockTransferItemResponse,
     StockTransferResponse,
     TransferResult,
@@ -69,7 +69,7 @@ class InventoryService:
                     )
             await self.uow.commit()
 
-    async def create_inventory(self, dto: CreateLocation) -> LocationResponse:
+    async def create_inventory(self, dto: CreateLocation) -> InventoryResponse:
         """Универсальный метод создания локации (Склад, Машина, Клиент)."""
 
         # Строгая валидация возвращена: у любой локации должен быть владелец (включая System User)
@@ -100,11 +100,11 @@ class InventoryService:
             )
             await self.uow.commit()
 
-            return LocationResponse.model_validate(new_inventory)
+            return InventoryResponse.model_validate(new_inventory)
 
     async def update_inventory(
         self, inventory_id: uuid.UUID, new_name: str
-    ) -> LocationResponse:
+    ) -> InventoryResponse:
         """Переименование склада, адреса или машины (без изменения типа)."""
         if not new_name.strip():
             raise BadRequestError(
@@ -121,55 +121,41 @@ class InventoryService:
             )
             await self.uow.commit()
 
-            return LocationResponse.model_validate(updated_inventory)
-
-    async def deactivate_inventory(self, inventory_id: uuid.UUID) -> bool:
-        """Soft-delete локации. Блокируется, если есть остатки или долги по таре."""
-        async with self.uow:
-            inventory = await self.uow.inventories.get(inventory_id)
-            if not inventory:
-                raise InventoryNotFoundError(inventory_id=inventory_id)
-
-            balances = await self.uow.transactions.get_all_balances(
-                inventory_id
-            )
-            if balances:
-                raise BadRequestError(
-                    message="Невозможно удалить локацию с ненулевым балансом. Спишите или переместите остатки."
-                )
-
-            success = await self.uow.inventories.archive(inventory_id)
-            await self.uow.commit()
-            return success
+            return InventoryResponse.model_validate(updated_inventory)
 
     async def get_inventory_by_id(
         self, inventory_id: uuid.UUID
-    ) -> LocationResponse:
+    ) -> InventoryResponse:
         """Получить локацию по ID."""
         async with self.uow:
             inventory = await self.uow.inventories.get(inventory_id)
             if not inventory:
                 raise InventoryNotFoundError(inventory_id=inventory_id)
-            return LocationResponse.model_validate(inventory)
+            return InventoryResponse.model_validate(inventory)
+
+    async def get_couriers_inventories(self) -> list[InventoriesResponse]:
+        async with self.uow:
+            inventories = await self.uow.inventories.get_couriers_inventories()
+            inventories_with_balances = []
+            for inventory in list(inventories):
+                balances = list(
+                    await self.uow.transactions.get_balances(inventory.id)
+                )
+                inventories_with_balances.append(
+                    InventoriesResponse(inventory=inventory, balances=balances)
+                )
+            return inventories_with_balances
 
     async def get_client_addresses(
         self, user_id: uuid.UUID
-    ) -> list[LocationResponse]:
+    ) -> list[InventoryResponse]:
         """Получить все адреса доставки конкретного клиента (B2B/B2C)."""
         async with self.uow:
             inventories = await self.uow.inventories.get_client_inventories(
                 user_id
             )
             return [
-                LocationResponse.model_validate(inv) for inv in inventories
-            ]
-
-    async def get_active_warehouses(self) -> list[LocationResponse]:
-        """Справочник: Список всех главных складов и заводов."""
-        async with self.uow:
-            inventories = await self.uow.inventories.get_warehouses()
-            return [
-                LocationResponse.model_validate(inv) for inv in inventories
+                InventoryResponse.model_validate(inv) for inv in inventories
             ]
 
 
@@ -183,27 +169,6 @@ class StockTransferService:
         self.uow = uow
 
     # --- ЧТЕНИЕ ОСТАТКОВ ---
-
-    async def get_inventory_balances(
-        self, inventory_id: uuid.UUID, as_of_date: datetime | None = None
-    ) -> list[InventoryBalanceResponse]:
-        """
-        Бизнес-кейс: Получить текущие остатки на Складе, в Машине или у Клиента.
-        """
-        async with self.uow:
-            # Проверяем, существует ли локация
-            inventory = await self.uow.inventories.get(inventory_id)
-            if not inventory:
-                raise InventoryNotFoundError(inventory_id=inventory_id)
-
-            balances_dict = await self.uow.transactions.get_all_balances(
-                inventory_id=inventory_id, as_of_date=as_of_date
-            )
-
-            return [
-                InventoryBalanceResponse(product_id=p_id, balance=qty)
-                for p_id, qty in balances_dict.items()
-            ]
 
     # --- ЧТЕНИЕ НАКЛАДНЫХ (СУЩЕСТВУЮЩЕЕ) ---
 

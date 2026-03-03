@@ -3,7 +3,7 @@ import uuid
 from collections.abc import Sequence
 from datetime import datetime
 
-from sqlalchemy import Result, desc, select, update
+from sqlalchemy import Result, delete, desc, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 
@@ -15,6 +15,35 @@ from src.modules.orders.models import Order, OrderItem
 class OrderItemRepository(BaseRepository[OrderItem]):
     def __init__(self, session: AsyncSession):
         super().__init__(model=OrderItem, session=session)
+
+    async def get_by_order_and_product(
+        self, order_id: uuid.UUID, product_id: uuid.UUID
+    ) -> OrderItem | None:
+        query = select(self.model).where(
+            self.model.order_id == order_id,
+            self.model.product_id == product_id,
+        )
+        result = await self.session.execute(query)
+        return result.scalar_one_or_none()
+
+    async def delete_by_order_and_product(
+        self, order_id: uuid.UUID, product_id: uuid.UUID
+    ) -> None:
+        stmt = delete(self.model).where(
+            self.model.order_id == order_id,
+            self.model.product_id == product_id,
+        )
+        await self.session.execute(stmt)
+
+    async def update_quantity(
+        self, order_item_id: uuid.UUID, new_quantity: int
+    ) -> None:
+        stmt = (
+            update(self.model)
+            .where(self.model.id == order_item_id)
+            .values(quantity=new_quantity)
+        )
+        await self.session.execute(stmt)
 
 
 class OrderRepository(BaseRepository[Order]):

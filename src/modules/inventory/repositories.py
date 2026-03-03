@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 
 from src.common.repository import BaseRepository
+from src.modules.catalog.models import Product
 from src.modules.inventory.models import (
     Inventory,
     InventoryType,
@@ -26,17 +27,40 @@ class InventoryRepository(BaseRepository[Inventory]):
     # --- СЦЕНАРИИ КУРЬЕРА И ЛОГИСТА ---
 
     async def get_courier_inventory(
-        self, user_id: uuid.UUID
-    ) -> Inventory | None:
-        """Поиск машины конкретного курьера (для старта смены)."""
-        return await self.get_by(user_id=user_id, type=InventoryType.COURIER)
+        self,
+        user_id: uuid.UUID,
+    ) -> Inventory:
+        query = (
+            select(self.model)
+            .where(
+                self.model.user_id == user_id,
+                self.model.type == InventoryType.COURIER,
+                self.model.is_active.is_(True),
+            )
+            .options(joinedload(self.model.user))
+        )
 
-    async def get_all_courier_inventories(self) -> Sequence[Inventory]:
-        """
-        Для UI Логиста: Список всего активного автопарка.
-        Используется для распределения маршрутов и инкассации.
-        """
-        return await self.get_multi(type=InventoryType.COURIER)
+        result = await self.session.execute(query)
+        return result.scalar_one()
+
+    async def get_couriers_inventories(
+        self,
+        offset: int = 0,
+        limit: int = 100,
+    ) -> Sequence[Inventory]:
+        query = (
+            select(self.model)
+            .where(
+                self.model.is_active.is_(True),
+                self.model.type == InventoryType.COURIER,
+            )
+            .options(joinedload(self.model.user))
+            .offset(offset)
+            .limit(limit)
+        )
+
+        result = await self.session.execute(query)
+        return result.scalars().all()
 
     async def get_warehouses(self) -> Sequence[Inventory]:
         """Для UI: Список всех доступных главных складов/заводов."""
@@ -49,7 +73,7 @@ class InventoryRepository(BaseRepository[Inventory]):
     ) -> Sequence[Inventory]:
         return await self.get_multi(user_id=user_id, type=InventoryType.CLIENT)
 
-    async def get_specific_client_inventory(
+    async def get_client_inventory(
         self, user_id: uuid.UUID, inventory_id: uuid.UUID
     ) -> Inventory | None:
         """
@@ -247,13 +271,6 @@ class StockTransactionRepository(BaseRepository[StockTransaction]):
     def __init__(self, session: AsyncSession):
         super().__init__(model=StockTransaction, session=session)
 
-    async def update(
-        self, id: uuid.UUID, obj_data: dict[str, Any]
-    ) -> StockTransaction | None:
-        raise NotImplementedError(
-            "Strict Ledger: Нельзя изменять. Делайте компенсирующую проводку."
-        )
-
     async def archive(self, id: uuid.UUID) -> bool:
         raise NotImplementedError(
             "Strict Ledger: Нельзя скрывать (archive). История иммутабельна."
@@ -311,7 +328,6 @@ class StockTransactionRepository(BaseRepository[StockTransaction]):
         product_id: uuid.UUID,
         as_of_date: datetime | None = None,
     ) -> int:
-        """Сверхбыстрый остаток одного товара."""
         query = select(
             func.coalesce(
                 func.sum(
@@ -343,10 +359,9 @@ class StockTransactionRepository(BaseRepository[StockTransaction]):
         result = await self.session.execute(query)
         return result.scalar() or 0
 
-    async def get_all_balances(
-        self, inventory_id: uuid.UUID, as_of_date: datetime | None = None
-    ) -> dict[uuid.UUID, int]:
-        """Остатки ВСЕХ товаров на складе (Ревизия)."""
+    async def get_balances(
+        self, inventory_id: uuid.UUID
+    ) -> list[dict[str, Any]]:
         balance_expr = func.sum(
             case(
                 (self.model.to_id == inventory_id, self.model.quantity),
@@ -354,24 +369,27 @@ class StockTransactionRepository(BaseRepository[StockTransaction]):
                 else_=0,
             )
         )
-
         query = (
-            select(self.model.product_id, balance_expr.label("balance"))
+            select(balance_expr.label("quantity"), Product)
+            .join(Product, self.model.product_id == Product.id)
             .where(
                 or_(
                     self.model.to_id == inventory_id,
                     self.model.from_id == inventory_id,
                 )
             )
-            .group_by(self.model.product_id)
+            .group_by(Product.id)
             .having(balance_expr != 0)
         )
 
-        if as_of_date:
-            query = query.where(self.model.created_at <= as_of_date)
-
         result = await self.session.execute(query)
-        return {row.product_id: row.balance for row in result.all()}
+        return [
+            {
+                "quantity": row.quantity,
+                "product": row.Product,
+            }
+            for row in result.all()
+        ]
 
     # --- АНАЛИТИКА: ДОЛГИ ПО ТАРЕ И ОБОРАЧИВАЕМОСТЬ (HOD Specific) ---
 

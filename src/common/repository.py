@@ -75,10 +75,7 @@ class BaseRepository[ModelType: BaseModel]:
 
     async def update(
         self, id: uuid.UUID, obj_data: dict[str, Any]
-    ) -> ModelType | None:
-        if not obj_data:
-            return await self.get(id, active_only=False)
-
+    ) -> ModelType:
         # Защита от случайного обновления ID
         obj_data.pop("id", None)
 
@@ -89,7 +86,7 @@ class BaseRepository[ModelType: BaseModel]:
             .returning(self.model)
         )
         result = await self.session.execute(statement)
-        return result.scalar_one_or_none()
+        return result.scalar_one()
 
     async def archive(self, id: uuid.UUID) -> bool:
         statement = (
