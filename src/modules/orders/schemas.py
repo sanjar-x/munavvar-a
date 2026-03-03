@@ -7,7 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from src.modules.orders.models import OrderStatus, PaymentMethod
 
 
-class CartItemDTO(BaseModel):
+class Item(BaseModel):
     """Элемент корзины, который присылает клиент."""
 
     product_id: uuid.UUID = Field(
@@ -22,8 +22,8 @@ class CartItemDTO(BaseModel):
     )
 
 
-class OrderCreateRequest(BaseModel):
-    items: list[CartItemDTO] = Field(
+class OrderCreate(BaseModel):
+    items: list[Item] = Field(
         ...,
         min_length=1,
         title="Корзина товаров",
@@ -58,7 +58,7 @@ class OrderItemResponse(BaseModel):
 
     id: uuid.UUID
     product_id: uuid.UUID
-    quantity: int =  Field(description="Количество")
+    quantity: int = Field(description="Количество")
     unit_price: int = Field(description="Историческая цена на момент покупки")
     total: int = Field(description="quantity * unit_price")
 

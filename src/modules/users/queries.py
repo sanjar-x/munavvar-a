@@ -6,8 +6,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.modules.catalog.models import Product, ProductType
 from src.modules.finances.models import Account, AccountType
-from src.modules.logistics.inventory.enums import InventoryType
-from src.modules.logistics.inventory.models import Inventory, StockTransaction
+from src.modules.inventory.enums import InventoryType
+from src.modules.inventory.models import Inventory, StockTransaction
 from src.modules.users.models import AuthProvider, Identity, Role, User
 from src.modules.users.schemas import (
     InventoryProduct,
@@ -78,7 +78,7 @@ class UsersDashboardQuery:
         user_balconies_stmt = (
             select(Inventory.id.label("inv_id"), Inventory.user_id).where(
                 Inventory.user_id.in_(user_ids),
-                Inventory.type == InventoryType.CLIENT_BALCONY,
+                Inventory.type == InventoryType.CLIENT,
             )
         ).subquery("user_balconies")
 
@@ -204,7 +204,7 @@ class UsersDashboardQuery:
         user_cars_stmt = (
             select(Inventory.id.label("inv_id"), Inventory.user_id).where(
                 Inventory.user_id.in_(user_ids),
-                Inventory.type == InventoryType.COURIER_CAR,
+                Inventory.type == InventoryType.COURIER,
             )
         ).subquery("user_cars")
 

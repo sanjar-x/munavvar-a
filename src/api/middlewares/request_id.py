@@ -10,7 +10,7 @@ from src.core.context import set_request_id
 class RequestIDMiddleware:
     """
     Высокопроизводительный ASGI Middleware для внедрения Request ID.
-    Является точкой входа (Outermost Middleware), поэтому отвечает за очистку лог-контекста.
+    Является точкой входа (Outermost Middleware), поэтому отвечает за очистку.
     """
 
     def __init__(self, app: ASGIApp):
@@ -26,7 +26,7 @@ class RequestIDMiddleware:
         # 1. ОЧИСТКА КОНТЕКСТА: Делаем это здесь, на самом верхнем уровне!
         structlog.contextvars.clear_contextvars()
 
-        # Оптимизация: передаем только scope, так как нам нужны только заголовки.
+        # Оптимизация: передаем scope, так как нам нужны только заголовк.
         # Это гарантирует, что мы случайно не «проглотим» receive stream.
         request = Request(scope)
 

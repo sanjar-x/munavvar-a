@@ -5,7 +5,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, status
 from fastapi.security import OAuth2PasswordRequestForm
 
-from src.api.dependencies.services import get_auth_service
+from src.modules.auth.dependencies import get_auth_service
 from src.modules.auth.schemas import LocalLogin, TokenResponse
 from src.modules.auth.services import AuthService
 

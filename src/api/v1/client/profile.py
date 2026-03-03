@@ -4,8 +4,8 @@ from typing import Annotated
 
 from fastapi import APIRouter, Security
 
-from src.api.dependencies.auth import get_current_user
 from src.core.security.permissions import Scope
+from src.modules.auth.dependencies import get_current_user
 from src.modules.users.models import User
 from src.modules.users.schemas import UserResponse
 

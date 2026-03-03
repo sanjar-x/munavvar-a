@@ -1,3 +1,4 @@
+# src/modules/finances.models.py
 import uuid
 from typing import TYPE_CHECKING
 
@@ -22,8 +23,6 @@ transaction_status_enum = Enum(
 
 
 class Account(BaseModel):
-    __tablename__ = "accounts"
-
     type: Mapped[AccountType] = mapped_column(
         account_type_enum, nullable=False, index=True
     )

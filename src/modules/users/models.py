@@ -1,3 +1,4 @@
+# src/modules/users/models.py
 import enum
 import uuid
 from typing import TYPE_CHECKING
@@ -9,7 +10,7 @@ from src.infrastructure.database.base import BaseModel
 
 if TYPE_CHECKING:
     from src.modules.finances.models import Account
-    from src.modules.logistics.inventory.models import Inventory
+    from src.modules.inventory.models import Inventory
 
 
 class Role(enum.Enum):

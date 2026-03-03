@@ -1,6 +1,6 @@
 import logging
 import sys
-from typing import Any
+from typing import Any, TextIO
 
 import structlog
 
@@ -8,11 +8,6 @@ from src.core.config import settings
 
 
 def setup_logging() -> None:
-    """
-    Настраивает Structlog для вывода структурированных логов.
-    Перехватывает стандартные логи FastAPI, Uvicorn и SQLAlchemy.
-    """
-    # 1. ОБЩИЕ ПРОЦЕССОРЫ (Выполняются для всех логов)
     shared_processors: list[Any] = [
         structlog.contextvars.merge_contextvars,
         structlog.stdlib.add_logger_name,
@@ -23,47 +18,36 @@ def setup_logging() -> None:
         structlog.processors.format_exc_info,
     ]
 
-    # 2. НАСТРОЙКА ЯДРА STRUCTLOG
     structlog.configure(
         processors=shared_processors
-        + [
-            # Заворачивает словарь для передачи в стандартный logging.
-            # ВАЖНО: Должен быть строго последним в этом списке!
-            structlog.stdlib.ProcessorFormatter.wrap_for_formatter,
-        ],
+        + [structlog.stdlib.ProcessorFormatter.wrap_for_formatter],
         logger_factory=structlog.stdlib.LoggerFactory(),
         wrapper_class=structlog.stdlib.BoundLogger,
         cache_logger_on_first_use=True,
     )
-
-    # 3. НАСТРОЙКА РЕНДЕРИНГА
-    if settings.ENVIRONMENT == "local" or settings.DEBUG:
-        # Для локальной разработки - красивые цветные логи в консоли
+    if settings.ENVIRONMENT == "dev" or settings.DEBUG:
         renderer = structlog.dev.ConsoleRenderer(colors=True)
     else:
-        # Для продакшена - строгий JSON для DataDog / ELK / Grafana
         renderer = structlog.processors.JSONRenderer()
 
-    # 4. СВЯЗКА СО СТАНДАРТНЫМ LOGGING
     formatter = structlog.stdlib.ProcessorFormatter(
         foreign_pre_chain=shared_processors,
         processors=[
-            # Очищает служебные метаданные.
-            # ВАЖНО: Должен быть строго первым в этом списке!
             structlog.stdlib.ProcessorFormatter.remove_processors_meta,
             renderer,
         ],
     )
 
-    handler = logging.StreamHandler(sys.stdout)
-    handler.setFormatter(formatter)
+    handler: logging.StreamHandler[TextIO | Any] = logging.StreamHandler(
+        stream=sys.stdout
+    )
+    handler.setFormatter(fmt=formatter)
 
-    root_logger = logging.getLogger()
+    root_logger: logging.Logger = logging.getLogger()
     root_logger.handlers.clear()
-    root_logger.addHandler(handler)
-    root_logger.setLevel(logging.INFO)
+    root_logger.addHandler(hdlr=handler)
+    root_logger.setLevel(level=logging.INFO)
 
-    # 5. ПЕРЕХВАТ ЛОГОВ UVICORN / FASTAPI
     for _log in ["uvicorn", "uvicorn.error", "fastapi"]:
         logger_instance = logging.getLogger(_log)
         logger_instance.handlers.clear()

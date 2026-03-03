@@ -4,9 +4,9 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, Security, status
 
-from src.api.dependencies.auth import get_current_user
-from src.api.dependencies.services import get_catalog_service
 from src.core.security.permissions import Scope
+from src.modules.auth.dependencies import get_current_user
+from src.modules.catalog.dependencies import get_catalog_service
 from src.modules.catalog.enums import ProductType
 from src.modules.catalog.schemas import (
     ProductCreate,

@@ -3,7 +3,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, status
 
-from src.api.dependencies.services import get_user_service
+from src.modules.users.dependencies import get_user_service
 from src.modules.users.models import Role, User
 from src.modules.users.schemas import UserAdminCreate, UserCreate, UserResponse
 from src.modules.users.services import UserService
@@ -23,7 +23,6 @@ async def register_user(
 ):
     admin_schema = UserAdminCreate(**schema.model_dump(), role=Role.CLIENT_B2C)
 
-    # 3. Передаем в сервис правильный объект UserAdminCreate
     user: User = await user_service.register_local_user(admin_schema)
 
     return user

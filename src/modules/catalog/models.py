@@ -1,3 +1,4 @@
+# src/modules/catalog/models.py
 import uuid
 from typing import Any
 

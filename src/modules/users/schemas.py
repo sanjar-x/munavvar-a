@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -31,7 +31,6 @@ FullNameStr = Annotated[
     ),
 ]
 
-# Строгая валидация пароля (только для входящих данных)
 PasswordStr = Annotated[
     str,
     Field(
@@ -47,6 +46,7 @@ PasswordStr = Annotated[
 # 2. БАЗОВАЯ СХЕМА (Общие поля)
 # ==========================================
 class UserBase(BaseModel):
+    role: Role
     full_name: FullNameStr
 
 
@@ -64,7 +64,6 @@ class UserCreate(UserBase):
 class UserAdminCreate(UserBase):
     phone: PhoneStr
     password: PasswordStr
-    role: Role
 
 
 # ==========================================
@@ -75,8 +74,7 @@ class UserProfileUpdate(BaseModel):
 
 
 # 2. Схема для администратора (Управление доступом)
-class UserAdminUpdate(BaseModel):
-    role: Role | None = None
+class UserAdminUpdate(UserBase):
     is_active: bool | None = None
 
 

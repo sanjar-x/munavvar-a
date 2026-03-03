@@ -1,3 +1,4 @@
+import uuid
 from functools import lru_cache
 from typing import Annotated, Any, Literal
 
@@ -30,6 +31,8 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7
 
     CORS_ORIGINS: Annotated[list[str] | str, BeforeValidator(parse_cors)] = []
+
+    SYSTEM_USER_ID: uuid.UUID = uuid.UUID(int=0)
 
     PGHOST: str
     PGPORT: int

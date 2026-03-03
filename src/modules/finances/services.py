@@ -1,25 +1,25 @@
 import uuid
 
-from src.common.uow import IUnitOfWork
 from src.modules.finances.models import (
     Account,
     AccountType,
     Transaction,
     TransactionStatus,
 )
+from src.modules.finances.uow import IFinancesUnitOfWork
 from src.modules.orders.models import Order, PaymentMethod
 from src.modules.users.exceptions import UserNotFoundError
 from src.modules.users.models import User
+from src.modules.users.services import UserService
 
 
 class BillingService:
-    def __init__(self, uow: IUnitOfWork):
-        self.uow: IUnitOfWork = uow
+    def __init__(self, uow: IFinancesUnitOfWork, user_service: UserService):
+        self.uow = uow
+        self.user_service: UserService = user_service
 
-    async def get_or_add_client_account(
-        self, client_id: uuid.UUID
-    ) -> Account:
-        client: User | None = await self.uow.users.get_client(id=client_id)
+    async def get_or_add_client_account(self, client_id: uuid.UUID) -> Account:
+        client: User | None = await self.user_service.get_client(id=client_id)
         if not client:
             raise UserNotFoundError(user_id=client_id)
 
@@ -33,16 +33,16 @@ class BillingService:
                 "user_id": client.id,
                 "name": f"Счет клиента: {client.full_name}",
             }
-            client_account = await self.uow.accounts.add(
-                client_account_data
-            )
+            client_account = await self.uow.accounts.add(client_account_data)
 
         return client_account
 
     async def get_or_add_courier_account(
         self, courier_id: uuid.UUID
     ) -> Account:
-        courier: User | None = await self.uow.users.get_courier(id=courier_id)
+        courier: User | None = await self.user_service.get_courier(
+            id=courier_id
+        )
         if not courier:
             raise UserNotFoundError(user_id=courier_id)
 
@@ -56,9 +56,7 @@ class BillingService:
                 "user_id": courier.id,
                 "name": f"Счет курьера: {courier.full_name}",
             }
-            courier_account = await self.uow.accounts.add(
-                courier_account_data
-            )
+            courier_account = await self.uow.accounts.add(courier_account_data)
 
         return courier_account
 
@@ -147,7 +145,7 @@ class BillingService:
             client_id
         )
 
-        system_user: User = await self.uow.users.get_system_user()
+        system_user: User = await self.user_service.get_system_user()
         revenue_account: Account = (
             await self.uow.accounts.get_system_revenue_account(system_user.id)
         )
@@ -170,8 +168,8 @@ class BillingService:
         reason = f"Оплата заказа #{order.id}"
 
         if order.payment_method == PaymentMethod.CASH:
-            courier_account: Account = (
-                await self.get_or_add_courier_account(order.courier_id)
+            courier_account: Account = await self.get_or_add_courier_account(
+                order.courier_id
             )
             await self.transfer(
                 from_account_id=client_account.id,
@@ -183,7 +181,7 @@ class BillingService:
             )
             return TransactionStatus.COMPLETED
         elif order.payment_method == PaymentMethod.CARD:
-            system_user = await self.uow.users.get_system_user()
+            system_user = await self.user_service.get_system_user()
             card_account = await self.uow.accounts.get_system_card_account(
                 system_user.id
             )

@@ -1,24 +1,27 @@
+# src/common/service.py
 import uuid
+from abc import ABC, abstractmethod
 from collections.abc import Sequence
 
 from pydantic import BaseModel as PydanticSchema
 
 from src.common.repository import BaseRepository
-from src.common.uow import IUnitOfWork
 from src.infrastructure.database.base import BaseModel
+from src.infrastructure.database.uow import BaseSQLAlchemyUoW
 
 
 class BaseService[
     ModelType: BaseModel,
     CreateSchemaType: PydanticSchema,
-]:
-    def __init__(self, uow: IUnitOfWork, repo_name: str):
+    UoWType: BaseSQLAlchemyUoW,
+](ABC):
+    def __init__(self, uow: UoWType):
         self.uow = uow
-        self.repo_name = repo_name
 
     @property
+    @abstractmethod
     def _repo(self) -> BaseRepository[ModelType]:
-        return getattr(self.uow, self.repo_name)
+        pass
 
     async def get(self, id: uuid.UUID) -> ModelType | None:
         async with self.uow:

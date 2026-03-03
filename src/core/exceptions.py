@@ -1,3 +1,4 @@
+# src/core/exceptions.py
 from typing import Any
 
 from fastapi import status  # Оставляем только статусы для удобства
@@ -92,6 +93,18 @@ class ConflictError(AppException):
             status_code=status.HTTP_409_CONFLICT,
             error_code=error_code,
             details=details,
+        )
+
+
+class UnprocessableEntityError(AppException):
+    def __init__(
+        self,
+        message: str = "Невозможно обработать сущность (ошибка бизнес-логики)",
+        error_code: str = "UNPROCESSABLE_ENTITY",
+        details: dict[str, Any] | None = None,
+    ):
+        super().__init__(
+            message, status.HTTP_422_UNPROCESSABLE_ENTITY, error_code, details
         )
 
 

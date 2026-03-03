@@ -9,16 +9,14 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from src.infrastructure.database.base import BaseModel
 from src.modules.orders.enums import OrderStatus, PaymentMethod
 
-# Используем TYPE_CHECKING для избежания циклических импортов
 if TYPE_CHECKING:
     from src.modules.catalog.models import Product
     from src.modules.finances.models import Transaction
-    from src.modules.logistics.inventory.models import StockTransaction
+    from src.modules.inventory.models import StockTransfer
     from src.modules.users.models import User
 
 
 class Order(BaseModel):
-    # --- 1. Физические колонки в Базе Данных ---
     client_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("users.id", ondelete="RESTRICT"),
         nullable=False,
@@ -38,7 +36,6 @@ class Order(BaseModel):
         nullable=False,
         default=OrderStatus.NEW,
     )
-
     total_amount: Mapped[int] = mapped_column(
         INTEGER, default=0, nullable=False, comment="Сумма всего заказа"
     )
@@ -47,11 +44,16 @@ class Order(BaseModel):
     items: Mapped[list["OrderItem"]] = relationship(
         back_populates="order", cascade="all, delete-orphan"
     )
-    stock_transactions: Mapped[list["StockTransaction"]] = relationship(
-        back_populates="order"
+
+    stock_transfers: Mapped[list["StockTransfer"]] = relationship(
+        "StockTransfer",
+        back_populates="order",
+        cascade="all, delete-orphan",
     )
     transactions: Mapped[list["Transaction"]] = relationship(
-        back_populates="order"
+        "Transaction",
+        back_populates="order",
+        cascade="all, delete-orphan",
     )
 
 
