@@ -35,7 +35,7 @@ class OrderService(BaseService[Order, OrderCreate, OrderUnitOfWork]):
     ) -> Order:
         """
         Процесс Checkout'а.
-        Формирует корзину заказа (OrderItem) и высчитывает итоговую сумму (total_amount),
+        Формирует корзину заказа (OrderItem) и высчитывает (total_amount),
         замораживая цены из Каталога на момент покупки.
         """
         if not dto.items:
@@ -93,7 +93,7 @@ class OrderService(BaseService[Order, OrderCreate, OrderUnitOfWork]):
     ) -> Order:
         """
         Глубокая загрузка заказа.
-        Если передан requesting_user_id (от клиента/курьера), проверяем права доступа (IDOR).
+        Если передан requesting_user_id (от клиента/курьера).
         Если не передан - считаем, что это запрос от Админа/CRM.
         """
         async with self.uow:
@@ -102,14 +102,13 @@ class OrderService(BaseService[Order, OrderCreate, OrderUnitOfWork]):
                 raise OrderNotFoundError(order_id=order_id)
 
             # IDOR Проверка
-            if requesting_user_id:
-                if requesting_user_id not in (
-                    order.client_id,
-                    order.courier_id,
-                ):
-                    raise OrderAccessDeniedError(
-                        user_id=requesting_user_id, order_id=order_id
-                    )
+            if requesting_user_id and requesting_user_id not in (
+                order.client_id,
+                order.courier_id,
+            ):
+                raise OrderAccessDeniedError(
+                    user_id=requesting_user_id, order_id=order_id
+                )
 
             return order
 
@@ -120,7 +119,6 @@ class OrderService(BaseService[Order, OrderCreate, OrderUnitOfWork]):
         Диспетчеризация: Логист назначает заказ конкретному курьеру.
         """
         async with self.uow:
-            # Блокируем заказ (чтобы два логиста одновременно не назначили разных курьеров)
             order = await self.uow.orders.get_with_details(
                 order_id, with_for_update=True
             )
@@ -153,9 +151,6 @@ class OrderService(BaseService[Order, OrderCreate, OrderUnitOfWork]):
     async def update_status(
         self, order_id: uuid.UUID, new_status: OrderStatus
     ) -> Order:
-        """
-        Легковесный метод для обновления статусов (например, курьер жмет 'В ПУТИ').
-        """
         async with self.uow:
             updated_order = await self.uow.orders.update_status(
                 order_id, new_status
@@ -189,20 +184,22 @@ class OrderService(BaseService[Order, OrderCreate, OrderUnitOfWork]):
         self,
         skip: int = 0,
         limit: int = 50,
-        status: OrderStatus | None = None,
+        statuses: list[OrderStatus] | None = None,
         courier_id: uuid.UUID | None = None,
         client_id: uuid.UUID | None = None,
         date_from: datetime | None = None,
         date_to: datetime | None = None,
-    ) -> Sequence[Order]:
+    ) -> list[Order]:
         """Универсальный поиск заказов для Администратора/CRM."""
         async with self.uow:
-            return await self.uow.orders.search_orders(
-                skip=skip,
-                limit=limit,
-                status=status,
-                courier_id=courier_id,
-                client_id=client_id,
-                date_from=date_from,
-                date_to=date_to,
+            return list(
+                await self.uow.orders.search_orders(
+                    skip=skip,
+                    limit=limit,
+                    statuses=statuses,
+                    courier_id=courier_id,
+                    client_id=client_id,
+                    date_from=date_from,
+                    date_to=date_to,
+                )
             )

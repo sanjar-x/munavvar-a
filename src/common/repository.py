@@ -1,3 +1,4 @@
+# src\common\repository.py
 import uuid
 from collections.abc import Sequence
 from typing import Any
@@ -19,7 +20,6 @@ class BaseRepository[ModelType: BaseModel]:
         active_only: bool = True,
         with_for_update: bool = False,
     ) -> ModelType | None:
-        """Получение с опциональной блокировкой строки (FOR UPDATE) от состояния гонки."""
         query = select(self.model).where(self.model.id == id)
         if active_only:
             query = query.where(self.model.is_active.is_(True))
@@ -69,7 +69,6 @@ class BaseRepository[ModelType: BaseModel]:
         if not objs_data:
             return []
 
-        # Используем bulk insert с возвратом созданных объектов (PostgreSQL RETURNING)
         stmt = insert(self.model).values(objs_data).returning(self.model)
         result = await self.session.execute(stmt)
         return result.scalars().all()

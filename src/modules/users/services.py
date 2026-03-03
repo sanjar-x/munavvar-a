@@ -61,7 +61,6 @@ class UserService(BaseService[User, UserAdminCreate, UserUnitOfWork]):
             # 2. Создаем запись User
             user_data = {"full_name": schema.full_name, "role": schema.role}
 
-            # Внимание: метод .add() в BaseRepository уже выполняет await self.session.flush(),
             # поэтому user.id сразу доступен. Явный uow.flush() здесь не нужен.
             user = await self.uow.users.add(user_data)
 

@@ -1,15 +1,15 @@
-# src/modules/orders/repository.py
+# src/modules/orders/repositories.py
 import uuid
 from collections.abc import Sequence
 from datetime import datetime
 
-from sqlalchemy import Result, desc, func, select, update
+from sqlalchemy import Result, desc, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 
 from src.common.repository import BaseRepository
 from src.modules.orders.enums import OrderStatus
-from src.modules.orders.models import Order, OrderItem, OrderStatus
+from src.modules.orders.models import Order, OrderItem
 
 
 class OrderItemRepository(BaseRepository[OrderItem]):
@@ -20,8 +20,6 @@ class OrderItemRepository(BaseRepository[OrderItem]):
 class OrderRepository(BaseRepository[Order]):
     def __init__(self, session: AsyncSession):
         super().__init__(model=Order, session=session)
-
-    # --- СЦЕНАРИИ КЛИЕНТА ---
 
     async def get_client_orders(
         self, client_id: uuid.UUID, skip: int = 0, limit: int = 20
@@ -34,9 +32,8 @@ class OrderRepository(BaseRepository[Order]):
             select(self.model)
             .where(self.model.client_id == client_id)
             .options(
-                joinedload(
-                    self.model.courier
-                )  # Чтобы показать "Ваш курьер: Иван"
+                joinedload(self.model.courier),
+                joinedload(self.model.client_inventory),
             )
             .order_by(desc(self.model.created_at))
             .offset(skip)
@@ -44,8 +41,6 @@ class OrderRepository(BaseRepository[Order]):
         )
         result: Result = await self.session.execute(query)
         return result.scalars().all()
-
-    # --- СЦЕНАРИИ КУРЬЕРА ---
 
     async def get_active_courier_orders(
         self, courier_id: uuid.UUID
@@ -67,29 +62,26 @@ class OrderRepository(BaseRepository[Order]):
                 ),
             )
             .options(
-                joinedload(self.model.client)  # Чтобы знать, кому звонить
+                joinedload(self.model.client),
+                joinedload(self.model.client_inventory),
+                selectinload(self.model.items).joinedload(OrderItem.product),
             )
-            .order_by(self.model.created_at.asc())  # Очередь доставки
+            .order_by(self.model.created_at.asc())
         )
         result: Result = await self.session.execute(query)
         return result.scalars().all()
 
-    # --- СЦЕНАРИИ МЕНЕДЖЕРА И БИЗНЕС-ЛОГИКИ (UoW) ---
-
     async def get_with_details(
         self, order_id: uuid.UUID, with_for_update: bool = False
     ) -> Order | None:
-        """
-        Глубокая загрузка заказа.
-        Подтягивает все связанные накладные (StockTransfers).
-        Используется в OrderService перед закрытием заказа.
-        """
         query = (
             select(self.model)
             .where(self.model.id == order_id)
             .options(
                 joinedload(self.model.client),
+                joinedload(self.model.client_inventory),
                 joinedload(self.model.courier),
+                selectinload(self.model.items).joinedload(OrderItem.product),
                 selectinload(self.model.stock_transfers),
             )
         )
@@ -104,19 +96,16 @@ class OrderRepository(BaseRepository[Order]):
         self,
         skip: int = 0,
         limit: int = 50,
-        status: OrderStatus | None = None,
+        statuses: list[OrderStatus] | None = None,
         courier_id: uuid.UUID | None = None,
         client_id: uuid.UUID | None = None,
         date_from: datetime | None = None,
         date_to: datetime | None = None,
     ) -> Sequence[Order]:
-        """
-        Универсальный поиск для CRM-системы (Админки).
-        """
         query = select(self.model)
 
-        if status:
-            query = query.where(self.model.status == status)
+        if statuses:
+            query = query.where(self.model.status.in_(statuses))
         if courier_id:
             query = query.where(self.model.courier_id == courier_id)
         if client_id:
@@ -128,9 +117,13 @@ class OrderRepository(BaseRepository[Order]):
 
         query = (
             query.options(
-                joinedload(self.model.client), joinedload(self.model.courier)
+                joinedload(self.model.client),
+                joinedload(self.model.client_inventory),
+                joinedload(self.model.courier),
+                selectinload(self.model.items).joinedload(OrderItem.product),
+                selectinload(self.model.stock_transfers),
             )
-            .order_by(desc(self.model.created_at))
+            .order_by(desc(self.model.updated_at))
             .offset(skip)
             .limit(limit)
         )
@@ -141,14 +134,10 @@ class OrderRepository(BaseRepository[Order]):
     async def update_status(
         self, order_id: uuid.UUID, new_status: OrderStatus
     ) -> Order | None:
-        """
-        Оптимизированный метод для быстрого перевода статусов без загрузки всего объекта.
-        Например: "Доставлен", "Отменен".
-        """
         stmt = (
             update(self.model)
             .where(self.model.id == order_id)
-            .values(status=new_status, updated_at=func.now())
+            .values(status=new_status)
             .returning(self.model)
         )
         result: Result = await self.session.execute(stmt)

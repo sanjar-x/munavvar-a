@@ -47,7 +47,6 @@ class InventoryRepository(BaseRepository[Inventory]):
     async def get_client_inventories(
         self, user_id: uuid.UUID
     ) -> Sequence[Inventory]:
-        """Для UI Клиента: Показать все его адреса доставки (Дом, Офис, Дача)."""
         return await self.get_multi(user_id=user_id, type=InventoryType.CLIENT)
 
     async def get_specific_client_inventory(
@@ -55,7 +54,6 @@ class InventoryRepository(BaseRepository[Inventory]):
     ) -> Inventory | None:
         """
         Security Alert (Защита от IDOR):
-        Получить конкретный адрес, строго проверяя, что он принадлежит этому пользователю.
         Использовать при оформлении заказа с фронтенда!
         """
         query = select(self.model).where(
@@ -84,10 +82,6 @@ class InventoryRepository(BaseRepository[Inventory]):
         inv_type: InventoryType | None = None,
         limit: int = 50,
     ) -> Sequence[Inventory]:
-        """
-        Для Admin UI: Умный поиск по номеру машины, названию склада или адресу клиента.
-        DBA Note: Для production на больших объемах потребуется trigram index (pg_trgm) на колонку name.
-        """
         query = select(self.model).where(
             self.model.name.ilike(f"%{search_query}%"),
             self.model.is_active.is_(True),
@@ -253,14 +247,11 @@ class StockTransactionRepository(BaseRepository[StockTransaction]):
     def __init__(self, session: AsyncSession):
         super().__init__(model=StockTransaction, session=session)
 
-    # --- ЗАЩИТА ЛЕДЖЕРА (Strict Ledger Enforcement) ---
-    # Блокируем любые мутации. Истина рождается только через добавление новых строк.
-
     async def update(
         self, id: uuid.UUID, obj_data: dict[str, Any]
     ) -> StockTransaction | None:
         raise NotImplementedError(
-            "Strict Ledger: Нельзя изменять. Делайте компенсирующую проводку (Reversal)."
+            "Strict Ledger: Нельзя изменять. Делайте компенсирующую проводку."
         )
 
     async def archive(self, id: uuid.UUID) -> bool:
@@ -286,10 +277,6 @@ class StockTransactionRepository(BaseRepository[StockTransaction]):
     async def get_balances_for_products(
         self, inventory_id: uuid.UUID, product_ids: list[uuid.UUID]
     ) -> dict[uuid.UUID, int]:
-        """
-        Bulk-проверка остатков.
-        Критично для UoW: проверяем наличие сразу 10 товаров перед созданием накладной одним запросом.
-        """
         if not product_ids:
             return {}
 
@@ -324,7 +311,7 @@ class StockTransactionRepository(BaseRepository[StockTransaction]):
         product_id: uuid.UUID,
         as_of_date: datetime | None = None,
     ) -> int:
-        """Сверхбыстрый остаток одного товара. Time-travel для расследований недостач."""
+        """Сверхбыстрый остаток одного товара."""
         query = select(
             func.coalesce(
                 func.sum(
@@ -359,7 +346,7 @@ class StockTransactionRepository(BaseRepository[StockTransaction]):
     async def get_all_balances(
         self, inventory_id: uuid.UUID, as_of_date: datetime | None = None
     ) -> dict[uuid.UUID, int]:
-        """Остатки ВСЕХ товаров на складе (Ревизия). Возвращает {product_id: count}."""
+        """Остатки ВСЕХ товаров на складе (Ревизия)."""
         balance_expr = func.sum(
             case(
                 (self.model.to_id == inventory_id, self.model.quantity),
@@ -391,16 +378,11 @@ class StockTransactionRepository(BaseRepository[StockTransaction]):
     async def get_client_total_debt(
         self, user_id: uuid.UUID, empty_bottle_id: uuid.UUID
     ) -> int:
-        """
-        Долг клиента по таре (по ВСЕМ его адресам, даже архивным).
-        Использование IN (subquery) спасает от дублирования строк при внутренних перемещениях.
-        """
         client_inv_ids = (
             select(Inventory.id)
             .where(
                 Inventory.user_id == user_id,
                 Inventory.type == InventoryType.CLIENT,
-                # ВАЖНО: Мы не фильтруем по is_active! Долг на закрытом адресе = всё еще долг.
             )
             .scalar_subquery()
         )

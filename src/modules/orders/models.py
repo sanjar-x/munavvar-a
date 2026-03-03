@@ -12,7 +12,7 @@ from src.modules.orders.enums import OrderStatus, PaymentMethod
 if TYPE_CHECKING:
     from src.modules.catalog.models import Product
     from src.modules.finances.models import Transaction
-    from src.modules.inventory.models import StockTransfer
+    from src.modules.inventory.models import Inventory, StockTransfer
     from src.modules.users.models import User
 
 
@@ -21,6 +21,12 @@ class Order(BaseModel):
         ForeignKey("users.id", ondelete="RESTRICT"),
         nullable=False,
         index=True,
+    )
+    client_inventory_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("inventories.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+        comment="Инвентарь (адрес) клиента",
     )
     courier_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"),
@@ -40,6 +46,9 @@ class Order(BaseModel):
         INTEGER, default=0, nullable=False, comment="Сумма всего заказа"
     )
     client: Mapped["User"] = relationship(foreign_keys=[client_id])
+    client_inventory: Mapped["Inventory"] = relationship(
+        foreign_keys=[client_inventory_id]
+    )
     courier: Mapped["User | None"] = relationship(foreign_keys=[courier_id])
     items: Mapped[list["OrderItem"]] = relationship(
         back_populates="order", cascade="all, delete-orphan"

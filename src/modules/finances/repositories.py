@@ -78,24 +78,26 @@ class AccountRepository(BaseRepository[Account]):
 
     async def get_account(
         self, account_type: AccountType, user_id: uuid.UUID
-    ) -> Account | None:
-        query = select(self.model).where(
-            self.model.type == account_type,
-            self.model.user_id == user_id,
-            self.model.is_active.is_(True),
+    ) -> Account:
+        query = (
+            select(self.model)
+            .where(
+                self.model.type == account_type,
+                self.model.user_id == user_id,
+                self.model.is_active.is_(True),
+            )
+            .with_for_update()
         )
         result = await self.session.execute(query)
-        return result.scalar_one_or_none()
+        return result.scalar_one()
 
-    async def get_client_account(self, client_id: uuid.UUID) -> Account | None:
+    async def get_client_account(self, client_id: uuid.UUID) -> Account:
         """Получает лицевой счет клиента для биллинга."""
         return await self.get_account(
             account_type=AccountType.CLIENT, user_id=client_id
         )
 
-    async def get_courier_account(
-        self, courier_id: uuid.UUID
-    ) -> Account | None:
+    async def get_courier_account(self, courier_id: uuid.UUID) -> Account:
         """Получает счет курьера (например, для учета принятых наличных)."""
         return await self.get_account(
             account_type=AccountType.COURIER, user_id=courier_id
