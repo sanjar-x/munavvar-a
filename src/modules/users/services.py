@@ -42,6 +42,7 @@ class UserService(BaseService[User, UserAdminCreate, UserUnitOfWork]):
 
             items = []
             for user in users:
+                identity = user.identities[0] if user.identities else None
                 account = user.accounts[0] if user.accounts else None
                 inventory = user.inventories[0] if user.inventories else None
 
@@ -49,6 +50,9 @@ class UserService(BaseService[User, UserAdminCreate, UserUnitOfWork]):
                     {
                         "id": user.id,
                         "username": user.username,
+                        "phone": identity.provider_identity_id
+                        if identity
+                        else None,
                         "is_active": user.is_active,
                         "account": account,
                         "inventory": inventory,

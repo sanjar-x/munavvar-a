@@ -125,6 +125,7 @@ class InventoryShort(BaseModel):
 class CourierResponse(BaseModel):
     id: uuid.UUID
     username: str
+    phone: str
     is_active: bool
     account: AccountShort | None = None
     inventory: InventoryShort | None = None

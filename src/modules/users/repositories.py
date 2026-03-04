@@ -156,12 +156,13 @@ class UserRepository(BaseRepository[User]):
         if search:
             query = query.where(self.model.username.ilike(f"%{search}%"))
 
-        # Считаем общее количество для пагинации
+        # Считаем общее количество для пагинации (до лимитов и джоинов)
         count_query = select(func.count()).select_from(query.subquery())
         total_count = await self.session.scalar(count_query) or 0
 
         # Жадная загрузка (Eager Load) связей
         query = query.options(
+            selectinload(self.model.identities),
             selectinload(self.model.accounts),
             selectinload(self.model.inventories),
         )
