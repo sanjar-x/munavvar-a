@@ -46,6 +46,35 @@ class UserService(BaseService[User, UserAdminCreate, UserUnitOfWork]):
                 provider_identity_id=identity_id,
             )
 
+    async def register_client(self, schema: UserAdminCreate) -> User:
+        """Регистрация пользователя по номеру телефона"""
+        async with self.uow:
+            # 1. Проверяем, нет ли уже такого телефона в базе
+            result = await self.uow.users.get_with_identity(
+                provider=AuthProvider.LOCAL,
+                provider_identity_id=schema.phone,
+            )
+
+            if result:
+                raise UserAlreadyExistsError(identity_id=schema.phone)
+
+            # 2. Создаем запись User
+            user_data = {"full_name": schema.full_name, "role": schema.role}
+
+            # поэтому user.id сразу доступен. Явный uow.flush() здесь не нужен.
+            user = await self.uow.users.add(user_data)
+
+            # 3. Создаем запись Identity (учетные данные)
+            identity_data = {
+                "user_id": user.id,
+                "provider": AuthProvider.LOCAL,
+                "provider_identity_id": schema.phone,
+            }
+            await self.uow.identities.add(identity_data)
+            await self.uow.commit()
+
+            return user
+
     async def register_local_user(self, schema: UserAdminCreate) -> User:
         """Регистрация пользователя по номеру телефона и паролю"""
         async with self.uow:

@@ -55,8 +55,8 @@ class UserBase(BaseModel):
 # ==========================================
 
 
-class UserCreate(UserBase):
-    password: PasswordStr
+class UserCreate(BaseModel):
+    full_name: FullNameStr | None = None
     phone: PhoneStr
 
 

@@ -22,7 +22,5 @@ async def register_user(
     user_service: Annotated[UserService, Depends(get_user_service)],
 ):
     admin_schema = UserAdminCreate(**schema.model_dump(), role=Role.CLIENT_B2C)
-
     user: User = await user_service.register_local_user(admin_schema)
-
     return user

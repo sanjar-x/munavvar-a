@@ -54,3 +54,36 @@ class AuthService:
         access_token = create_access_token(payload_data=payload_data)
 
         return TokenResponse(access_token=access_token, token_type="bearer")
+
+    async def client_login(self, phone) -> TokenResponse:
+        """Бизнес-процесс входа в систему"""
+
+        result = await self.user_service.get_user_local_identity(
+            identity_id=phone,
+        )
+
+        if not result:
+            raise UnauthorizedError(
+                message="Неверный номер телефона или пароль",
+                error_code="INVALID_CREDENTIALS",
+            )
+
+        user, identity = result
+
+        # 2. Базовые проверки целостности данных
+        if not user:
+            raise UnauthorizedError(
+                message="Неверный номер телефона",
+                error_code="INVALID_CREDENTIALS",
+            )
+
+        # 5. Подготовка Payload и генерация JWT
+        user_scopes = ROLE_SCOPES.get(user.role, [])
+        payload_data = {
+            "sub": str(user.id),
+            "scopes": user_scopes,
+        }
+
+        access_token = create_access_token(payload_data=payload_data)
+
+        return TokenResponse(access_token=access_token, token_type="bearer")
