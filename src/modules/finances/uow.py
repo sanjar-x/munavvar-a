@@ -19,7 +19,6 @@ class FinancesUnitOfWork(BaseSQLAlchemyUoW, IFinancesUnitOfWork):
         # Инициализируем сессию через родительский метод
         await super().__aenter__()
 
-        # Передаем гарантированно существующую self.session в репозитории
         self.accounts = AccountRepository(session=self.session)
         self.transactions = TransactionRepository(session=self.session)
 

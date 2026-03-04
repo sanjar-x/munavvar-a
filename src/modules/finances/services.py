@@ -6,7 +6,7 @@ from src.modules.finances.models import (
     Transaction,
     TransactionStatus,
 )
-from src.modules.finances.uow import IFinancesUnitOfWork
+from src.modules.finances.uow import FinancesUnitOfWork
 from src.modules.orders.models import Order, PaymentMethod
 from src.modules.users.exceptions import UserNotFoundError
 from src.modules.users.models import User
@@ -14,8 +14,8 @@ from src.modules.users.services import UserService
 
 
 class BillingService:
-    def __init__(self, uow: IFinancesUnitOfWork, user_service: UserService):
-        self.uow = uow
+    def __init__(self, uow: FinancesUnitOfWork, user_service: UserService):
+        self.uow: FinancesUnitOfWork = uow
         self.user_service: UserService = user_service
 
     async def get_or_add_client_account(self, client_id: uuid.UUID) -> Account:

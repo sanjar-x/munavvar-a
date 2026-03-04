@@ -50,6 +50,10 @@ class UserBase(BaseModel):
     username: FullNameStr
 
 
+class CourierBase(BaseModel):
+    username: FullNameStr
+
+
 # ==========================================
 # 3. СХЕМА СОЗДАНИЯ (Регистрация)
 # ==========================================
@@ -62,6 +66,11 @@ class UserCreate(BaseModel):
 
 # 2. Схема для администратора (Управление доступом)
 class UserAdminCreate(UserBase):
+    phone: PhoneStr
+    password: PasswordStr
+
+
+class CourierAdminCreate(CourierBase):
     phone: PhoneStr
     password: PasswordStr
 

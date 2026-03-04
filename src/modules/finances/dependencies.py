@@ -20,7 +20,7 @@ def get_finances_uow() -> IFinancesUnitOfWork:
 
 
 def get_billing_service(
-    uow: Annotated[IFinancesUnitOfWork, Depends(get_finances_uow)],
+    uow: Annotated[FinancesUnitOfWork, Depends(get_finances_uow)],
     user_service: Annotated[UserService, Depends(get_user_service)],
 ) -> BillingService:
     return BillingService(uow=uow, user_service=user_service)
