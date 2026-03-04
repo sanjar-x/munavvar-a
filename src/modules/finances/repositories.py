@@ -89,7 +89,7 @@ class AccountRepository(BaseRepository[Account]):
             .with_for_update()
         )
         result = await self.session.execute(query)
-        return result.scalar_one()
+        return result.scalar_one_or_none()
 
     async def get_client_account(self, client_id: uuid.UUID) -> Account:
         """Получает лицевой счет клиента для биллинга."""
