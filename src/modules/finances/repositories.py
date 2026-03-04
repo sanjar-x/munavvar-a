@@ -91,13 +91,15 @@ class AccountRepository(BaseRepository[Account]):
         result = await self.session.execute(query)
         return result.scalar_one_or_none()
 
-    async def get_client_account(self, client_id: uuid.UUID) -> Account:
+    async def get_client_account(self, client_id: uuid.UUID) -> Account | None:
         """Получает лицевой счет клиента для биллинга."""
         return await self.get_account(
             account_type=AccountType.CLIENT, user_id=client_id
         )
 
-    async def get_courier_account(self, courier_id: uuid.UUID) -> Account:
+    async def get_courier_account(
+        self, courier_id: uuid.UUID
+    ) -> Account | None:
         """Получает счет курьера (например, для учета принятых наличных)."""
         return await self.get_account(
             account_type=AccountType.COURIER, user_id=courier_id
