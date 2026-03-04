@@ -1,6 +1,7 @@
+from sqlalchemy.orm import selectinload
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, Sequence
 
 from src.common.repository import BaseRepository
 from src.modules.users.models import AuthProvider, Identity, Role, User
@@ -144,6 +145,34 @@ class UserRepository(BaseRepository[User]):
 
     async def get_couriers(self) -> list[User]:
         return await self._get_all_active_by_roles(Role.COURIER)
+
+    async def get_couriers_with_details(
+        self, skip: int, limit: int, search: str | None
+    ) -> tuple[int, Sequence[User]]:
+        """Загружает курьеров вместе с их счетами и инвентарями."""
+
+        query = select(self.model).where(self.model.role == Role.COURIER)
+
+        if search:
+            query = query.where(self.model.username.ilike(f"%{search}%"))
+
+        # Считаем общее количество для пагинации
+        count_query = select(func.count()).select_from(query.subquery())
+        total_count = await self.session.scalar(count_query) or 0
+
+        # Жадная загрузка (Eager Load) связей
+        query = query.options(
+            selectinload(self.model.accounts),
+            selectinload(self.model.inventories),
+        )
+        query = (
+            query.order_by(self.model.created_at.desc())
+            .offset(skip)
+            .limit(limit)
+        )
+
+        result = await self.session.scalars(query)
+        return total_count, result.all()
 
     async def get_clients(self) -> list[User]:
         return await self._get_all_active_by_roles(

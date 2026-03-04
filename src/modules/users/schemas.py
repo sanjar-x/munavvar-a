@@ -100,6 +100,32 @@ class UserResponseList(BaseModel):
     users: list[UserResponse]
 
 
+class AccountShort(BaseModel):
+    id: uuid.UUID
+    balance: int
+    name: str
+    model_config = ConfigDict(from_attributes=True)
+
+
+class InventoryShort(BaseModel):
+    id: uuid.UUID
+    name: str
+    model_config = ConfigDict(from_attributes=True)
+
+
+class CourierResponse(BaseModel):
+    id: uuid.UUID
+    username: str
+    is_active: bool
+    account: AccountShort | None = None
+    inventory: InventoryShort | None = None
+
+
+class CouriersResponse(BaseModel):
+    total_count: int
+    couriers: list[CourierResponse]
+
+
 class InventoryProduct(BaseModel):
     type: ProductType = Field(
         ..., title="Тип товара", examples=[ProductType.CONTAINER]
