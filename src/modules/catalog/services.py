@@ -89,8 +89,12 @@ class CatalogService(BaseService[Product, ProductCreate, CatalogUnitOfWork]):
                 message="Возвратная тара может быть привязана только к товарам типа WATER"
             )
 
+        if dto.type == ProductType.WATER and not dto.returnable_item_id:
+            raise InvalidReturnableItemError(
+                message="Товар типа WATER не может быть создан без привязки к возвратной таре (CONTAINER)"
+            )
+
         async with self.uow:
-            # Бизнес-правило 2: Проверяем, что привязываемая тара реально существует и это именно тара
             if dto.returnable_item_id:
                 bottle = await self._repo.get(dto.returnable_item_id)
                 if not bottle:
@@ -99,13 +103,11 @@ class CatalogService(BaseService[Product, ProductCreate, CatalogUnitOfWork]):
                         message="Указанная возвратная тара не найдена",
                     )
 
-                # Небольшая правка: в Enum у тебя CONTAINER, а в сообщении было BOTTLE
                 if bottle.type != ProductType.CONTAINER:
                     raise InvalidReturnableItemError(
                         message="В качестве возвратной тары можно указать только товар типа CONTAINER"
                     )
 
-            # Используем родительский метод _repo.add для сохранения
             data = dto.model_dump(exclude_unset=True)
             new_product = await self._repo.add(data)
             await self.uow.commit()
