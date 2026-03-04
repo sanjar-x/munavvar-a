@@ -12,10 +12,6 @@ from src.modules.users.services import UserService
 
 
 def get_finances_uow() -> IFinancesUnitOfWork:
-    """
-    Fabrika (Factory) za UoW u domenu finansija.
-    Vraća interfejs IFinancesUnitOfWork u skladu sa principom inverzije zavisnosti.
-    """
     return FinancesUnitOfWork(session_factory=async_session_maker)
 
 
