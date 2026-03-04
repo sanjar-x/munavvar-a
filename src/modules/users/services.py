@@ -44,7 +44,7 @@ class UserService(BaseService[User, UserAdminCreate, UserUnitOfWork]):
     ) -> dict[str, Any]:
         async with self.uow:
             total, items = await self._repo.get_list(skip, limit, role, search)
-            return {"total_count": total, "items": items}
+            return {"total_count": total, "users": items}
 
     async def get_user_local_identity(self, identity_id: str):
         async with self.uow:
