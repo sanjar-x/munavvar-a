@@ -47,7 +47,7 @@ PasswordStr = Annotated[
 # ==========================================
 class UserBase(BaseModel):
     role: Role
-    full_name: FullNameStr
+    username: FullNameStr
 
 
 # ==========================================
@@ -56,7 +56,7 @@ class UserBase(BaseModel):
 
 
 class UserCreate(BaseModel):
-    full_name: FullNameStr | None = None
+    username: FullNameStr | None = None
     phone: PhoneStr
 
 
@@ -70,7 +70,7 @@ class UserAdminCreate(UserBase):
 # 4. СХЕМА ОБНОВЛЕНИЯ (PATCH запрос)
 # ==========================================
 class UserProfileUpdate(BaseModel):
-    full_name: FullNameStr | None = None
+    username: FullNameStr | None = None
 
 
 # 2. Схема для администратора (Управление доступом)
@@ -123,7 +123,7 @@ class InventoryProduct(BaseModel):
 class UsersDashboard(BaseModel):
     id: uuid.UUID
     role: Role
-    full_name: FullNameStr
+    username: FullNameStr
     phone: PhoneStr
     model_config = ConfigDict(from_attributes=True)
     inventory: list[InventoryProduct]

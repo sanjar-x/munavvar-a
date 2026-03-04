@@ -6,11 +6,11 @@ from src.modules.orders.repositories import (
 )
 
 
-class OrderUnitOfWork(BaseSQLAlchemyUoW):
+class BaseOrderUnitOfWork(BaseSQLAlchemyUoW):
     orders: OrderRepository
     order_items: OrderItemRepository
 
-    async def __aenter__(self) -> "OrderUnitOfWork":
+    async def __aenter__(self) -> "BaseOrderUnitOfWork":
         await super().__aenter__()
 
         self.orders = OrderRepository(session=self.session)

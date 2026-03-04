@@ -6,26 +6,28 @@ from fastapi import Depends
 from src.infrastructure.database.session import async_session_maker
 from src.modules.catalog.dependencies import get_catalog_service
 from src.modules.catalog.services import CatalogService
-from src.modules.orders.services import OrderService
-from src.modules.orders.uow import OrderUnitOfWork
+from src.modules.orders.services import BaseOrderService
+from src.modules.orders.uow import BaseOrderUnitOfWork
 
 
-def get_order_uow() -> OrderUnitOfWork:
+def get_base_order_uow() -> BaseOrderUnitOfWork:
     """
     Фабрика UoW для домена заказов.
     Просто возвращает неинициализированный объект.
     Сессия БД будет открыта внутри сервиса через `async with self.uow`.
     """
-    return OrderUnitOfWork(session_factory=async_session_maker)
+    return BaseOrderUnitOfWork(session_factory=async_session_maker)
 
 
-def get_order_service(
-    uow: Annotated[OrderUnitOfWork, Depends(dependency=get_order_uow)],
+def get_base_order_service(
+    uow: Annotated[
+        BaseOrderUnitOfWork, Depends(dependency=get_base_order_uow)
+    ],
     catalog_service: Annotated[CatalogService, Depends(get_catalog_service)],
-) -> OrderService:
+) -> BaseOrderService:
     """
     Провайдер сервиса заказов.
     Готов к внедрению в роутеры слоя API (например, в backoffice/orders.py).
     """
 
-    return OrderService(uow=uow, catalog_service=catalog_service)
+    return BaseOrderService(uow=uow, catalog_service=catalog_service)

@@ -1,8 +1,8 @@
-# src/application/delivery/service.py
+# src/application/order/service.py
 import uuid
 from collections import defaultdict
 
-from src.application.delivery.uow import IDeliveryUnitOfWork
+from src.application.order.uow import IOrderUnitOfWork
 from src.core.exceptions import ConflictError
 from src.modules.catalog.enums import ProductType
 from src.modules.finances.models import TransactionStatus
@@ -10,10 +10,10 @@ from src.modules.inventory.enums import TransferStatus, TransferType
 from src.modules.orders.enums import OrderStatus, PaymentMethod
 
 
-class DeliveryService:
+class OrderService:
     """Оркестратор для кросс-доменных операций по доставке."""
 
-    def __init__(self, uow: IDeliveryUnitOfWork):
+    def __init__(self, uow: IOrderUnitOfWork):
         self.uow = uow
 
     async def delivery(

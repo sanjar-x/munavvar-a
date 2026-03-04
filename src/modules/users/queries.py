@@ -25,8 +25,8 @@ class UsersDashboardQuery:
     ) -> UsersDashboardResponse:
         # ЗАПРОС 1: Пагинация
         users_stmt = select(
-            User.id, User.full_name, User.role
-        )  # full_name уже тут
+            User.id, User.username, User.role
+        )  # username уже тут
         users_stmt = users_stmt.where(
             User.role.in_([Role.CLIENT_B2B, Role.CLIENT_B2C])
         )
@@ -62,7 +62,7 @@ class UsersDashboardQuery:
 
         stmt = select(
             users_page.c.id,
-            users_page.c.full_name,
+            users_page.c.username,
             users_page.c.role,
             phone_subq.label("phone"),
             func.coalesce(balance_subq, 0).label("balance"),
@@ -136,7 +136,7 @@ class UsersDashboardQuery:
         final_users = [
             UsersDashboard(
                 id=u["id"],
-                full_name=u["full_name"],  # ДОБАВЛЕНО: Имя
+                username=u["username"],  # ДОБАВЛЕНО: Имя
                 phone=u["phone"] or "Нет телефона",
                 role=u["role"],
                 balance=u["balance"],
@@ -153,7 +153,7 @@ class UsersDashboardQuery:
         self, skip: int = 0, limit: int = 50
     ) -> UsersDashboardResponse:
         # ЗАПРОС 1: Пагинация курьеров
-        users_stmt = select(User.id, User.full_name, User.role).where(
+        users_stmt = select(User.id, User.username, User.role).where(
             User.role == Role.COURIER
         )
         count_stmt = select(func.count()).select_from(users_stmt.subquery())
@@ -188,7 +188,7 @@ class UsersDashboardQuery:
 
         stmt = select(
             users_page.c.id,
-            users_page.c.full_name,
+            users_page.c.username,
             users_page.c.role,
             phone_subq.label("phone"),
             func.coalesce(balance_subq, 0).label("balance"),
@@ -287,7 +287,7 @@ class UsersDashboardQuery:
         final_users = [
             UsersDashboard(
                 id=u["id"],
-                full_name=u["full_name"],  # ДОБАВЛЕНО: Имя
+                username=u["username"],  # ДОБАВЛЕНО: Имя
                 phone=u["phone"] or "Нет телефона",
                 role=u["role"],
                 balance=u["balance"],

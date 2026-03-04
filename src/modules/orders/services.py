@@ -5,7 +5,7 @@ from datetime import datetime
 
 from src.common.service import BaseService
 from src.modules.catalog.services import CatalogService
-from src.modules.orders.enums import OrderStatus
+from src.modules.orders.enums import OrderStatus, PaymentMethod
 from src.modules.orders.exceptions import (
     CourierAssignmentError,
     EmptyCartError,
@@ -16,11 +16,13 @@ from src.modules.orders.exceptions import (
 from src.modules.orders.models import Order
 from src.modules.orders.repositories import OrderRepository
 from src.modules.orders.schemas import OrderCreate
-from src.modules.orders.uow import OrderUnitOfWork
+from src.modules.orders.uow import BaseOrderUnitOfWork
 
 
-class OrderService(BaseService[Order, OrderCreate, OrderUnitOfWork]):
-    def __init__(self, uow: OrderUnitOfWork, catalog_service: CatalogService):
+class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
+    def __init__(
+        self, uow: BaseOrderUnitOfWork, catalog_service: CatalogService
+    ):
         super().__init__(uow=uow)
         self.catalog_service = catalog_service
 
@@ -292,23 +294,30 @@ class OrderService(BaseService[Order, OrderCreate, OrderUnitOfWork]):
     async def search_orders(
         self,
         skip: int = 0,
-        limit: int = 50,
+        limit: int = 100,
         statuses: list[OrderStatus] | None = None,
+        payment_methods: list[PaymentMethod] | None = None,
         courier_id: uuid.UUID | None = None,
         client_id: uuid.UUID | None = None,
+        client_inventory_id: uuid.UUID | None = None,
         date_from: datetime | None = None,
         date_to: datetime | None = None,
+        min_amount: int | None = None,
+        max_amount: int | None = None,
     ) -> list[Order]:
-        """Универсальный поиск заказов для Администратора/CRM."""
         async with self.uow:
             return list(
                 await self.uow.orders.search_orders(
                     skip=skip,
                     limit=limit,
                     statuses=statuses,
+                    payment_methods=payment_methods,
                     courier_id=courier_id,
                     client_id=client_id,
+                    client_inventory_id=client_inventory_id,
                     date_from=date_from,
                     date_to=date_to,
+                    min_amount=min_amount,
+                    max_amount=max_amount,
                 )
             )

@@ -1,4 +1,4 @@
-# src/use_cases/delivery/uow.py
+# src\application\order\uow.py
 from src.common.uow import IUnitOfWork
 from src.infrastructure.database.uow import BaseSQLAlchemyUoW
 from src.modules.finances.repositories import (
@@ -18,7 +18,7 @@ from src.modules.users.repositories import (
 )
 
 
-class IDeliveryUnitOfWork(IUnitOfWork):
+class IOrderUnitOfWork(IUnitOfWork):
     """Интерфейс для композитного UoW доставки."""
 
     users: UserRepository
@@ -30,10 +30,10 @@ class IDeliveryUnitOfWork(IUnitOfWork):
     finances: FinanceTransactionRepository
 
 
-class DeliveryUnitOfWork(BaseSQLAlchemyUoW, IDeliveryUnitOfWork):
+class OrderUnitOfWork(BaseSQLAlchemyUoW, IOrderUnitOfWork):
     """Реализация UoW, объединяющая 3 домена в одну транзакцию."""
 
-    async def __aenter__(self) -> "DeliveryUnitOfWork":
+    async def __aenter__(self) -> "OrderUnitOfWork":
         await super().__aenter__()
         self.users = UserRepository(session=self.session)
         self.orders = OrderRepository(session=self.session)

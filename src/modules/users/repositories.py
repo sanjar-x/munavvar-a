@@ -83,7 +83,7 @@ class UserRepository(BaseRepository[User]):
         if search:
             # Поиск по ФИО без учета регистра (ILIKE)
             statement = statement.where(
-                self.model.full_name.ilike(f"%{search}%")
+                self.model.username.ilike(f"%{search}%")
             )
 
         count_statement = select(func.count()).select_from(

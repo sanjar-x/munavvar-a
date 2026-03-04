@@ -54,7 +54,7 @@ async def create_product(
     catalog_service: Annotated[CatalogService, Depends(get_catalog_service)],
 ):
     """Добавление новой позиции (Вода, Тара, Оборудование)."""
-    return await catalog_service.add(schema)
+    return await catalog_service.add_product(schema)
 
 
 @catalog_router.patch(

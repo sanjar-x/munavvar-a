@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 
 from src.common.repository import BaseRepository
-from src.modules.orders.enums import OrderStatus
+from src.modules.orders.enums import OrderStatus, PaymentMethod
 from src.modules.orders.models import Order, OrderItem
 
 
@@ -126,24 +126,48 @@ class OrderRepository(BaseRepository[Order]):
         skip: int = 0,
         limit: int = 50,
         statuses: list[OrderStatus] | None = None,
+        payment_methods: list[PaymentMethod] | None = None,
         courier_id: uuid.UUID | None = None,
         client_id: uuid.UUID | None = None,
+        client_inventory_id: uuid.UUID | None = None,
         date_from: datetime | None = None,
         date_to: datetime | None = None,
+        min_amount: int | None = None,
+        max_amount: int | None = None,
     ) -> Sequence[Order]:
+        """
+        Универсальный поиск заказов по всем доступным атрибутам модели.
+        """
         query = select(self.model)
 
         if statuses:
             query = query.where(self.model.status.in_(statuses))
+        if payment_methods:
+            query = query.where(self.model.payment_method.in_(payment_methods))
+
+        # Точные совпадения по ID
         if courier_id:
             query = query.where(self.model.courier_id == courier_id)
         if client_id:
             query = query.where(self.model.client_id == client_id)
+        if client_inventory_id:
+            query = query.where(
+                self.model.client_inventory_id == client_inventory_id
+            )
+
+        # Диапазоны дат (предполагается, что created_at есть в BaseModel)
         if date_from:
             query = query.where(self.model.created_at >= date_from)
         if date_to:
             query = query.where(self.model.created_at <= date_to)
 
+        # Диапазоны сумм
+        if min_amount is not None:
+            query = query.where(self.model.total_amount >= min_amount)
+        if max_amount is not None:
+            query = query.where(self.model.total_amount <= max_amount)
+
+        # Жадная загрузка связей и пагинация
         query = (
             query.options(
                 joinedload(self.model.client),

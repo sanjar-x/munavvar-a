@@ -57,7 +57,7 @@ class Identity(BaseModel):
 
 
 class User(BaseModel):
-    full_name: Mapped[str] = mapped_column(
+    username: Mapped[str] = mapped_column(
         String(length=255),
         nullable=False,
         comment="ФИО или Название компании",

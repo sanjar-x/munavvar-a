@@ -59,7 +59,7 @@ class UserService(BaseService[User, UserAdminCreate, UserUnitOfWork]):
                 raise UserAlreadyExistsError(identity_id=schema.phone)
 
             # 2. Создаем запись User
-            user_data = {"full_name": schema.full_name, "role": schema.role}
+            user_data = {"username": schema.username, "role": schema.role}
 
             # поэтому user.id сразу доступен. Явный uow.flush() здесь не нужен.
             user = await self.uow.users.add(user_data)
@@ -88,7 +88,7 @@ class UserService(BaseService[User, UserAdminCreate, UserUnitOfWork]):
                 raise UserAlreadyExistsError(identity_id=schema.phone)
 
             # 2. Создаем запись User
-            user_data = {"full_name": schema.full_name, "role": schema.role}
+            user_data = {"username": schema.username, "role": schema.role}
 
             # поэтому user.id сразу доступен. Явный uow.flush() здесь не нужен.
             user = await self.uow.users.add(user_data)

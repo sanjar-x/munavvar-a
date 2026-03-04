@@ -2,13 +2,13 @@
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Body, Depends, Query, Security
+from fastapi import APIRouter, Body, Depends, Security
 
 from src.core.security.permissions import Scope
 from src.modules.auth.dependencies import get_current_user
-from src.modules.orders.dependencies import get_order_service
+from src.modules.orders.dependencies import get_base_order_service
 from src.modules.orders.schemas import OrderCreate, OrderResponse
-from src.modules.orders.services import OrderService
+from src.modules.orders.services import BaseOrderService
 from src.modules.users.models import User
 
 orders_router = APIRouter()
@@ -16,27 +16,30 @@ orders_router = APIRouter()
 
 @orders_router.post("/", response_model=OrderResponse)
 async def create_order(
-    client_id: Annotated[uuid.UUID, Query(description="ID клиента")],
     dto: OrderCreate,
-    admin: Annotated[
+    client: Annotated[
         User, Security(get_current_user, scopes=[Scope.ORDERS_EDIT])
     ],
-    order_service: Annotated[OrderService, Depends(get_order_service)],
+    base_order_service: Annotated[
+        BaseOrderService, Depends(get_base_order_service)
+    ],
 ):
-    """Создание заказа администратором от лица клиента."""
-    return await order_service.create_order(client_id=client_id, dto=dto)
+    """Создание"""
+    return await base_order_service.create_order(client_id=client.id, dto=dto)
 
 
 @orders_router.get("/{order_id}", response_model=OrderResponse)
 async def get_order_details(
     order_id: uuid.UUID,
-    admin: Annotated[
+    client: Annotated[
         User, Security(get_current_user, scopes=[Scope.ORDERS_READ])
     ],
-    order_service: Annotated[OrderService, Depends(get_order_service)],
+    base_order_service: Annotated[
+        BaseOrderService, Depends(get_base_order_service)
+    ],
 ):
     """Детальная информация по конкретному заказу."""
-    return await order_service.get_order_with_details(order_id=order_id)
+    return await base_order_service.get_order_with_details(order_id=order_id)
 
 
 @orders_router.post("/{order_id}/items", response_model=OrderResponse)
@@ -47,9 +50,11 @@ async def add_product_to_order(
     admin: Annotated[
         User, Security(get_current_user, scopes=[Scope.ORDERS_EDIT])
     ],
-    order_service: Annotated[OrderService, Depends(get_order_service)],
+    base_order_service: Annotated[
+        BaseOrderService, Depends(get_base_order_service)
+    ],
 ):
-    return await order_service.add_product_to_order(
+    return await base_order_service.add_product_to_order(
         order_id=order_id, product_id=product_id, quantity=quantity
     )
 
@@ -60,13 +65,15 @@ async def add_product_to_order(
 async def remove_product_from_order(
     order_id: uuid.UUID,
     product_id: uuid.UUID,
-    admin: Annotated[
+    client: Annotated[
         User, Security(get_current_user, scopes=[Scope.ORDERS_EDIT])
     ],
-    order_service: Annotated[OrderService, Depends(get_order_service)],
+    base_order_service: Annotated[
+        BaseOrderService, Depends(get_base_order_service)
+    ],
 ):
     """Полностью удалить позицию товара из заказа."""
-    return await order_service.remove_product_from_order(
+    return await base_order_service.remove_product_from_order(
         order_id=order_id, product_id=product_id
     )
 
@@ -76,6 +83,8 @@ async def get_tasks(
     client: Annotated[
         User, Security(get_current_user, scopes=[Scope.ORDERS_READ])
     ],
-    order_service: Annotated[OrderService, Depends(get_order_service)],
+    base_order_service: Annotated[
+        BaseOrderService, Depends(get_base_order_service)
+    ],
 ):
-    return await order_service.get_client_history(client_id=client.id)
+    return await base_order_service.get_client_history(client_id=client.id)

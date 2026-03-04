@@ -32,7 +32,7 @@ class OrderCreate(BaseModel):
         ...,
         title="Способ оплаты",
         description="Намерение клиента по оплате: Наличные, Карта ",
-        examples=[PaymentMethod.CARD],
+        examples=[PaymentMethod.CASH],
     )
 
 

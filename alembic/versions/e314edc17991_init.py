@@ -75,7 +75,7 @@ def upgrade() -> None:
     op.create_table(
         "users",
         sa.Column(
-            "full_name",
+            "username",
             sa.String(length=255),
             nullable=False,
             comment="ФИО или Название компании",

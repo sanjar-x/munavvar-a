@@ -7,10 +7,10 @@ from fastapi import APIRouter, Body, Depends, Query, Security
 
 from src.core.security.permissions import Scope
 from src.modules.auth.dependencies import get_current_user
-from src.modules.orders.dependencies import get_order_service
-from src.modules.orders.enums import OrderStatus
+from src.modules.orders.dependencies import get_base_order_service
+from src.modules.orders.enums import OrderStatus, PaymentMethod
 from src.modules.orders.schemas import OrderCreate, OrderResponse
-from src.modules.orders.services import OrderService
+from src.modules.orders.services import BaseOrderService
 from src.modules.users.models import User
 
 orders_router = APIRouter()
@@ -21,24 +21,43 @@ async def search_orders(
     admin: Annotated[
         User, Security(get_current_user, scopes=[Scope.ORDERS_READ])
     ],
-    order_service: Annotated[OrderService, Depends(get_order_service)],
+    base_order_service: Annotated[
+        BaseOrderService, Depends(get_base_order_service)
+    ],
     skip: Annotated[int, Query(ge=0)] = 0,
-    limit: Annotated[int, Query(ge=1, le=100)] = 50,
-    statuses: Annotated[list[OrderStatus] | None, Query()] = None,
+    limit: Annotated[int, Query(ge=1, le=500)] = 50,
+    statuses: Annotated[
+        list[OrderStatus] | None, Query(description="Фильтр по статусам")
+    ] = None,
+    payment_methods: Annotated[
+        list[PaymentMethod] | None,
+        Query(description="Фильтр по способам оплаты"),
+    ] = None,
     courier_id: uuid.UUID | None = None,
     client_id: uuid.UUID | None = None,
+    client_inventory_id: uuid.UUID | None = None,
     date_from: datetime | None = None,
     date_to: datetime | None = None,
+    min_amount: Annotated[
+        int | None, Query(ge=0, description="Минимальная сумма заказа")
+    ] = None,
+    max_amount: Annotated[
+        int | None, Query(ge=0, description="Максимальная сумма заказа")
+    ] = None,
 ):
     """Глобальный поиск заказов по фильтрам."""
-    return await order_service.search_orders(
+    return await base_order_service.search_orders(
         skip=skip,
         limit=limit,
         statuses=statuses,
+        payment_methods=payment_methods,
         courier_id=courier_id,
         client_id=client_id,
+        client_inventory_id=client_inventory_id,
         date_from=date_from,
         date_to=date_to,
+        min_amount=min_amount,
+        max_amount=max_amount,
     )
 
 
@@ -49,10 +68,12 @@ async def create_order(
     admin: Annotated[
         User, Security(get_current_user, scopes=[Scope.ORDERS_EDIT])
     ],
-    order_service: Annotated[OrderService, Depends(get_order_service)],
+    base_order_service: Annotated[
+        BaseOrderService, Depends(get_base_order_service)
+    ],
 ):
     """Создание заказа администратором от лица клиента."""
-    return await order_service.create_order(client_id=client_id, dto=dto)
+    return await base_order_service.create_order(client_id=client_id, dto=dto)
 
 
 @orders_router.get("/{order_id}", response_model=OrderResponse)
@@ -61,10 +82,12 @@ async def get_order_details(
     admin: Annotated[
         User, Security(get_current_user, scopes=[Scope.ORDERS_READ])
     ],
-    order_service: Annotated[OrderService, Depends(get_order_service)],
+    base_order_service: Annotated[
+        BaseOrderService, Depends(get_base_order_service)
+    ],
 ):
     """Детальная информация по конкретному заказу."""
-    return await order_service.get_order_with_details(order_id=order_id)
+    return await base_order_service.get_order_with_details(order_id=order_id)
 
 
 @orders_router.post("/{order_id}/items", response_model=OrderResponse)
@@ -75,10 +98,12 @@ async def add_product_to_order(
     admin: Annotated[
         User, Security(get_current_user, scopes=[Scope.ORDERS_EDIT])
     ],
-    order_service: Annotated[OrderService, Depends(get_order_service)],
+    base_order_service: Annotated[
+        BaseOrderService, Depends(get_base_order_service)
+    ],
 ):
     """Добавить товар в заказ (или увеличить количество)."""
-    return await order_service.add_product_to_order(
+    return await base_order_service.add_product_to_order(
         order_id=order_id, product_id=product_id, quantity=quantity
     )
 
@@ -92,10 +117,12 @@ async def remove_product_from_order(
     admin: Annotated[
         User, Security(get_current_user, scopes=[Scope.ORDERS_EDIT])
     ],
-    order_service: Annotated[OrderService, Depends(get_order_service)],
+    base_order_service: Annotated[
+        BaseOrderService, Depends(get_base_order_service)
+    ],
 ):
     """Полностью удалить позицию товара из заказа."""
-    return await order_service.remove_product_from_order(
+    return await base_order_service.remove_product_from_order(
         order_id=order_id, product_id=product_id
     )
 
@@ -107,10 +134,12 @@ async def assign_courier(
     admin: Annotated[
         User, Security(get_current_user, scopes=[Scope.ORDERS_EDIT])
     ],
-    order_service: Annotated[OrderService, Depends(get_order_service)],
+    base_order_service: Annotated[
+        BaseOrderService, Depends(get_base_order_service)
+    ],
 ):
     """Назначить или сменить курьера на заказе."""
-    return await order_service.assign_courier(
+    return await base_order_service.assign_courier(
         order_id=order_id, courier_id=courier_id
     )
 
@@ -122,10 +151,12 @@ async def update_order_status(
     admin: Annotated[
         User, Security(get_current_user, scopes=[Scope.ORDERS_EDIT])
     ],
-    order_service: Annotated[OrderService, Depends(get_order_service)],
+    base_order_service: Annotated[
+        BaseOrderService, Depends(get_base_order_service)
+    ],
 ):
     """Принудительно изменить статус заказа (ручная корректировка)."""
-    return await order_service.update_status(
+    return await base_order_service.update_status(
         order_id=order_id, new_status=new_status
     )
 
@@ -138,12 +169,14 @@ async def get_client_history(
     admin: Annotated[
         User, Security(get_current_user, scopes=[Scope.ORDERS_READ])
     ],
-    order_service: Annotated[OrderService, Depends(get_order_service)],
+    base_order_service: Annotated[
+        BaseOrderService, Depends(get_base_order_service)
+    ],
     skip: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),
 ):
     """Просмотр истории заказов конкретного клиента."""
-    return await order_service.get_client_history(
+    return await base_order_service.get_client_history(
         client_id=client_id, skip=skip, limit=limit
     )
 
@@ -156,7 +189,9 @@ async def get_courier_tasks(
     admin: Annotated[
         User, Security(get_current_user, scopes=[Scope.ORDERS_READ])
     ],
-    order_service: Annotated[OrderService, Depends(get_order_service)],
+    base_order_service: Annotated[
+        BaseOrderService, Depends(get_base_order_service)
+    ],
 ):
     """Просмотр активных задач (заказов) конкретного курьера."""
-    return await order_service.get_courier_tasks(courier_id=courier_id)
+    return await base_order_service.get_courier_tasks(courier_id=courier_id)

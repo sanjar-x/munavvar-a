@@ -31,7 +31,7 @@ class BillingService:
             client_account_data = {
                 "type": AccountType.CLIENT,
                 "user_id": client.id,
-                "name": f"Счет клиента: {client.full_name}",
+                "name": f"Счет клиента: {client.username}",
             }
             client_account = await self.uow.accounts.add(client_account_data)
 
@@ -54,7 +54,7 @@ class BillingService:
             courier_account_data = {
                 "type": AccountType.COURIER,
                 "user_id": courier.id,
-                "name": f"Счет курьера: {courier.full_name}",
+                "name": f"Счет курьера: {courier.username}",
             }
             courier_account = await self.uow.accounts.add(courier_account_data)
 

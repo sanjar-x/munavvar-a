@@ -27,7 +27,7 @@
 #             if not existing_system:
 #                 system_user = {
 #                     "id": settings.SYSTEM_USER_ID,
-#                     "full_name": "SYSTEM USER",
+#                     "username": "SYSTEM USER",
 #                     "role": Role.SYSTEM,
 #                 }
 #                 await uow.users.add(system_user)
@@ -41,7 +41,7 @@
 
 #         if admin_phone and admin_password:
 #             super_user = UserAdminCreate(
-#                 full_name="Super Admin",
+#                 username="Super Admin",
 #                 phone=admin_phone,
 #                 password=admin_password,
 #                 role=Role.ADMIN,
