@@ -79,40 +79,38 @@ class CatalogService(BaseService[Product, ProductCreate, CatalogUnitOfWork]):
     # COMMANDS (МУТАЦИИ ДЛЯ АДМИНКИ)
     # ==========================================
 
+    async def add_product(self, dto: ProductCreate) -> Product:
+        """
+        Создание нового товара с жесткой бизнес-валидацией.
+        """
+        # Бизнес-правило 1: Только у воды (WATER) может быть привязана возвратная тара
+        if dto.returnable_item_id and dto.type != ProductType.WATER:
+            raise InvalidReturnableItemError(
+                message="Возвратная тара может быть привязана только к товарам типа WATER"
+            )
 
-async def add_product(self, dto: ProductCreate) -> Product:
-    """
-    Создание нового товара с жесткой бизнес-валидацией.
-    """
-    # Бизнес-правило 1: Только у воды (WATER) может быть привязана возвратная тара
-    if dto.returnable_item_id and dto.type != ProductType.WATER:
-        raise InvalidReturnableItemError(
-            message="Возвратная тара может быть привязана только к товарам типа WATER"
-        )
+        async with self.uow:
+            # Бизнес-правило 2: Проверяем, что привязываемая тара реально существует и это именно тара
+            if dto.returnable_item_id:
+                bottle = await self._repo.get(dto.returnable_item_id)
+                if not bottle:
+                    raise ProductNotFoundError(
+                        product_id=dto.returnable_item_id,
+                        message="Указанная возвратная тара не найдена",
+                    )
 
-    async with self.uow:
-        # Бизнес-правило 2: Проверяем, что привязываемая тара реально существует и это именно тара
-        if dto.returnable_item_id:
-            bottle = await self._repo.get(dto.returnable_item_id)
-            if not bottle:
-                raise ProductNotFoundError(
-                    product_id=dto.returnable_item_id,
-                    message="Указанная возвратная тара не найдена",
-                )
+                # Небольшая правка: в Enum у тебя CONTAINER, а в сообщении было BOTTLE
+                if bottle.type != ProductType.CONTAINER:
+                    raise InvalidReturnableItemError(
+                        message="В качестве возвратной тары можно указать только товар типа CONTAINER"
+                    )
 
-            # Небольшая правка: в Enum у тебя CONTAINER, а в сообщении было BOTTLE
-            if bottle.type != ProductType.CONTAINER:
-                raise InvalidReturnableItemError(
-                    message="В качестве возвратной тары можно указать только товар типа CONTAINER"
-                )
+            # Используем родительский метод _repo.add для сохранения
+            data = dto.model_dump(exclude_unset=True)
+            new_product = await self._repo.add(data)
+            await self.uow.commit()
+            return new_product
 
-        # Используем родительский метод _repo.add для сохранения
-        data = dto.model_dump(exclude_unset=True)
-        new_product = await self._repo.add(data)
-        await self.uow.commit()
-        return new_product
-
-
-# Примечание: методы get(), get_multi(), update(), archive() и delete()
-# уже доступны благодаря наследованию от BaseService.
-# Если для update() потребуется особая валидация тары, мы переопределим его (override).
+    # Примечание: методы get(), get_multi(), update(), archive() и delete()
+    # уже доступны благодаря наследованию от BaseService.
+    # Если для update() потребуется особая валидация тары, мы переопределим его (override).
