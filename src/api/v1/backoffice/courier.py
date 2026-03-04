@@ -5,6 +5,8 @@ from fastapi import APIRouter, Depends, Query, Security, status
 
 from src.core.security.permissions import Scope
 from src.modules.auth.dependencies import get_current_user
+from src.modules.finances.dependencies import get_billing_service
+from src.modules.finances.services import BillingService
 from src.modules.users.dependencies import get_user_service
 from src.modules.users.models import Role, User
 from src.modules.users.schemas import (
@@ -31,15 +33,18 @@ async def create_courier(
         User, Security(get_current_user, scopes=[Scope.USERS_WRITE])
     ],
     user_service: Annotated[UserService, Depends(get_user_service)],
+    billing_service: Annotated[
+        BillingService, Depends(get_billing_service)
+    ],  # <-- ИНЪЕКЦИЯ
 ):
     """
     Создание курьера. Роль принудительно устанавливается в COURIER,
     чтобы избежать случайного создания других типов пользователей.
     """
-    # Жестко форсируем роль
     schema.role = Role.COURIER
-    user = await user_service.register_local_user(schema)
-    return user
+    courier = await user_service.register_local_user(schema)
+    await billing_service.get_or_add_courier_account(courier_id=courier.id)
+    return courier
 
 
 # src/api/v1/backoffice/couriers.py
