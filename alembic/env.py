@@ -9,23 +9,24 @@ from sqlalchemy.sql.schema import MetaData
 
 from alembic import context
 
-# =============================================================================
-# 1. ИМПОРТЫ НАШЕГО ПРИЛОЖЕНИЯ
-# =============================================================================
+# # =============================================================================
+# # 1. ИМПОРТЫ НАШЕГО ПРИЛОЖЕНИЯ
+# # =============================================================================
 from src.core.config import settings
-from src.infrastructure.database.base import BaseModel
-from src.modules.catalog.models import Product  # noqa: F401
-from src.modules.finances.models import Account, Transaction  # noqa: F401
-from src.modules.inventory.models import (
-    Inventory,  # noqa: F401
-    StockTransaction,  # noqa: F401
-    StockTransfer,  # noqa: F401
-    StockTransferItem,  # noqa: F401
-)
-from src.modules.orders.models import Order, OrderItem  # noqa: F401
-from src.modules.users.models import Identity, User  # noqa: F401
+from src.infrastructure.database.models import BaseModel
 
-# =============================================================================
+# from src.modules.catalog.models import Product  # noqa: F401
+# from src.modules.finances.models import Account, Transaction  # noqa: F401
+# from src.modules.inventory.models import (
+#     Inventory,  # noqa: F401
+#     StockTransaction,  # noqa: F401
+#     StockTransfer,  # noqa: F401
+#     StockTransferItem,  # noqa: F401
+# )
+# from src.modules.orders.models import Order, OrderItem  # noqa: F401
+# from src.modules.users.models import Identity, User  # noqa: F401
+
+# # =============================================================================
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
