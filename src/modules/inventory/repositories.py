@@ -303,10 +303,10 @@ class StockTransactionRepository(BaseRepository[StockTransaction]):
                 (self.model.from_id == inventory_id, -self.model.quantity),
                 else_=0,
             )
-        )
+        ).label("balance")
 
         query = (
-            select(self.model.product_id, balance_expr.label("balance"))
+            select(self.model.product_id, balance_expr)
             .where(
                 self.model.product_id.in_(product_ids),
                 or_(
@@ -318,9 +318,14 @@ class StockTransactionRepository(BaseRepository[StockTransaction]):
         )
 
         result = await self.session.execute(query)
-        # Если товара вообще не было в транзакциях, его не будет в ответе.
-        # Слой сервиса должен воспринимать отсутствие ключа как остаток = 0.
-        return {row.product_id: row.balance for row in result.all()}
+
+        balances = dict.fromkeys(product_ids, 0)
+
+        # 3. Обновляем нули реальными данными из БД
+        for row in result.all():
+            balances[row.product_id] = row.balance
+
+        return balances
 
     async def get_balance(
         self,

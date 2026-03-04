@@ -76,7 +76,6 @@ class UserRepository(BaseRepository[User]):
         # 1. Базовый запрос
         statement = select(self.model)
 
-        # 2. Динамическая фильтрация
         if role:
             statement = statement.where(self.model.role == role)
 

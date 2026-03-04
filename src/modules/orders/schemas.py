@@ -8,8 +8,6 @@ from src.modules.orders.models import OrderStatus, PaymentMethod
 
 
 class Item(BaseModel):
-    """Элемент корзины, который присылает клиент."""
-
     product_id: uuid.UUID = Field(
         ...,
         description="ID воды, тары или оборудования из каталога",
@@ -33,6 +31,11 @@ class OrderCreate(BaseModel):
         title="Способ оплаты",
         description="Намерение клиента по оплате: Наличные, Карта ",
         examples=[PaymentMethod.CASH],
+    )
+    inventory_id: uuid.UUID = Field(
+        ...,
+        min_length=1,
+        title="ID адресса клиента",
     )
 
 

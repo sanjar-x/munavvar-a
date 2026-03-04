@@ -38,13 +38,11 @@ async def create_user(
     return user
 
 
-users_router.get(
+@users_router.get(
     "/",
     response_model=UserResponseList,
     summary="Список пользователей (Сотрудники, Клиенты)",
 )
-
-
 async def get_users(
     current_admin: Annotated[
         User, Security(get_current_user, scopes=[Scope.USERS_READ])

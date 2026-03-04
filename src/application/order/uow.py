@@ -1,47 +1,50 @@
 # src\application\order\uow.py
 from src.common.uow import IUnitOfWork
 from src.infrastructure.database.uow import BaseSQLAlchemyUoW
+from src.modules.catalog.repositories import ProductRepository
 from src.modules.finances.repositories import (
     AccountRepository,
-)
-from src.modules.finances.repositories import (
-    TransactionRepository as FinanceTransactionRepository,
+    TransactionRepository,
 )
 from src.modules.inventory.repositories import (
     InventoryRepository,
     StockTransactionRepository,
     StockTransferRepository,
 )
-from src.modules.orders.repositories import OrderRepository
+from src.modules.orders.repositories import (
+    OrderItemRepository,
+    OrderRepository,
+)
 from src.modules.users.repositories import (
     UserRepository,
 )
 
 
 class IOrderUnitOfWork(IUnitOfWork):
-    """Интерфейс для композитного UoW доставки."""
-
-    users: UserRepository
-    orders: OrderRepository
-    inventories: InventoryRepository
-    stock_transfers: StockTransferRepository
-    stock_transactions: StockTransactionRepository
+    products: ProductRepository
     accounts: AccountRepository
-    finances: FinanceTransactionRepository
+    transactions: TransactionRepository
+    inventories: InventoryRepository
+    stock_transactions: StockTransactionRepository
+    stock_transfers: StockTransferRepository
+    order_items: OrderItemRepository
+    orders: OrderRepository
+    users: UserRepository
 
 
 class OrderUnitOfWork(BaseSQLAlchemyUoW, IOrderUnitOfWork):
-    """Реализация UoW, объединяющая 3 домена в одну транзакцию."""
-
     async def __aenter__(self) -> "OrderUnitOfWork":
         await super().__aenter__()
-        self.users = UserRepository(session=self.session)
-        self.orders = OrderRepository(session=self.session)
+        self.products = ProductRepository(session=self.session)
+        self.accounts = AccountRepository(session=self.session)
+        self.transactions = TransactionRepository(session=self.session)
         self.inventories = InventoryRepository(session=self.session)
-        self.stock_transfers = StockTransferRepository(session=self.session)
         self.stock_transactions = StockTransactionRepository(
             session=self.session
         )
-        self.accounts = AccountRepository(session=self.session)
-        self.finances = FinanceTransactionRepository(session=self.session)
+        self.stock_transfers = StockTransferRepository(session=self.session)
+        self.order_items = OrderItemRepository(session=self.session)
+        self.orders = OrderRepository(session=self.session)
+        self.users = UserRepository(session=self.session)
+
         return self

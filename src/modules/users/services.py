@@ -32,6 +32,13 @@ class UserService(BaseService[User, UserAdminCreate, UserUnitOfWork]):
         async with self.uow:
             return await self._repo.get_courier(id=id)
 
+    async def get_couriers_list(
+        self, skip: int, limit: int, role: Role | None, search: str | None
+    ) -> dict[str, Any]:
+        async with self.uow:
+            total, items = await self._repo.get_list(skip, limit, role, search)
+            return {"total_count": total, "items": items}
+
     async def get_users_list(
         self, skip: int, limit: int, role: Role | None, search: str | None
     ) -> dict[str, Any]:
