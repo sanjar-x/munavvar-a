@@ -1,0 +1,100 @@
+import uuid
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, Query, Security, status
+
+from src.application.client.dependencies import get_client_service
+from src.application.client.schemas import (
+    ClientCreate,
+    ClientResponse,
+    ClientsResponse,
+)
+from src.application.client.service import ClientService
+from src.core.security.permissions import Scope
+from src.infrastructure.database.models import User
+from src.modules.auth.dependencies import get_current_user
+from src.modules.users.dependencies import get_user_service
+from src.modules.users.schemas import UserAdminUpdate, UserResponse
+from src.modules.users.services import UserService
+
+clients_router = APIRouter(prefix="/clients", tags=["Clients (Backoffice)"])
+
+
+@clients_router.post(
+    "/",
+    status_code=status.HTTP_201_CREATED,
+    summary="Создать нового клиента",
+    description="Создает профиль клиента, привязывает номер телефона, открывает финансовый счет и создает первый адрес (инвентарь).",
+)
+async def create_client(
+    data: ClientCreate,
+    client_service: Annotated[ClientService, Depends(get_client_service)],
+):
+    return await client_service.create_client(data=data)
+
+
+@clients_router.get(
+    "/",
+    response_model=ClientsResponse,
+    summary="Получить список клиентов",
+    description="Возвращает список клиентов с пагинацией. Поддерживает поиск по ФИО или номеру телефона.",
+)
+async def get_clients(
+    client_service: Annotated[ClientService, Depends(get_client_service)],
+    skip: int = Query(0, ge=0, description="Сколько записей пропустить"),
+    limit: int = Query(
+        50, ge=1, le=100, description="Сколько записей вернуть"
+    ),
+    search: str | None = Query(None, description="Поиск по ФИО или телефону"),
+):
+    return await client_service.get_clients(
+        skip=skip, limit=limit, search=search
+    )
+
+
+@clients_router.get(
+    "/{client_id}",
+    response_model=ClientResponse,
+    summary="Получить карточку клиента",
+    description="Возвращает полную информацию о клиенте: профиль, баланс счета, остатки на адресах и историю заказов.",
+)
+async def get_client(
+    client_id: uuid.UUID,
+    client_service: Annotated[ClientService, Depends(get_client_service)],
+):
+    return await client_service.get_client(client_id=client_id)
+
+
+@clients_router.patch(
+    "/{client_id}",
+    response_model=UserResponse,
+    summary="Обновить данные Клиента",
+)
+async def update_client(
+    client_id: uuid.UUID,
+    schema: UserAdminUpdate,
+    current_admin: Annotated[
+        User, Security(get_current_user, scopes=[Scope.USERS_WRITE])
+    ],
+    user_service: Annotated[UserService, Depends(get_user_service)],
+):
+    updated_user = await user_service.update(client_id, schema)
+    return updated_user
+
+
+@clients_router.post(
+    "/{user_id}/block",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Заблокировать пользователя",
+)
+async def block_user(
+    user_id: uuid.UUID,
+    current_admin: Annotated[
+        User, Security(get_current_user, scopes=[Scope.USERS_WRITE])
+    ],
+    user_service: Annotated[UserService, Depends(get_user_service)],
+):
+    """
+    Мягкое удаление / блокировка пользователя (is_active = False).
+    """
+    await user_service.archive(user_id)

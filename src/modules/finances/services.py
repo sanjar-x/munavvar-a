@@ -1,13 +1,15 @@
 import uuid
 
-from src.modules.finances.models import (
-    Account,
-    AccountType,
-    Transaction,
-    TransactionStatus,
+from src.modules.finances.enums import AccountType, TransactionStatus
+from src.modules.finances.exceptions import (
+    AccountNotFoundError,
+    InvalidTransactionAmountError,
+    InvalidTransactionStatusError,
+    SelfTransferError,
+    TransactionNotFoundError,
 )
+from src.modules.finances.models import Account, Transaction
 from src.modules.finances.uow import FinancesUnitOfWork
-from src.modules.orders.models import Order, PaymentMethod
 from src.modules.users.exceptions import UserNotFoundError
 from src.modules.users.models import User
 from src.modules.users.services import UserService
@@ -38,7 +40,6 @@ class BillingService:
                 client_account = await self.uow.accounts.add(
                     client_account_data
                 )
-                # Обязательно коммитим изменения при создании
                 await self.uow.commit()
 
             return client_account
@@ -52,7 +53,6 @@ class BillingService:
         if not courier:
             raise UserNotFoundError(user_id=courier_id)
 
-        # Открываем транзакцию
         async with self.uow:
             courier_account: (
                 Account | None
@@ -69,7 +69,6 @@ class BillingService:
                 courier_account = await self.uow.accounts.add(
                     courier_account_data
                 )
-                # Обязательно коммитим изменения при создании
                 await self.uow.commit()
 
             return courier_account
@@ -84,18 +83,17 @@ class BillingService:
         status: TransactionStatus = TransactionStatus.COMPLETED,
     ) -> Transaction:
         if amount <= 0:
-            raise ValueError("Сумма перевода должна быть больше нуля.")
+            raise InvalidTransactionAmountError(amount=amount)
         if from_account_id == to_account_id:
-            raise ValueError("Нельзя перевести средства на тот же самый счет.")
+            raise SelfTransferError(account_id=from_account_id)
 
-        # Оборачиваем всю логику перевода в единую транзакцию
         async with self.uow:
             accounts = await self.uow.accounts.get_many_for_update(
                 [from_account_id, to_account_id]
             )
 
             if len(accounts) != 2:
-                raise ValueError("Один или оба счета не найдены.")
+                raise AccountNotFoundError(account_id=from_account_id)
 
             if accounts[0].id == from_account_id:
                 from_account, to_account = accounts[0], accounts[1]
@@ -116,7 +114,6 @@ class BillingService:
             }
             transaction = await self.uow.transactions.add(transaction_data)
 
-            # Сохраняем перевод и обновленные балансы
             await self.uow.commit()
             return transaction
 
@@ -126,14 +123,15 @@ class BillingService:
                 transaction_id
             )
             if not transaction:
-                raise ValueError(f"Транзакция {transaction_id} не найдена.")
+                raise TransactionNotFoundError(transaction_id=transaction_id)
 
             if transaction.status == TransactionStatus.COMPLETED:
                 return
 
             if transaction.status != TransactionStatus.PENDING:
-                raise ValueError(
-                    f"Невозможно подтвердить транзакцию в статусе {transaction.status}."
+                raise InvalidTransactionStatusError(
+                    transaction_id=transaction_id,
+                    current_status=transaction.status,
                 )
 
             # Получаем и блокируем оба счета за 1 запрос
@@ -142,9 +140,8 @@ class BillingService:
             )
 
             if len(accounts) != 2:
-                raise ValueError("Один или оба счета не найдены.")
+                raise AccountNotFoundError(account_id=transaction.from_id)
 
-            # Определяем кто отправитель, а кто получатель
             if accounts[0].id == transaction.from_id:
                 from_account, to_account = accounts[0], accounts[1]
             else:
@@ -154,7 +151,6 @@ class BillingService:
             to_account.balance += transaction.amount
             transaction.status = TransactionStatus.COMPLETED
 
-            # Фиксируем подтверждение
             await self.uow.commit()
 
     async def add_debt(
@@ -171,7 +167,6 @@ class BillingService:
 
         system_user: User = await self.user_service.get_system_user()
 
-        # Получение счета системы тоже требует UoW
         async with self.uow:
             revenue_account: Account = (
                 await self.uow.accounts.get_system_revenue_account(
@@ -185,50 +180,5 @@ class BillingService:
             amount=amount,
             order_id=order_id,
             reason=reason,
+            status=TransactionStatus.COMPLETED,
         )
-
-    async def process_order_payment(
-        self,
-        order: Order,
-    ) -> TransactionStatus:
-        client_account: Account = await self.get_or_add_client_account(
-            order.client_id
-        )
-
-        reason = f"Оплата заказа #{order.id}"
-
-        if order.payment_method == PaymentMethod.CASH:
-            courier_account: Account = await self.get_or_add_courier_account(
-                order.courier_id
-            )
-            await self.transfer(
-                from_account_id=client_account.id,
-                to_account_id=courier_account.id,
-                amount=order.total_amount,
-                order_id=order.id,
-                reason=reason,
-                status=TransactionStatus.COMPLETED,
-            )
-            return TransactionStatus.COMPLETED
-
-        elif order.payment_method == PaymentMethod.CARD:
-            system_user = await self.user_service.get_system_user()
-
-            # Получение счета системы тоже требует UoW
-            async with self.uow:
-                card_account = await self.uow.accounts.get_system_card_account(
-                    system_user.id
-                )
-
-            await self.transfer(
-                from_account_id=client_account.id,
-                to_account_id=card_account.id,
-                amount=order.total_amount,
-                order_id=order.id,
-                reason=reason,
-                status=TransactionStatus.PENDING,
-            )
-            return TransactionStatus.PENDING
-
-        else:
-            return TransactionStatus.COMPLETED

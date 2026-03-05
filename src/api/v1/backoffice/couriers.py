@@ -3,15 +3,15 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, Security, status
 
+from src.application.courier.dependencies import get_courier_service
+from src.application.courier.schemas import CourierCreate
+from src.application.courier.service import CourierService
 from src.core.security.permissions import Scope
 from src.modules.auth.dependencies import get_current_user
-from src.modules.finances.dependencies import get_billing_service
-from src.modules.finances.services import BillingService
 from src.modules.users.dependencies import get_user_service
-from src.modules.users.models import Role, User
+from src.modules.users.models import User
 from src.modules.users.schemas import (
     CouriersResponse,
-    UserAdminCreate,
     UserAdminUpdate,
     UserResponse,
 )
@@ -28,26 +28,17 @@ couriers_router = APIRouter()
     summary="Зарегистрировать нового курьера",
 )
 async def create_courier(
-    schema: UserAdminCreate,
+    schema: CourierCreate,
     current_admin: Annotated[
         User, Security(get_current_user, scopes=[Scope.USERS_WRITE])
     ],
-    user_service: Annotated[UserService, Depends(get_user_service)],
-    billing_service: Annotated[
-        BillingService, Depends(get_billing_service)
-    ],  # <-- ИНЪЕКЦИЯ
+    courier_service: Annotated[CourierService, Depends(get_courier_service)],
 ):
-    """
-    Создание курьера. Роль принудительно устанавливается в COURIER,
-    чтобы избежать случайного создания других типов пользователей.
-    """
-    schema.role = Role.COURIER
-    courier = await user_service.register_local_user(schema)
-    await billing_service.get_or_add_courier_account(courier_id=courier.id)
-    return courier
+    await courier_service.create_courier(schema)
+
+    return
 
 
-# src/api/v1/backoffice/couriers.py
 @couriers_router.get(
     "/",
     response_model=CouriersResponse,

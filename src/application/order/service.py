@@ -66,16 +66,12 @@ class OrderService:
                 ):
                     required_tara[product.returnable_item_id] += qty
 
-            # 3. Вычисляем дефицит тары через Dictionary Comprehension (O(N))
             tara_deficit = {
                 tara_id: req_qty - explicit_items.get(tara_id, 0)
                 for tara_id, req_qty in required_tara.items()
                 if req_qty - explicit_items.get(tara_id, 0) > 0
             }
-
-            # 4. Валидация баланса тары — ИЗБАВЛЯЕМСЯ ОТ N+1 ЗАПРОСОВ
             if tara_deficit:
-                # Достаем все балансы нужных тар ОДНИМ запросом
                 tara_ids = list(tara_deficit.keys())
                 balances_map = await self.uow.stock_transactions.get_balances_for_products(
                     inventory_id=dto.inventory_id,
@@ -132,6 +128,8 @@ class OrderService:
             client_account = await self.uow.accounts.get_client_account(
                 order.client_id
             )
+            if not client_account:
+                return
             system_user = await self.uow.users.get_system_user()
             revenue_account = (
                 await self.uow.accounts.get_system_revenue_account(
@@ -157,6 +155,8 @@ class OrderService:
                 courier_account = await self.uow.accounts.get_courier_account(
                     courier_id
                 )
+                if not courier_account:
+                    return
                 client_account.balance -= order.total_amount
                 courier_account.balance += order.total_amount
 

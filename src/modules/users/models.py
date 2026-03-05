@@ -11,6 +11,7 @@ from src.infrastructure.database.base import BaseModel
 if TYPE_CHECKING:
     from src.modules.finances.models import Account
     from src.modules.inventory.models import Inventory
+    from src.modules.orders.models import Order
 
 
 class Role(enum.Enum):
@@ -76,4 +77,15 @@ class User(BaseModel):
     )
     inventories: Mapped[list["Inventory"]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
+    )
+    # НОВЫЕ СВЯЗИ ДЛЯ ЗАКАЗОВ
+    client_orders: Mapped[list["Order"]] = relationship(
+        "Order",
+        foreign_keys="[Order.client_id]",
+        back_populates="client",
+    )
+    courier_orders: Mapped[list["Order"]] = relationship(
+        "Order",
+        foreign_keys="[Order.courier_id]",
+        back_populates="courier",
     )

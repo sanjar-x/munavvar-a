@@ -1,9 +1,10 @@
-from sqlalchemy.orm import selectinload
 from uuid import UUID
 
-from sqlalchemy import func, select, Sequence
+from sqlalchemy import Sequence, func, or_, select
+from sqlalchemy.orm import joinedload, selectinload
 
 from src.common.repository import BaseRepository
+from src.infrastructure.database.models import Account, Order, OrderItem
 from src.modules.users.models import AuthProvider, Identity, Role, User
 
 
@@ -32,12 +33,6 @@ class UserRepository(BaseRepository[User]):
 
     async def add_courier(self, **kwargs) -> User:
         return await self.add_with_role(role=Role.COURIER, **kwargs)
-
-    async def add_b2c_client(self, **kwargs) -> User:
-        return await self.add_with_role(role=Role.CLIENT_B2C, **kwargs)
-
-    async def add_b2b_client(self, **kwargs) -> User:
-        return await self.add_with_role(role=Role.CLIENT_B2B, **kwargs)
 
     # --- ПРИВАТНЫЕ МЕТОДЫ-ПОМОЩНИКИ (Скрывают SQL) ---
 
@@ -127,11 +122,6 @@ class UserRepository(BaseRepository[User]):
     async def get_courier(self, id: UUID) -> User | None:
         return await self._get_active_by_role_and_id(id, Role.COURIER)
 
-    async def get_client(self, id: UUID) -> User | None:
-        return await self._get_active_by_role_and_id(
-            id, [Role.CLIENT_B2B, Role.CLIENT_B2C]
-        )
-
     async def get_cashier(self, id: UUID) -> User | None:
         return await self._get_active_by_role_and_id(id, Role.CASHIER)
 
@@ -156,11 +146,9 @@ class UserRepository(BaseRepository[User]):
         if search:
             query = query.where(self.model.username.ilike(f"%{search}%"))
 
-        # Считаем общее количество для пагинации (до лимитов и джоинов)
         count_query = select(func.count()).select_from(query.subquery())
         total_count = await self.session.scalar(count_query) or 0
 
-        # Жадная загрузка (Eager Load) связей
         query = query.options(
             selectinload(self.model.identities),
             selectinload(self.model.accounts),
@@ -175,10 +163,77 @@ class UserRepository(BaseRepository[User]):
         result = await self.session.scalars(query)
         return total_count, result.all()
 
+    async def add_b2c_client(self, **kwargs) -> User:
+        return await self.add_with_role(role=Role.CLIENT_B2C, **kwargs)
+
+    async def add_b2b_client(self, **kwargs) -> User:
+        return await self.add_with_role(role=Role.CLIENT_B2B, **kwargs)
+
+    async def get_client(self, id: UUID) -> User | None:
+        return await self._get_active_by_role_and_id(
+            id, [Role.CLIENT_B2B, Role.CLIENT_B2C]
+        )
+
     async def get_clients(self) -> list[User]:
         return await self._get_all_active_by_roles(
             [Role.CLIENT_B2B, Role.CLIENT_B2C]
         )
+
+    async def get_client_with_details(self, client_id: UUID) -> User | None:
+        query = (
+            select(self.model)
+            .where(self.model.id == client_id, self.model.is_active.is_(True))
+            .options(
+                selectinload(self.model.identities),
+                selectinload(self.model.accounts).selectinload(
+                    Account.outgoing_transactions
+                ),
+                selectinload(self.model.inventories),
+                selectinload(self.model.client_orders).options(
+                    joinedload(Order.client_inventory),
+                    joinedload(Order.courier),
+                    selectinload(Order.items).joinedload(OrderItem.product),
+                ),
+            )
+        )
+        result = await self.session.execute(query)
+        return result.scalar_one_or_none()
+
+    async def get_clients_with_details(
+        self, skip: int, limit: int, search: str | None = None
+    ) -> tuple[int, Sequence[User]]:
+        query = select(self.model).where(
+            self.model.is_active.is_(True),
+            self.model.role.in_([Role.CLIENT_B2C, Role.CLIENT_B2B]),
+        )
+        if search:
+            search_pattern = f"%{search}%"
+            query = query.where(
+                or_(
+                    self.model.username.ilike(search_pattern),
+                    self.model.identities.any(
+                        Identity.provider_identity_id.ilike(search_pattern)
+                    ),
+                )
+            )
+
+        count_query = select(func.count()).select_from(query.subquery())
+        total_count = await self.session.scalar(count_query) or 0
+
+        if total_count == 0:
+            return 0, []
+        query = (
+            query.options(
+                selectinload(self.model.identities),
+                selectinload(self.model.client_orders),
+            )
+            .order_by(self.model.created_at.desc())
+            .offset(skip)
+            .limit(limit)
+        )
+
+        result = await self.session.scalars(query)
+        return total_count, result.all()
 
     async def get_all_by_role(self, role: Role) -> list[User]:
         return await self._get_all_active_by_roles(role)

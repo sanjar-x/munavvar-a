@@ -184,15 +184,6 @@ class ShiftReconciliationResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class InventoryBalanceResponse(BaseModel):
-    """Модель для отображения остатков на складе."""
-
-    product_id: uuid.UUID
-    balance: int
-
-    model_config = ConfigDict(from_attributes=True)
-
-
 class StockTransferResponse(BaseModel):
     """
     Полная модель накладной (с агрегацией).
