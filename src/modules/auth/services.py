@@ -35,9 +35,7 @@ class AuthService:
             )
 
         # 4. Строгая проверка валидности пароля
-        is_valid_password = verify_password(
-            data.password, identity.password_hash
-        )
+        is_valid_password = verify_password(data.password, identity.password_hash)
         if not is_valid_password:
             raise UnauthorizedError(
                 message="Неверный номер телефона или пароль",

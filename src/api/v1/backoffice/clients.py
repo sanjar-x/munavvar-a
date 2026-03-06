@@ -7,6 +7,7 @@ from src.application.client.dependencies import get_client_service
 from src.application.client.schemas import (
     ClientCreate,
     ClientsResponse,
+    InventoryCreate,
 )
 from src.application.client.service import ClientService
 from src.core.security.permissions import Scope
@@ -23,7 +24,7 @@ clients_router = APIRouter()
     "/",
     status_code=status.HTTP_201_CREATED,
     summary="Создать нового клиента",
-    description="Создает профиль клиента, привязывает номер телефона, открывает финансовый счет и создает первый адрес (инвентарь).",
+    description="Создает профиль клиента.",
 )
 async def create_client(
     data: ClientCreate,
@@ -32,11 +33,26 @@ async def create_client(
     return await client_service.create_client(data=data)
 
 
+@clients_router.post(
+    "/{client_id}/inventories",
+    status_code=status.HTTP_201_CREATED,
+    response_model=ClientsResponse,  # Укажи схему полной карточки клиента
+    summary="Добавить новый адрес (инвентарь) клиенту",
+    description="Создает дополнительный адрес доставки/склад для указанного клиента и возвращает обновленную карточку профиля.",
+)
+async def create_client_inventory(
+    client_id: uuid.UUID,
+    data: InventoryCreate,
+    client_service: Annotated[ClientService, Depends(get_client_service)],
+):
+    return await client_service.create_client_inventory(client_id=client_id, data=data)
+
+
 @clients_router.get(
     "/",
     response_model=ClientsResponse,
     summary="Получить список клиентов",
-    description="Возвращает список клиентов с пагинацией. Поддерживает поиск по ФИО или номеру телефона.",
+    description="Возвращает список клиентов с пагинацией.  Поиск по ФИО/телефон.",
 )
 async def get_clients(
     client_service: Annotated[ClientService, Depends(get_client_service)],

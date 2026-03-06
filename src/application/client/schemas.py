@@ -31,6 +31,14 @@ class ClientCreate(BaseModel):
         return v
 
 
+class InventoryCreate(BaseModel):
+    name: str = Field(..., description="Название склада/машины")
+
+
+class InventoryUpdate(BaseModel):
+    name: str | None = None
+
+
 # --- CLIENTS LIST ---
 class Client(BaseModel):
     id: uuid.UUID

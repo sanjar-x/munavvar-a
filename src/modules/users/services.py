@@ -45,18 +45,14 @@ class UserService(BaseService[User, UserAdminCreate, UserUnitOfWork]):
                 account = user.accounts[0] if user.accounts else None
                 inventory = user.inventories[0] if user.inventories else None
 
-                items.append(
-                    {
-                        "id": user.id,
-                        "username": user.username,
-                        "phone": identity.provider_identity_id
-                        if identity
-                        else None,
-                        "is_active": user.is_active,
-                        "account": account,
-                        "inventory": inventory,
-                    }
-                )
+                items.append({
+                    "id": user.id,
+                    "username": user.username,
+                    "phone": identity.provider_identity_id if identity else None,
+                    "is_active": user.is_active,
+                    "account": account,
+                    "inventory": inventory,
+                })
 
             return {"total_count": total, "couriers": items}
 

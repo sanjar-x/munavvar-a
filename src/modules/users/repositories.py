@@ -44,7 +44,11 @@ class UserRepository(BaseRepository[User]):
     async def add_courier(self, **kwargs) -> User:
         return await self.add_with_role(role=Role.COURIER, **kwargs)
 
-    # --- ПРИВАТНЫЕ МЕТОДЫ-ПОМОЩНИКИ (Скрывают SQL) ---
+    async def add_b2c_client(self, **kwargs) -> User:
+        return await self.add_with_role(role=Role.CLIENT_B2C, **kwargs)
+
+    async def add_b2b_client(self, **kwargs) -> User:
+        return await self.add_with_role(role=Role.CLIENT_B2B, **kwargs)
 
     async def _get_active_by_role_and_id(
         self, id: UUID, roles: list[Role] | Role
@@ -116,6 +120,9 @@ class UserRepository(BaseRepository[User]):
         result = await self.session.execute(statement)
         return result.first()
 
+    async def get_all_by_role(self, role: Role) -> list[User]:
+        return await self._get_all_active_by_roles(role)
+
     async def get_system_user(self) -> User:
         statement = select(self.model).where(self.model.role == Role.SYSTEM)
         result = await self.session.execute(statement)
@@ -135,45 +142,66 @@ class UserRepository(BaseRepository[User]):
 
     # --- СПИСКИ ---
 
-    async def get_couriers(self) -> list[User]:
-        return await self._get_all_active_by_roles(Role.COURIER)
-
     async def get_couriers_with_details(
-        self, skip: int, limit: int, search: str | None
+        self, skip: int, limit: int, search: str | None = None
     ) -> tuple[int, Sequence[User]]:
-        """Загружает курьеров вместе с их счетами и инвентарями."""
-
         query = select(self.model).where(self.model.role == Role.COURIER)
 
         if search:
-            query = query.where(self.model.username.ilike(f"%{search}%"))
+            search_pattern = f"%{search}%"
+            query = query.where(
+                or_(
+                    self.model.username.ilike(search_pattern),
+                    self.model.identities.any(
+                        Identity.provider_identity_id.ilike(search_pattern)
+                    ),
+                )
+            )
 
         count_query = select(func.count()).select_from(query.subquery())
         total_count = await self.session.scalar(count_query) or 0
 
-        query = query.options(
-            selectinload(self.model.identities),
-            selectinload(self.model.accounts),
-            selectinload(self.model.inventories),
+        if total_count == 0:
+            return 0, []
+
+        query = (
+            query
+            .options(
+                selectinload(self.model.identities),
+                selectinload(self.model.accounts),
+                selectinload(self.model.inventories),
+                selectinload(self.model.courier_orders),
+            )
+            .order_by(self.model.created_at.desc())
+            .offset(skip)
+            .limit(limit)
         )
-        query = query.order_by(self.model.created_at.desc()).offset(skip).limit(limit)
 
         result = await self.session.scalars(query)
         return total_count, result.all()
 
-    async def add_b2c_client(self, **kwargs) -> User:
-        return await self.add_with_role(role=Role.CLIENT_B2C, **kwargs)
-
-    async def add_b2b_client(self, **kwargs) -> User:
-        return await self.add_with_role(role=Role.CLIENT_B2B, **kwargs)
+    async def get_courier_with_details(self, courier_id: UUID) -> User | None:
+        query = (
+            select(self.model)
+            .where(self.model.id == courier_id, self.model.role == Role.COURIER)
+            .options(
+                selectinload(self.model.identities),
+                selectinload(self.model.accounts),
+                selectinload(self.model.inventories),
+                selectinload(self.model.courier_orders).options(
+                    joinedload(Order.client_inventory),
+                    joinedload(Order.client),
+                    selectinload(Order.items).joinedload(OrderItem.product),
+                ),
+            )
+        )
+        result = await self.session.execute(query)
+        return result.scalar_one_or_none()
 
     async def get_client(self, id: UUID) -> User | None:
         return await self._get_active_by_role_and_id(
             id, [Role.CLIENT_B2B, Role.CLIENT_B2C]
         )
-
-    async def get_clients(self) -> list[User]:
-        return await self._get_all_active_by_roles([Role.CLIENT_B2B, Role.CLIENT_B2C])
 
     async def get_client_with_details(self, client_id: UUID) -> User | None:
         query = (
@@ -231,6 +259,3 @@ class UserRepository(BaseRepository[User]):
 
         result = await self.session.scalars(query)
         return total_count, result.all()
-
-    async def get_all_by_role(self, role: Role) -> list[User]:
-        return await self._get_all_active_by_roles(role)

@@ -137,9 +137,7 @@ class CouriersResponse(BaseModel):
 
 
 class InventoryProduct(BaseModel):
-    type: ProductType = Field(
-        ..., title="Тип товара", examples=[ProductType.CONTAINER]
-    )
+    type: ProductType = Field(..., title="Тип товара", examples=[ProductType.CONTAINER])
     name: str = Field(
         ...,
         min_length=1,

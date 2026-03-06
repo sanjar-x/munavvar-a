@@ -83,9 +83,11 @@ class User(BaseModel):
         "Order",
         foreign_keys="[Order.client_id]",
         back_populates="client",
+        order_by="desc(Order.created_at)",
     )
     courier_orders: Mapped[list["Order"]] = relationship(
         "Order",
         foreign_keys="[Order.courier_id]",
         back_populates="courier",
+        order_by="desc(Order.created_at)",
     )

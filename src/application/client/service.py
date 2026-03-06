@@ -8,7 +8,7 @@ from src.application.client.exceptions import (
     ClientAlreadyExistsError,
     ClientNotFoundError,
 )
-from src.application.client.schemas import ClientCreate, ClientUpdate
+from src.application.client.schemas import ClientCreate, ClientUpdate, InventoryCreate
 from src.application.client.uow import ClientUnitOfWork
 from src.modules.finances.enums import AccountType
 from src.modules.inventory.enums import InventoryType
@@ -68,6 +68,24 @@ class ClientService:
                 if "uq_identities_provider_identity_id" in str(e.orig):
                     raise ClientAlreadyExistsError(phone=data.phone)
                 raise e
+
+    async def create_client_inventory(
+        self, client_id: uuid.UUID, data: InventoryCreate
+    ) -> dict[str, Any]:
+        async with self.uow:
+            user = await self.uow.users.get(id=client_id)
+            if not user:
+                raise ClientNotFoundError(client_id)
+
+            await self.uow.inventories.add({
+                "name": data.name,
+                "type": InventoryType.CLIENT,
+                "user_id": client_id,
+            })
+            await self.uow.commit()
+
+        # Обязательно await и строго вне блока текущей сессии UoW
+        return await self.get_client(client_id)
 
     async def get_clients(
         self, skip: int, limit: int, search: str | None = None

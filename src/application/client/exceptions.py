@@ -32,9 +32,7 @@ class ClientAlreadyExistsError(ConflictError):
 class ClientInactiveError(UnauthorizedError):
     """Выбрасывается, если клиент был заблокирован/деактивирован в админке."""
 
-    def __init__(
-        self, phone: str | None = None, client_id: uuid.UUID | None = None
-    ):
+    def __init__(self, phone: str | None = None, client_id: uuid.UUID | None = None):
         details = {}
         if phone:
             details["phone"] = phone
