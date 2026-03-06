@@ -25,12 +25,36 @@ class CourierUpdate(BaseModel):
     )
 
 
+# --- ВСПОМОГАТЕЛЬНЫЕ DTO ДЛЯ ОТВЕТА (ИСПРАВЛЕНИЕ ОШИБКИ) ---
+
+
+class AccountShortDTO(BaseModel):
+    """Схема для сериализации финансового счета"""
+
+    id: uuid.UUID
+    name: str
+    balance: float  # или Decimal, в зависимости от твоей БД
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class InventoryShortDTO(BaseModel):
+    """Схема для сериализации инвентаря (машины)"""
+
+    id: uuid.UUID
+    name: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 # --- ВЛОЖЕННЫЕ СХЕМЫ (ДЛЯ ОТВЕТОВ) ---
 
 
 class CourierInventoryWithBalancesDTO(BaseModel):
-    inventory: Any
-    balances: list[Any]
+    inventory: InventoryShortDTO  # Убрали Any
+    balances: list[
+        Any
+    ]  # Пока оставим Any для балансов, если у тебя нет схемы StockTransactionDTO
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -44,8 +68,8 @@ class Courier(BaseModel):
     id: uuid.UUID
     username: str
     phone: str | None
-    account: Any | None
-    inventory: Any | None
+    account: AccountShortDTO | None  # УБРАЛИ Any, теперь Pydantic знает как парсить!
+    inventory: InventoryShortDTO | None  # УБРАЛИ Any!
     is_active: bool
     orders: int = Field(description="Количество выполненных заказов")
     created_at: datetime
@@ -65,10 +89,12 @@ class CourierResponse(BaseModel):
 
     id: uuid.UUID
     username: str
-    phone: str
+    phone: str | None
     is_active: bool
-    account: Any
+    account: AccountShortDTO | None  # УБРАЛИ Any
     inventory: CourierInventoryWithBalancesDTO | None
-    orders: list[Any]
+    orders: list[
+        Any
+    ]  # Если заказы тоже падают с такой же ошибкой, их тоже нужно описать через DTO!
 
     model_config = ConfigDict(from_attributes=True)
