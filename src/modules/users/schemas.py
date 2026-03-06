@@ -83,7 +83,7 @@ class UserProfileUpdate(BaseModel):
 
 
 # 2. Схема для администратора (Управление доступом)
-class UserAdminUpdate(UserBase):
+class UserAdminUpdate(UserAdminCreate):
     is_active: bool | None = None
 
 
