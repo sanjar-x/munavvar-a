@@ -1,8 +1,7 @@
 import uuid
 
-from src.infrastructure.database.models import User
+from src.infrastructure.database.models import Account, User
 from src.modules.finances.enums import AccountType
-from src.modules.finances.models import Account
 from src.modules.finances.uow import FinancesUnitOfWork
 from src.modules.users.exceptions import UserNotFoundError
 from src.modules.users.services import UserService

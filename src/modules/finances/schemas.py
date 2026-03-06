@@ -4,7 +4,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from src.modules.finances.models import AccountType
+from src.modules.finances.enums import AccountType
 
 
 class AccountBase(BaseModel):
@@ -33,9 +33,7 @@ class AccountCreate(AccountBase):
     Все новые счета рождаются с балансом 0.
     """
 
-    user_id: uuid.UUID = Field(
-        ..., title="Владелец счета (Пользователь или Система)"
-    )
+    user_id: uuid.UUID = Field(..., title="Владелец счета (Пользователь или Система)")
 
 
 class AccountUpdate(BaseModel):

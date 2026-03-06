@@ -4,11 +4,17 @@ from collections import defaultdict
 from sqlalchemy import func, select, union_all
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.infrastructure.database.models import Identity, Product, User
+from src.infrastructure.database.models import (
+    Account,
+    Identity,
+    Inventory,
+    Product,
+    StockTransaction,
+    User,
+)
 from src.modules.catalog.enums import ProductType
-from src.modules.finances.models import Account, AccountType
+from src.modules.finances.enums import AccountType
 from src.modules.inventory.enums import InventoryType
-from src.modules.inventory.models import Inventory, StockTransaction
 from src.modules.users.enums import AuthProvider, Role
 from src.modules.users.schemas import (
     InventoryProduct,

@@ -6,8 +6,7 @@ from typing import Self
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from src.modules.catalog.schemas import ProductResponse
-from src.modules.inventory.enums import InventoryType
-from src.modules.inventory.models import TransferStatus, TransferType
+from src.modules.inventory.enums import InventoryType, TransferStatus, TransferType
 from src.modules.users.schemas import UserResponse
 
 
@@ -54,9 +53,7 @@ class Item(BaseModel):
     """Стандартная единица измерения передачи товара."""
 
     product_id: uuid.UUID
-    quantity: int = Field(
-        gt=0, description="Количество товара (строго больше нуля)"
-    )
+    quantity: int = Field(gt=0, description="Количество товара (строго больше нуля)")
 
 
 class AdjustmentItem(BaseModel):
@@ -106,9 +103,7 @@ class FactoryRefillRequest(BaseModel):
     warehouse_id: uuid.UUID
     factory_id: uuid.UUID = Field(description="ID Завода (Скважины)")
     water_id: uuid.UUID = Field(description="ID продукта 'Вода' (сырье)")
-    bottle_id: uuid.UUID = Field(
-        description="ID продукта 'Пустая бутыль' (тара)"
-    )
+    bottle_id: uuid.UUID = Field(description="ID продукта 'Пустая бутыль' (тара)")
     quantity: int = Field(gt=0, description="Сколько бутылей воды разлито")
 
 
@@ -139,15 +134,9 @@ class CloseShiftRequest(BaseModel):
     """Вечерняя сдача смены курьером (Инкассация тары)."""
 
     route_sheet_id: uuid.UUID
-    warehouse_id: uuid.UUID = Field(
-        description="Склад, на который сдается факт"
-    )
-    actual_full_water: int = Field(
-        ge=0, description="Факт: нераспроданная полная вода"
-    )
-    actual_empty_bottles: int = Field(
-        ge=0, description="Факт: собранные пустые бутыли"
-    )
+    warehouse_id: uuid.UUID = Field(description="Склад, на который сдается факт")
+    actual_full_water: int = Field(ge=0, description="Факт: нераспроданная полная вода")
+    actual_empty_bottles: int = Field(ge=0, description="Факт: собранные пустые бутыли")
     actual_equipment: list[Item] = Field(
         default_factory=list,
         description="Остальное оборудование (кулеры, помпы)",

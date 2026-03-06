@@ -6,8 +6,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.common.repository import BaseRepository
 from src.core.config import settings
+from src.infrastructure.database.models import Account, Transaction
 from src.modules.finances.enums import AccountType, TransactionStatus
-from src.modules.finances.models import Account, Transaction
 
 
 class AccountRepository(BaseRepository[Account]):
