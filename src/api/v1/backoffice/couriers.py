@@ -33,7 +33,6 @@ async def create_courier(
     ],
     courier_service: Annotated[CourierService, Depends(get_courier_service)],
 ):
-    # Исправлено: Возвращаем результат
     return await courier_service.create_courier(schema)
 
 
