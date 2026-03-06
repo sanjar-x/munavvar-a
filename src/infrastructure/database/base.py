@@ -1,15 +1,11 @@
-# src.infrastructure.database.models.py
+# src/infrastructure/database/base.py
 import re
 import uuid
-from datetime import UTC, datetime
+from datetime import datetime
 
-from sqlalchemy import BOOLEAN, TIMESTAMP, UUID, func
-from sqlalchemy.orm import (
-    DeclarativeBase,
-    Mapped,
-    declared_attr,
-    mapped_column,
-)
+from sqlalchemy import BOOLEAN, TIMESTAMP, func
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import DeclarativeBase, Mapped, declared_attr, mapped_column
 
 
 class BaseModel(DeclarativeBase):
@@ -40,14 +36,12 @@ class BaseModel(DeclarativeBase):
     updated_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True),
         server_default=func.now(),
-        onupdate=datetime.now(UTC),
+        onupdate=func.now(),
         comment="Дата и время последнего обновления",
     )
 
     def __repr__(self) -> str:
         columns: str = ", ".join(
-            f"{k}={repr(v)}"
-            for k, v in self.__dict__.items()
-            if not k.startswith("_")
+            f"{k}={repr(v)}" for k, v in self.__dict__.items() if not k.startswith("_")
         )
         return f"<{self.__class__.__name__}({columns})>"

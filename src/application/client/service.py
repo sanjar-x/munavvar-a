@@ -8,61 +8,52 @@ from src.application.client.exceptions import (
     ClientAlreadyExistsError,
     ClientNotFoundError,
 )
-from src.application.client.schemas import ClientCreate, ClientUpdate, InventoryCreate
+from src.application.client.schemas import (
+    Account,
+    ClientCreate,
+    ClientResponse,
+    InventoryCreate,
+)
 from src.application.client.uow import ClientUnitOfWork
-from src.modules.finances.enums import AccountType
 from src.modules.inventory.enums import InventoryType
-from src.modules.users.models import AuthProvider
 
 
 class ClientService:
     def __init__(self, uow: ClientUnitOfWork):
         self.uow = uow
 
-    async def create_client(self, data: ClientCreate) -> dict[str, Any]:
+    async def create_client(self, data: ClientCreate) -> ClientResponse:
         async with self.uow:
-            existing_identity = await self.uow.identities.get_by_provider_and_id(
-                provider=AuthProvider.LOCAL, provider_identity_id=data.phone
-            )
+            existing_identity = await self.uow.identities.get_local_by_id(data.phone)
             if existing_identity:
                 raise ClientAlreadyExistsError(phone=data.phone)
 
             try:
-                client = await self.uow.users.add({
-                    "username": data.username,
-                    "role": data.role,
-                })
-                await self.uow.session.flush()
+                client_data = data.model_dump(
+                    exclude_unset=True,
+                    exclude_none=True,
+                    exclude={"phone", "address_name"},
+                )
+                client = await self.uow.users.add(client_data)
 
-                await self.uow.identities.add({
-                    "user_id": client.id,
-                    "provider": AuthProvider.LOCAL,
-                    "provider_identity_id": data.phone,
-                    "password_hash": None,
-                })
+                await self.uow.identities.add_local(
+                    user_id=client.id,
+                    provider_identity_id=data.phone,
+                )
 
-                client_account = await self.uow.accounts.add({
-                    "type": AccountType.CLIENT,
-                    "user_id": client.id,
-                    "name": f"Счет клиента: {client.username}",
-                    "balance": 0,
-                })
-
-                client_inventory = await self.uow.inventories.add({
-                    "user_id": client.id,
-                    "type": InventoryType.CLIENT,
-                    "name": data.address_name,
-                })
+                await self.uow.accounts.create_client_account(
+                    client_id=client.id,
+                    client_name=data.username,
+                )
+                if data.address_name:
+                    await self.uow.inventories.create_client_inventory(
+                        user_id=client.id,
+                        inventory_name=data.address_name,
+                    )
 
                 await self.uow.commit()
+                return await self.get_client(client.id)
 
-                return {
-                    "id": client.id,
-                    "username": client.username,
-                    "phone": data.phone,
-                    "account": client_account,
-                    "inventory": client_inventory,
-                }
             except IntegrityError as e:
                 await self.uow.rollback()
                 if "uq_identities_provider_identity_id" in str(e.orig):
@@ -71,7 +62,7 @@ class ClientService:
 
     async def create_client_inventory(
         self, client_id: uuid.UUID, data: InventoryCreate
-    ) -> dict[str, Any]:
+    ) -> ClientResponse:
         async with self.uow:
             user = await self.uow.users.get(id=client_id)
             if not user:
@@ -84,7 +75,6 @@ class ClientService:
             })
             await self.uow.commit()
 
-        # Обязательно await и строго вне блока текущей сессии UoW
         return await self.get_client(client_id)
 
     async def get_clients(
@@ -111,74 +101,58 @@ class ClientService:
 
             return {"total_count": total, "clients": clients_data}
 
-    async def get_client(self, client_id: uuid.UUID) -> dict[str, Any]:
-
+    async def get_client(self, client_id: uuid.UUID) -> ClientResponse:
         async with self.uow:
             client = await self.uow.users.get_client_with_details(client_id=client_id)
             if not client:
                 raise ClientNotFoundError(client_id=client_id)
+            identity = await self.uow.identities.get_local_by_user(user_id=client_id)
+            account = await self.uow.accounts.get_client_account(client_id=client_id)
 
-            inventories = []
-            for inventory in client.inventories:
-                balances = await self.uow.stock_transactions.get_balances(
-                    inventory_id=inventory.id
-                )
-                inventories.append({"inventory": inventory, "balances": balances})
+            response = ClientResponse.model_validate(client)
+            response.account = Account.model_validate(account) if account else None
+            response.phone = identity.provider_identity_id if identity else None
+            return response
 
-            return {
-                "id": client.id,
-                "username": client.username,
-                "phone": client.identities[0].provider_identity_id
-                if client.identities
-                else None,
-                "account": client.accounts[0] if client.accounts else None,
-                "inventories": inventories,
-                "orders": sorted(
-                    client.client_orders,
-                    key=lambda o: o.created_at,
-                    reverse=True,
-                ),
-            }
+    # async def update_client(self, client_id: uuid.UUID, data: ClientUpdate):
+    #     async with self.uow:
+    #         client = await self.uow.users.get_client_with_details(client_id=client_id)
+    #         if not client:
+    #             raise ClientNotFoundError(client_id=client_id)
 
-    async def update_client(self, client_id: uuid.UUID, data: ClientUpdate):
-        async with self.uow:
-            client = await self.uow.users.get_client_with_details(client_id=client_id)
-            if not client:
-                raise ClientNotFoundError(client_id=client_id)
+    #         if data.phone:
+    #             existing_identity = await self.uow.identities.get_by_provider_and_id(
+    #                 provider=AuthProvider.LOCAL, provider_identity_id=data.phone
+    #             )
+    #             if existing_identity and existing_identity.user_id != client.id:
+    #                 raise ClientAlreadyExistsError(phone=data.phone)
 
-            if data.phone:
-                existing_identity = await self.uow.identities.get_by_provider_and_id(
-                    provider=AuthProvider.LOCAL, provider_identity_id=data.phone
-                )
-                if existing_identity and existing_identity.user_id != client.id:
-                    raise ClientAlreadyExistsError(phone=data.phone)
+    #             local_identity = next(
+    #                 i for i in client.identities if i.provider == AuthProvider.LOCAL
+    #             )
 
-                local_identity = next(
-                    i for i in client.identities if i.provider == AuthProvider.LOCAL
-                )
+    #             if local_identity.provider_identity_id != data.phone:
+    #                 await self.uow.identities.update(
+    #                     id=local_identity.id,
+    #                     obj_data={"provider_identity_id": data.phone},
+    #                 )
 
-                if local_identity.provider_identity_id != data.phone:
-                    await self.uow.identities.update(
-                        id=local_identity.id,
-                        obj_data={"provider_identity_id": data.phone},
-                    )
+    #         user_update_data = data.model_dump(
+    #             exclude_unset=True, exclude_none=True, exclude={"phone"}
+    #         )
 
-            user_update_data = data.model_dump(
-                exclude_unset=True, exclude_none=True, exclude={"phone"}
-            )
+    #         if user_update_data:
+    #             await self.uow.users.update(
+    #                 id=client.id,
+    #                 obj_data=user_update_data,
+    #             )
 
-            if user_update_data:
-                await self.uow.users.update(
-                    id=client.id,
-                    obj_data=user_update_data,
-                )
+    #         try:
+    #             await self.uow.commit()
+    #         except IntegrityError as e:
+    #             await self.uow.rollback()
+    #             if "uq_identities_provider_identity_id" in str(e.orig):
+    #                 raise ClientAlreadyExistsError(phone=data.phone or "Unknown")
+    #             raise e
 
-            try:
-                await self.uow.commit()
-            except IntegrityError as e:
-                await self.uow.rollback()
-                if "uq_identities_provider_identity_id" in str(e.orig):
-                    raise ClientAlreadyExistsError(phone=data.phone or "Unknown")
-                raise e
-
-        return await self.get_client(client_id=client_id)
+    #     return await self.get_client(client_id=client_id)

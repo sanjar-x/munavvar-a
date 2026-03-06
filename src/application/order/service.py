@@ -237,9 +237,7 @@ class OrderService:
             if not client_account:
                 return
             system_user = await self.uow.users.get_system_user()
-            revenue_account = await self.uow.accounts.get_system_revenue_account(
-                system_user.id
-            )
+            revenue_account = await self.uow.accounts.get_system_revenue_account()
 
             client_account.balance += order.total_amount
 
@@ -271,9 +269,7 @@ class OrderService:
                 })
 
             elif order.payment_method == PaymentMethod.CARD:
-                card_account = await self.uow.accounts.get_system_card_account(
-                    system_user.id
-                )
+                card_account = await self.uow.accounts.get_system_card_account()
                 financial_transactions.append({
                     "from_id": client_account.id,
                     "to_id": card_account.id,

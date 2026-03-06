@@ -3,11 +3,12 @@ from collections.abc import Sequence
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import case, delete, desc, func, or_, select
+from sqlalchemy import case, desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 
 from src.common.repository import BaseRepository
+from src.core.config import settings
 from src.modules.catalog.models import Product
 from src.modules.inventory.models import (
     Inventory,
@@ -24,7 +25,27 @@ class InventoryRepository(BaseRepository[Inventory]):
     def __init__(self, session: AsyncSession):
         super().__init__(model=Inventory, session=session)
 
-    # --- СЦЕНАРИИ КУРЬЕРА И ЛОГИСТА ---
+    async def create_client_inventory(
+        self, user_id: uuid.UUID, inventory_name: str
+    ) -> Inventory:
+        return await self.add({
+            "user_id": user_id,
+            "type": InventoryType.CLIENT,
+            "name": inventory_name,
+        })
+
+    async def get_system_inventory(self, inv_type: InventoryType) -> Inventory:
+        query = select(self.model).where(
+            self.model.user_id == settings.SYSTEM_USER_ID, self.model.type == inv_type
+        )
+        result = await self.session.execute(query)
+        return result.scalar_one()
+
+    async def get_vendor_inventory(self) -> Inventory:
+        return await self.get_system_inventory(InventoryType.VIRTUAL_VENDOR)
+
+    async def get_loss_inventory(self) -> Inventory:
+        return await self.get_system_inventory(InventoryType.VIRTUAL_LOSS)
 
     async def get_courier_inventory(
         self,
@@ -62,15 +83,9 @@ class InventoryRepository(BaseRepository[Inventory]):
         result = await self.session.execute(query)
         return result.scalars().all()
 
-    async def get_warehouses(self) -> Sequence[Inventory]:
-        """Для UI: Список всех доступных главных складов/заводов."""
-        return await self.get_multi(type=InventoryType.WAREHOUSE)
-
     # --- СЦЕНАРИИ КЛИЕНТА (B2C / B2B) ---
 
-    async def get_client_inventories(
-        self, user_id: uuid.UUID
-    ) -> Sequence[Inventory]:
+    async def get_client_inventories(self, user_id: uuid.UUID) -> Sequence[Inventory]:
         return await self.get_multi(user_id=user_id, type=InventoryType.CLIENT)
 
     async def get_client_inventory(
@@ -91,15 +106,6 @@ class InventoryRepository(BaseRepository[Inventory]):
 
     # --- СИСТЕМНЫЕ И АДМИНСКИЕ СЦЕНАРИИ ---
 
-    async def get_system_virtual_inventory(
-        self, v_type: InventoryType
-    ) -> Inventory | None:
-        """
-        Получение системных виртуальных локаций (VIRTUAL_LOSS, VIRTUAL_VENDOR).
-        Используется сервисами "под капотом" при списании брака или закупках.
-        """
-        return await self.get_by(type=v_type)
-
     async def search_inventories(
         self,
         search_query: str,
@@ -117,9 +123,7 @@ class InventoryRepository(BaseRepository[Inventory]):
         result = await self.session.execute(query)
         return result.scalars().all()
 
-    async def get_by_ids(
-        self, inventory_ids: list[uuid.UUID]
-    ) -> Sequence[Inventory]:
+    async def get_by_ids(self, inventory_ids: list[uuid.UUID]) -> Sequence[Inventory]:
         """
         Bulk запрос для отчетов и агрегаций (чтобы избежать N+1 запросов к БД).
         Например, маппинг списка складов для аналитики.
@@ -134,83 +138,62 @@ class InventoryRepository(BaseRepository[Inventory]):
         return result.scalars().all()
 
 
+class StockTransferItemRepository(BaseRepository[StockTransferItem]):
+    def __init__(self, session: AsyncSession):
+        super().__init__(model=StockTransferItem, session=session)
+
+
 class StockTransferRepository(BaseRepository[StockTransfer]):
     def __init__(self, session: AsyncSession):
         super().__init__(model=StockTransfer, session=session)
 
-    # --- ТРАНЗАКЦИОННЫЕ И ДЕТАЛЬНЫЕ МЕТОДЫ (UoW / Backend) ---
-
-    async def get_with_details(
-        self, id: uuid.UUID, with_for_update: bool = False
-    ) -> StockTransfer | None:
-        """
-        Полная загрузка документа для проведения логики в Unit of Work.
-        Подтягивает шапку, черновики, леджер и справочники маршрута.
-        """
+    async def get_with_items(self, transfer_id: uuid.UUID) -> StockTransfer | None:
         query = (
-            select(self.model)
-            .where(self.model.id == id)
-            .options(
-                joinedload(self.model.from_inventory),
-                joinedload(self.model.to_inventory),
-                selectinload(self.model.items),
-                selectinload(self.model.transactions),
-            )
+            select(StockTransfer)
+            .where(StockTransfer.id == transfer_id)
+            .options(selectinload(StockTransfer.items))
         )
-        if with_for_update:
-            # Блокируем строку накладной от состояния гонки
-            query = query.with_for_update()
-
         result = await self.session.execute(query)
         return result.scalar_one_or_none()
 
-    async def get_by_order_id(
-        self, order_id: uuid.UUID
-    ) -> Sequence[StockTransfer]:
-        """
-        Для CRM и клиентского приложения:
-        Какие накладные (доставка/возврат тары) привязаны к конкретному заказу.
-        """
+    async def get_with_items_for_update(
+        self, transfer_id: uuid.UUID
+    ) -> StockTransfer | None:
         query = (
-            select(self.model)
-            .where(self.model.order_id == order_id)
-            .options(
-                joinedload(self.model.from_inventory),
-                joinedload(self.model.to_inventory),
-                selectinload(
-                    self.model.transactions
-                ),  # Клиенту важен только подтвержденный факт
-            )
-            .order_by(self.model.created_at.asc())
+            select(StockTransfer)
+            .where(StockTransfer.id == transfer_id)
+            .options(selectinload(StockTransfer.items))
+            .with_for_update()
         )
         result = await self.session.execute(query)
-        return result.scalars().all()
+        return result.scalar_one_or_none()
 
-    # --- СЦЕНАРИИ СКЛАДА И ЛОГИСТА (Операционный уровень) ---
-
-    async def get_outgoing_drafts(
-        self, from_inventory_id: uuid.UUID
-    ) -> Sequence[StockTransfer]:
-        """Для терминала Кладовщика: Что сейчас нужно собрать и погрузить?"""
+    async def get_transfer(self, transfer_id: uuid.UUID) -> StockTransfer | None:
         query = (
-            select(self.model)
-            .where(
-                self.model.from_id == from_inventory_id,
-                self.model.status == TransferStatus.DRAFT,
-            )
+            select(StockTransfer)
+            .where(StockTransfer.id == transfer_id)
             .options(
-                joinedload(
-                    self.model.to_inventory
-                ),  # Чтобы видеть, кому собираем
-                selectinload(self.model.items),  # Загружаем корзину для сборки
+                joinedload(StockTransfer.from_inventory),
+                joinedload(StockTransfer.to_inventory),
+                selectinload(StockTransfer.items).joinedload(StockTransferItem.product),
             )
-            .order_by(self.model.created_at.asc())
         )
 
         result = await self.session.execute(query)
-        return result.scalars().all()
+        return result.unique().scalar_one_or_none()
 
-    # --- АДМИН ПАНЕЛЬ И АНАЛИТИКА (Уровень Управления) ---
+    async def change_status(
+        self,
+        transfer_id: uuid.UUID,
+        new_status: TransferStatus,
+        accepted_by_id: uuid.UUID | None = None,
+    ) -> StockTransfer | None:
+        transfer = await self.get_with_items_for_update(transfer_id)
+        if transfer:
+            transfer.status = new_status
+            transfer.accepted_by_id = accepted_by_id
+            await self.session.flush()
+        return transfer
 
     async def search_transfers(
         self,
@@ -223,10 +206,6 @@ class StockTransferRepository(BaseRepository[StockTransfer]):
         date_from: datetime | None = None,
         date_to: datetime | None = None,
     ) -> Sequence[StockTransfer]:
-        """
-        Универсальный иструмент для UI/Аналитики.
-        Позволяет бэк-офису фильтровать любые потоки.
-        """
         query = select(self.model)
 
         if status:
@@ -243,28 +222,19 @@ class StockTransferRepository(BaseRepository[StockTransfer]):
             query = query.where(self.model.created_at <= date_to)
 
         query = (
-            query.options(
+            query
+            .options(
                 joinedload(self.model.from_inventory),
                 joinedload(self.model.to_inventory),
-                joinedload(self.model.created_by),
+                selectinload(StockTransfer.items).joinedload(StockTransferItem.product),
             )
-            .order_by(desc(self.model.created_at))
+            .order_by(self.model.created_at.desc())
             .offset(skip)
             .limit(limit)
         )
 
         result = await self.session.execute(query)
-        return result.scalars().all()
-
-
-class StockTransferItemRepository(BaseRepository[StockTransferItem]):
-    def __init__(self, session: AsyncSession):
-        super().__init__(model=StockTransferItem, session=session)
-
-    async def clear_draft_items(self, transfer_id: uuid.UUID) -> None:
-        """Очистка корзины при отмене или полном пересчете накладной."""
-        stmt = delete(self.model).where(self.model.transfer_id == transfer_id)
-        await self.session.execute(stmt)
+        return result.unique().scalars().all()
 
 
 class StockTransactionRepository(BaseRepository[StockTransaction]):
@@ -364,9 +334,7 @@ class StockTransactionRepository(BaseRepository[StockTransaction]):
         result = await self.session.execute(query)
         return result.scalar() or 0
 
-    async def get_balances(
-        self, inventory_id: uuid.UUID
-    ) -> list[dict[str, Any]]:
+    async def get_balances(self, inventory_id: uuid.UUID) -> list[dict[str, Any]]:
         balance_expr = func.sum(
             case(
                 (self.model.to_id == inventory_id, self.model.quantity),

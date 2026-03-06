@@ -24,8 +24,8 @@ class CourierService:
 
     async def create_courier(self, data: CourierCreate) -> dict[str, Any]:
         async with self.uow:
-            existing_identity = await self.uow.identities.get_by_provider_and_id(
-                provider=AuthProvider.LOCAL, provider_identity_id=data.phone
+            existing_identity = await self.uow.identities.get_local_by_id(
+                provider_identity_id=data.phone
             )
             if existing_identity:
                 raise CourierAlreadyExistsError(phone=data.phone)
@@ -49,7 +49,6 @@ class CourierService:
                     "type": AccountType.COURIER,
                     "user_id": courier.id,
                     "name": f"Счет курьера: {courier.username}",
-                    "balance": 0,
                 })
 
                 await self.uow.commit()

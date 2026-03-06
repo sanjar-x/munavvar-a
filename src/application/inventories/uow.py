@@ -24,5 +24,4 @@ class InventoryUnitOfWork(BaseSQLAlchemyUoW, IInventoryUnitOfWork):
         self.stock_transactions = StockTransactionRepository(session=self.session)
         self.products = ProductRepository(session=self.session)
         self.users = UserRepository(session=self.session)
-
         return self

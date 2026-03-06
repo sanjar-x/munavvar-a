@@ -1,7 +1,7 @@
 import enum
 
 
-class InventoryType(enum.Enum):
+class InventoryType(enum.StrEnum):
     WAREHOUSE = "WAREHOUSE"  # Главный склад / Завод
     COURIER = "COURIER"  # Машина курьера
     CLIENT = "CLIENT"  # Клиент (у него копятся пустые бутыли!)
@@ -9,7 +9,7 @@ class InventoryType(enum.Enum):
     VIRTUAL_VENDOR = "VIRTUAL_VENDOR"  # Источник новых бутылей (закупки) и находок
 
 
-class TransferType(enum.Enum):
+class TransferType(enum.StrEnum):
     FACTORY_RECEIPT = "FACTORY_RECEIPT"
     PURCHASE = "PURCHASE"
     PRODUCTION = "PRODUCTION"
@@ -25,7 +25,7 @@ class TransferType(enum.Enum):
     INVENTORY_FINDING = "INVENTORY_FINDING"  # Оприходование
 
 
-class TransferStatus(enum.Enum):
+class TransferStatus(enum.StrEnum):
     DRAFT = "DRAFT"
     COMPLETED = "COMPLETED"
     CANCELLED = "CANCELLED"

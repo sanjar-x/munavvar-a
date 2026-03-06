@@ -36,7 +36,7 @@
 #     ) -> dict[str, Any]:
 #         """Получает список всех инвентарей с пагинацией и фильтрами."""
 #         async with self.uow:
-#             total, inventories = await self.uow.inventories.get_inventories_list(
+#             total, inventories = await self.uow.inventories.(
 #                 skip=skip, limit=limit, search=search, inv_type=inv_type
 #             )
 #             return {"total_count": total, "items": inventories}

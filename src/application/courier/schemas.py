@@ -33,8 +33,7 @@ class AccountShortDTO(BaseModel):
 
     id: uuid.UUID
     name: str
-    balance: float  # или Decimal, в зависимости от твоей БД
-
+    balance: int
     model_config = ConfigDict(from_attributes=True)
 
 

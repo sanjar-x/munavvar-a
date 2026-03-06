@@ -2,9 +2,10 @@ import uuid
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator
 
 from src.modules.catalog.enums import ProductType
+from src.modules.inventory.enums import InventoryType
 from src.modules.orders.enums import OrderStatus, PaymentMethod
 from src.modules.users.models import Role
 
@@ -35,11 +36,87 @@ class InventoryCreate(BaseModel):
     name: str = Field(..., description="Название склада/машины")
 
 
+class Account(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    name: str
+    balance: int
+
+
+class Product(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    type: ProductType
+    name: str
+    price: int
+    attributes: dict[str, Any] = Field(default_factory=dict)
+
+
+class Balance(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    quantity: int
+    product: Product
+
+
+class Inventory(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    type: InventoryType
+    name: str
+    balances: list[Balance] = []
+
+
+class ClientInventory(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    type: InventoryType
+    name: str
+
+
+class Courier(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    username: str
+
+
+class Item(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    quantity: int
+    unit_price: int
+    product: Product
+
+    @computed_field
+    @property
+    def subtotal(self) -> int:
+        return self.quantity * self.unit_price
+
+
+class Order(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    payment_method: PaymentMethod
+    status: OrderStatus
+    total_amount: int
+    client_inventory: ClientInventory
+    courier: Courier | None = None
+    items: list[Item]
+    created_at: datetime
+
+
+class ClientResponse(BaseModel):
+    model_config = ConfigDict(
+        from_attributes=True,
+        validate_assignment=True,
+    )
+    id: uuid.UUID
+    username: str
+    phone: str | None = None
+    account: Account | None = None
+    inventories: list[Inventory] = []
+    client_orders: list[Order] = []
+
+
 class InventoryUpdate(BaseModel):
     name: str | None = None
 
 
 # --- CLIENTS LIST ---
+
+
 class Client(BaseModel):
     id: uuid.UUID
     username: str
@@ -55,93 +132,6 @@ class ClientsResponse(BaseModel):
 
 
 # --- CLIENT DETAIL ---
-
-
-class Product(BaseModel):
-    id: uuid.UUID
-    type: ProductType
-    name: str
-    price: int
-    attributes: dict[str, Any]
-    returnable_item_id: uuid.UUID | None
-    is_active: bool
-    created_at: datetime
-    updated_at: datetime
-
-    model_config = ConfigDict(from_attributes=True)
-
-
-class Inventory(BaseModel):
-    id: uuid.UUID
-    name: str
-
-
-class InventoryBalance(BaseModel):
-    quantity: int
-    product: Product
-
-
-class InventoryAndBalances(BaseModel):
-    inventory: Inventory
-    balances: list[InventoryBalance]
-
-    model_config = ConfigDict(from_attributes=True)
-
-
-class Account(BaseModel):
-    id: uuid.UUID
-    name: str
-    balance: int
-    model_config = ConfigDict(from_attributes=True)
-
-
-class OrderCourierShortDTO(BaseModel):
-    id: uuid.UUID
-    username: str
-
-    model_config = ConfigDict(from_attributes=True)
-
-
-class OrderInventoryShortDTO(BaseModel):
-    id: uuid.UUID
-    name: str
-
-    model_config = ConfigDict(from_attributes=True)
-
-
-class OrderItem(BaseModel):
-    id: uuid.UUID
-    quantity: int
-    unit_price: int
-    product: Product
-    model_config = ConfigDict(from_attributes=True)
-
-
-class Order(BaseModel):
-    id: uuid.UUID
-    status: OrderStatus
-    payment_method: PaymentMethod
-    total_amount: int
-    created_at: datetime
-    updated_at: datetime
-
-    # Вложенные связи заказа
-    client_inventory: OrderInventoryShortDTO
-    courier: OrderCourierShortDTO | None = None
-    items: list[OrderItem]
-
-    model_config = ConfigDict(from_attributes=True)
-
-
-class FullClientResponse(BaseModel):
-    id: uuid.UUID
-    username: str
-    phone: str | None = None
-    account: Account | None = None
-    inventories: list[InventoryAndBalances]
-    orders: list[Order]
-
-    model_config = ConfigDict(from_attributes=True)
 
 
 class ClientUpdate(BaseModel):

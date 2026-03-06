@@ -31,23 +31,28 @@ if TYPE_CHECKING:
 
 class Inventory(BaseModel):
     __tablename__ = "inventories"
-
-    user_id: Mapped[uuid.UUID | None] = mapped_column(
+    user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("users.id", ondelete="RESTRICT"),
-        index=True,
-        comment="Кто материально ответственен за эту точку?",
+        nullable=False,
+        comment="Кто материально ответственен за эту точку (курьер, клиент, кладовщик)?",
     )
     type: Mapped[InventoryType] = mapped_column(
-        Enum(InventoryType, name="inventory_type_enum", native_enum=True),
+        Enum(
+            InventoryType,
+            name="inventory_type_enum",
+            native_enum=True,
+            create_type=True,
+        ),
         nullable=False,
         index=True,
+        comment="Тип инвентаря: WAREHOUSE, COURIER, CLIENT, VIRTUAL",
     )
     name: Mapped[str] = mapped_column(
         String(255),
         nullable=False,
+        comment="Понятное название (например: 'Машина АВ123', 'Склад Центр')",
     )
-
     user: Mapped["User"] = relationship(back_populates="inventories")
 
     outgoing_transactions: Mapped[list["StockTransaction"]] = relationship(
@@ -58,30 +63,19 @@ class Inventory(BaseModel):
         foreign_keys="StockTransaction.to_id",
         back_populates="to_inventory",
     )
+    balances: Mapped[list["Balance"]] = relationship(
+        back_populates="inventory", cascade="all, delete-orphan"
+    )
+    __table_args__ = (
+        Index("idx_inventory_user_type", "user_id", "type"),
+        {
+            "comment": "Реестр всех физических и виртуальных мест хранения (склады, машины, клиенты)"
+        },
+    )
 
 
 class StockTransfer(BaseModel):
     __tablename__ = "stock_transfers"
-    __table_args__ = (
-        CheckConstraint(
-            "from_id != to_id", name="ck_stock_transfer_no_circular"
-        ),
-        UniqueConstraint(
-            "id", "from_id", "to_id", name="uq_stock_transfer_route"
-        ),
-    )
-
-    type: Mapped[TransferType] = mapped_column(
-        Enum(TransferType, name="transfer_type_enum", native_enum=True),
-        nullable=False,
-        index=True,
-    )
-    status: Mapped[TransferStatus] = mapped_column(
-        Enum(TransferStatus, name="transfer_status_enum", native_enum=True),
-        nullable=False,
-        default=TransferStatus.DRAFT,
-        index=True,
-    )
 
     from_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -95,34 +89,51 @@ class StockTransfer(BaseModel):
         nullable=False,
         index=True,
     )
-
     created_by_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("users.id", ondelete="RESTRICT"),
         nullable=False,
+        comment="Кто создал документ перемещения",
     )
     accepted_by_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("users.id", ondelete="RESTRICT"),
         nullable=True,
+        comment="Кто физически принял товар (подтвердил накладную)",
     )
-
     order_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("orders.id", ondelete="RESTRICT"),
         nullable=True,
         index=True,
+        comment="Ссылка на клиентский заказ (если применимо)",
+    )
+
+    type: Mapped[TransferType] = mapped_column(
+        Enum(
+            TransferType, name="transfer_type_enum", native_enum=True, create_type=True
+        ),
+        nullable=False,
+        index=True,
+    )
+    status: Mapped[TransferStatus] = mapped_column(
+        Enum(
+            TransferStatus,
+            name="transfer_status_enum",
+            native_enum=True,
+            create_type=True,
+        ),
+        nullable=False,
+        default=TransferStatus.DRAFT,
+        index=True,
+        comment="Статус документа (DRAFT, COMPLETED, CANCELLED)",
     )
 
     from_inventory: Mapped["Inventory"] = relationship(foreign_keys=[from_id])
     to_inventory: Mapped["Inventory"] = relationship(foreign_keys=[to_id])
     created_by: Mapped["User"] = relationship(foreign_keys=[created_by_id])
-    accepted_by: Mapped["User | None"] = relationship(
-        foreign_keys=[accepted_by_id]
-    )
-    order: Mapped["Order | None"] = relationship(
-        back_populates="stock_transfers"
-    )
+    accepted_by: Mapped["User | None"] = relationship(foreign_keys=[accepted_by_id])
+    order: Mapped["Order | None"] = relationship(back_populates="stock_transfers")
 
     items: Mapped[list["StockTransferItem"]] = relationship(
         back_populates="transfer", cascade="all, delete-orphan"
@@ -131,19 +142,17 @@ class StockTransfer(BaseModel):
         back_populates="transfer", cascade="all, delete-orphan"
     )
 
+    __table_args__ = (
+        CheckConstraint("from_id != to_id", name="ck_stock_transfer_no_circular"),
+        UniqueConstraint("id", "from_id", "to_id", name="uq_stock_transfer_route"),
+        {
+            "comment": "Документы (накладные) на перемещение товаров между складами/клиентами"
+        },
+    )
+
 
 class StockTransferItem(BaseModel):
-    """
-    Строки черновика накладной (Корзина).
-    Сюда добавляют товары, пока статус DRAFT. Эта таблица НЕ влияет на остатки.
-    """
-
     __tablename__ = "stock_transfer_items"
-    __table_args__ = (
-        CheckConstraint(
-            "quantity > 0", name="ck_stock_transfer_item_quantity_pos"
-        ),
-    )
 
     transfer_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -157,42 +166,63 @@ class StockTransferItem(BaseModel):
         nullable=False,
         index=True,
     )
-    quantity: Mapped[int] = mapped_column(Integer, nullable=False)
 
+    quantity: Mapped[int] = mapped_column(
+        Integer, nullable=False, comment="Количество в документе"
+    )
     transfer: Mapped["StockTransfer"] = relationship(back_populates="items")
     product: Mapped["Product"] = relationship()
 
+    __table_args__ = (
+        CheckConstraint("quantity > 0", name="ck_stock_transfer_item_quantity_pos"),
+        {
+            "comment": "Черновик строк накладной (не влияет на остатки, пока статус DRAFT)"
+        },
+    )
+
+
+class Balance(BaseModel):
+    __tablename__ = "inventory_balances"
+
+    inventory_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("inventories.id", ondelete="CASCADE"),
+        nullable=False,
+        # УДАЛЕНО index=True: покрывается индексом от UniqueConstraint
+    )
+    product_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("products.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+
+    quantity: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, comment="Фактический остаток"
+    )
+
+    inventory: Mapped["Inventory"] = relationship(back_populates="balances")
+    product: Mapped["Product"] = relationship()
+
+    __table_args__ = (
+        UniqueConstraint(
+            "inventory_id", "product_id", name="uq_inventory_product_balance"
+        ),
+        {
+            "comment": "Материализованные (закэшированные) остатки. Обновляется триггером базы данных"
+        },
+    )
+
 
 class StockTransaction(BaseModel):
-    """
-    Строгий Леджер. Истина в последней инстанции для остатков.
-    """
-
     __tablename__ = "stock_transactions"
-    __table_args__ = (
-        CheckConstraint(
-            "quantity > 0", name="ck_stock_transaction_quantity_positive"
-        ),
-        ForeignKeyConstraint(
-            ["transfer_id", "from_id", "to_id"],
-            [
-                "stock_transfers.id",
-                "stock_transfers.from_id",
-                "stock_transfers.to_id",
-            ],
-            ondelete="CASCADE",
-            name="fk_stock_transaction_strict_route",
-        ),
-        Index("idx_st_product_from", "product_id", "from_id"),
-        Index("idx_st_product_to", "product_id", "to_id"),
-    )
+
     product_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("products.id", ondelete="RESTRICT"),
         nullable=False,
         index=True,
     )
-
     transfer_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), nullable=False, index=True
     )
@@ -209,7 +239,9 @@ class StockTransaction(BaseModel):
         index=True,
     )
 
-    quantity: Mapped[int] = mapped_column(Integer, nullable=False)
+    quantity: Mapped[int] = mapped_column(
+        Integer, nullable=False, comment="Проведенное количество"
+    )
 
     product: Mapped["Product"] = relationship()
     from_inventory: Mapped["Inventory"] = relationship(
@@ -218,6 +250,23 @@ class StockTransaction(BaseModel):
     to_inventory: Mapped["Inventory"] = relationship(
         foreign_keys=[to_id], back_populates="incoming_transactions"
     )
-    transfer: Mapped["StockTransfer"] = relationship(
-        back_populates="transactions"
+    transfer: Mapped["StockTransfer"] = relationship(back_populates="transactions")
+
+    __table_args__ = (
+        CheckConstraint("quantity > 0", name="ck_stock_transaction_quantity_positive"),
+        ForeignKeyConstraint(
+            ["transfer_id", "from_id", "to_id"],
+            [
+                "stock_transfers.id",
+                "stock_transfers.from_id",
+                "stock_transfers.to_id",
+            ],
+            ondelete="CASCADE",
+            name="fk_stock_transaction_strict_route",
+        ),
+        Index("idx_st_product_from", "product_id", "from_id"),
+        Index("idx_st_product_to", "product_id", "to_id"),
+        {
+            "comment": "Строгий леджер движения товаров (Event Sourcing). Истина в последней инстанции"
+        },
     )

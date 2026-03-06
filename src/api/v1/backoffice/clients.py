@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, Query, Security, status
 from src.application.client.dependencies import get_client_service
 from src.application.client.schemas import (
     ClientCreate,
+    ClientResponse,
     ClientsResponse,
     InventoryCreate,
 )
@@ -22,6 +23,7 @@ clients_router = APIRouter()
 
 @clients_router.post(
     "/",
+    response_model=ClientResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Создать нового клиента",
     description="Создает профиль клиента.",
@@ -39,7 +41,7 @@ async def create_client(
 @clients_router.post(
     "/{client_id}/inventories",
     status_code=status.HTTP_201_CREATED,
-    response_model=ClientsResponse,
+    response_model=ClientResponse,
     summary="Добавить новый адрес (инвентарь) клиенту",
     description="Создает дополнительный адрес доставки/склад для указанного клиента и возвращает обновленную карточку профиля.",
 )
@@ -74,6 +76,7 @@ async def get_clients(
 
 @clients_router.get(
     "/{client_id}",
+    response_model=ClientResponse,
     summary="Получить карточку клиента",
     description="Возвращает полную информацию о клиенте: профиль, баланс счета, остатки на адресах и историю заказов.",
 )

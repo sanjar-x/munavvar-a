@@ -4,16 +4,42 @@ from sqlalchemy import Sequence, func, or_, select
 from sqlalchemy.orm import joinedload, selectinload
 
 from src.common.repository import BaseRepository
-from src.infrastructure.database.models import Account, Order, OrderItem
-from src.modules.users.models import AuthProvider, Identity, Role, User
+from src.infrastructure.database.models import (
+    Balance,
+    Identity,
+    Inventory,
+    Order,
+    OrderItem,
+    User,
+)
+from src.modules.users.enums import AuthProvider, Role
 
 
 class IdentityRepository(BaseRepository[Identity]):
     def __init__(self, session):
         super().__init__(model=Identity, session=session)
 
-    async def get_by_provider_and_id(
-        self, provider: AuthProvider, provider_identity_id: str
+    async def add_local(self, user_id: UUID, provider_identity_id: str) -> Identity:
+        return await self.add({
+            "user_id": user_id,
+            "provider": AuthProvider.LOCAL,
+            "provider_identity_id": provider_identity_id,
+        })
+
+    async def get_by_user_and_provider(
+        self, user_id: UUID, provider: AuthProvider
+    ) -> Identity:
+        query = select(self.model).where(
+            self.model.user_id == user_id,
+            self.model.provider == provider,
+        )
+        result = await self.session.execute(query)
+        return result.scalar_one_or_none()
+
+    async def get_by_id_and_provider(
+        self,
+        provider_identity_id: str,
+        provider: AuthProvider,
     ) -> Identity | None:
         query = select(self.model).where(
             self.model.provider == provider,
@@ -21,6 +47,15 @@ class IdentityRepository(BaseRepository[Identity]):
         )
         result = await self.session.execute(query)
         return result.scalar_one_or_none()
+
+    async def get_local_by_id(self, provider_identity_id: str) -> Identity | None:
+        return await self.get_by_id_and_provider(
+            provider_identity_id=provider_identity_id,
+            provider=AuthProvider.LOCAL,
+        )
+
+    async def get_local_by_user(self, user_id: UUID) -> Identity:
+        return await self.get_by_user_and_provider(user_id, AuthProvider.LOCAL)
 
 
 class UserRepository(BaseRepository[User]):
@@ -43,12 +78,6 @@ class UserRepository(BaseRepository[User]):
 
     async def add_courier(self, **kwargs) -> User:
         return await self.add_with_role(role=Role.COURIER, **kwargs)
-
-    async def add_b2c_client(self, **kwargs) -> User:
-        return await self.add_with_role(role=Role.CLIENT_B2C, **kwargs)
-
-    async def add_b2b_client(self, **kwargs) -> User:
-        return await self.add_with_role(role=Role.CLIENT_B2B, **kwargs)
 
     async def _get_active_by_role_and_id(
         self, id: UUID, roles: list[Role] | Role
@@ -208,11 +237,9 @@ class UserRepository(BaseRepository[User]):
             select(self.model)
             .where(self.model.id == client_id, self.model.is_active.is_(True))
             .options(
-                selectinload(self.model.identities),
-                selectinload(self.model.accounts).selectinload(
-                    Account.outgoing_transactions
+                selectinload(self.model.inventories).options(
+                    selectinload(Inventory.balances).joinedload(Balance.product)
                 ),
-                selectinload(self.model.inventories),
                 selectinload(self.model.client_orders).options(
                     joinedload(Order.client_inventory),
                     joinedload(Order.courier),
@@ -221,7 +248,7 @@ class UserRepository(BaseRepository[User]):
             )
         )
         result = await self.session.execute(query)
-        return result.scalar_one_or_none()
+        return result.unique().scalar_one_or_none()
 
     async def get_clients_with_details(
         self, skip: int, limit: int, search: str | None = None

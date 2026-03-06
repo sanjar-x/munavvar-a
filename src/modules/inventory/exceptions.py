@@ -166,8 +166,7 @@ class InvalidTransferStatusError(ConflictError):
 
         if isinstance(expected_status, list):
             exp_val = [
-                e.value if hasattr(e, "value") else str(e)
-                for e in expected_status
+                e.value if hasattr(e, "value") else str(e) for e in expected_status
             ]
         else:
             exp_val = (
@@ -201,9 +200,7 @@ class TransferTypeMismatchError(ConflictError):
             else str(expected_type)
         )
         act_val = (
-            actual_type.value
-            if hasattr(actual_type, "value")
-            else str(actual_type)
+            actual_type.value if hasattr(actual_type, "value") else str(actual_type)
         )
 
         super().__init__(
@@ -235,9 +232,7 @@ class InventoryTypeMismatchError(ConflictError):
             else str(expected_type)
         )
         act_val = (
-            actual_type.value
-            if hasattr(actual_type, "value")
-            else str(actual_type)
+            actual_type.value if hasattr(actual_type, "value") else str(actual_type)
         )
 
         super().__init__(
