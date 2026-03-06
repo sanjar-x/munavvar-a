@@ -16,6 +16,7 @@ from src.application.client.schemas import (
 )
 from src.application.client.uow import ClientUnitOfWork
 from src.modules.inventory.enums import InventoryType
+from src.modules.users.enums import Role
 
 
 class ClientService:
@@ -29,11 +30,10 @@ class ClientService:
                 raise ClientAlreadyExistsError(phone=data.phone)
 
             try:
-                client_data = data.model_dump(
-                    exclude_unset=True,
-                    exclude_none=True,
-                    exclude={"phone", "address_name"},
-                )
+                client_data = {
+                    "username": data.username,
+                    "role": Role(data.role.value),
+                }
                 client = await self.uow.users.add(client_data)
 
                 await self.uow.identities.add_local(

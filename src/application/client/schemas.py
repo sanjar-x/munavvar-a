@@ -1,8 +1,9 @@
+import enum
 import uuid
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, computed_field
 
 from src.modules.catalog.enums import ProductType
 from src.modules.inventory.enums import InventoryType
@@ -10,26 +11,21 @@ from src.modules.orders.enums import OrderStatus, PaymentMethod
 from src.modules.users.models import Role
 
 
-# --- CREATE CLIENT ---
+class ClientRole(enum.StrEnum):
+    CLIENT_B2C = "client_b2c"
+    CLIENT_B2B = "client_b2b"
+
+
 class ClientCreate(BaseModel):
     username: str = Field(..., description="ФИО или Название компании")
     phone: str = Field(..., description="Номер телефона клиента (будет Identity)")
-    role: Role = Field(
-        default=Role.CLIENT_B2C,
+    role: ClientRole = Field(
+        default=ClientRole.CLIENT_B2C,
         description="Тип клиента: физическое (client_b2c) или юридическое лицо (client_b2b)",
     )
     address_name: str | None = Field(
         default=None, description="Название первого адреса (Инвентаря)"
     )
-
-    @field_validator("role")
-    @classmethod
-    def validate_role(cls, v: Role) -> Role:
-        if v not in (Role.CLIENT_B2C, Role.CLIENT_B2B):
-            raise ValueError(
-                "Разрешено создавать только роли client_b2c или client_b2b"
-            )
-        return v
 
 
 class InventoryCreate(BaseModel):
@@ -60,7 +56,7 @@ class Inventory(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     type: InventoryType
     name: str
-    balances: list[Balance] = []
+    balances: list[Balance]
 
 
 class ClientInventory(BaseModel):
@@ -106,8 +102,8 @@ class ClientResponse(BaseModel):
     username: str
     phone: str | None = None
     account: Account | None = None
-    inventories: list[Inventory] = []
-    client_orders: list[Order] = []
+    inventories: list[Inventory]
+    client_orders: list[Order]
 
 
 class InventoryUpdate(BaseModel):
