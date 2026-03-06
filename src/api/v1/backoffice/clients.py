@@ -27,6 +27,9 @@ clients_router = APIRouter()
     description="Создает профиль клиента.",
 )
 async def create_client(
+    current_admin: Annotated[
+        User, Security(get_current_user, scopes=[Scope.USERS_WRITE])
+    ],
     data: ClientCreate,
     client_service: Annotated[ClientService, Depends(get_client_service)],
 ):
@@ -36,13 +39,16 @@ async def create_client(
 @clients_router.post(
     "/{client_id}/inventories",
     status_code=status.HTTP_201_CREATED,
-    response_model=ClientsResponse,  # Укажи схему полной карточки клиента
+    response_model=ClientsResponse,
     summary="Добавить новый адрес (инвентарь) клиенту",
     description="Создает дополнительный адрес доставки/склад для указанного клиента и возвращает обновленную карточку профиля.",
 )
 async def create_client_inventory(
     client_id: uuid.UUID,
     data: InventoryCreate,
+    current_admin: Annotated[
+        User, Security(get_current_user, scopes=[Scope.USERS_WRITE])
+    ],
     client_service: Annotated[ClientService, Depends(get_client_service)],
 ):
     return await client_service.create_client_inventory(client_id=client_id, data=data)
@@ -55,6 +61,9 @@ async def create_client_inventory(
     description="Возвращает список клиентов с пагинацией.  Поиск по ФИО/телефон.",
 )
 async def get_clients(
+    current_admin: Annotated[
+        User, Security(get_current_user, scopes=[Scope.USERS_WRITE])
+    ],
     client_service: Annotated[ClientService, Depends(get_client_service)],
     skip: int = Query(0, ge=0, description="Сколько записей пропустить"),
     limit: int = Query(50, ge=1, le=100, description="Сколько записей вернуть"),
@@ -70,6 +79,9 @@ async def get_clients(
 )
 async def get_client(
     client_id: uuid.UUID,
+    current_admin: Annotated[
+        User, Security(get_current_user, scopes=[Scope.USERS_WRITE])
+    ],
     client_service: Annotated[ClientService, Depends(get_client_service)],
 ):
     return await client_service.get_client(client_id=client_id)
