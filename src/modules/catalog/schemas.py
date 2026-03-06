@@ -4,7 +4,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from src.modules.catalog.models import ProductType
+from src.modules.catalog.enums import ProductType
 
 
 # --- БАЗОВАЯ СХЕМА ---
@@ -39,9 +39,7 @@ class ProductBase(BaseModel):
 
 # --- СХЕМА ДЛЯ СОЗДАНИЯ (POST /products) ---
 class ProductCreate(ProductBase):
-    type: ProductType = Field(
-        ..., title="Тип товара", examples=[ProductType.WATER]
-    )
+    type: ProductType = Field(..., title="Тип товара", examples=[ProductType.WATER])
 
 
 # --- СХЕМА ДЛЯ ОБНОВЛЕНИЯ (PATCH /products/{id}) ---

@@ -5,7 +5,7 @@ from typing import Annotated, Any
 from pydantic import BaseModel, ConfigDict, Field
 
 from src.modules.catalog.enums import ProductType
-from src.modules.users.models import Role
+from src.modules.users.enums import Role
 
 # ==========================================
 # 1. КАСТОМНЫЕ ТИПЫ (Переиспользуемая валидация)

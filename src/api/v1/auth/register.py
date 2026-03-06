@@ -3,8 +3,9 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, status
 
+from src.infrastructure.database.models import User
 from src.modules.users.dependencies import get_user_service
-from src.modules.users.models import Role, User
+from src.modules.users.enums import Role
 from src.modules.users.schemas import UserAdminCreate, UserCreate, UserResponse
 from src.modules.users.services import UserService
 

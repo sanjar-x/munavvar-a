@@ -4,12 +4,12 @@ from collections.abc import Sequence
 from typing import Any
 
 from src.common.service import BaseService
+from src.infrastructure.database.models import Product
 from src.modules.catalog.enums import ProductType
 from src.modules.catalog.exceptions import (
     InvalidReturnableItemError,
     ProductNotFoundError,
 )
-from src.modules.catalog.models import Product
 from src.modules.catalog.repositories import ProductRepository
 from src.modules.catalog.schemas import ProductCreate
 from src.modules.catalog.uow import CatalogUnitOfWork
@@ -51,9 +51,7 @@ class CatalogService(BaseService[Product, ProductCreate, CatalogUnitOfWork]):
                     active_only=True,  # На витрине только активные товары!
                 )
 
-    async def get_by_ids(
-        self, product_ids: list[uuid.UUID]
-    ) -> Sequence[Product]:
+    async def get_by_ids(self, product_ids: list[uuid.UUID]) -> Sequence[Product]:
         """
         PUBLIC API для соседних доменов (Orders).
         Используется корзиной для получения актуальных цен при чекауте.

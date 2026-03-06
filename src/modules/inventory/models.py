@@ -24,9 +24,9 @@ from src.modules.inventory.enums import (
 )
 
 if TYPE_CHECKING:
+    from src.infrastructure.database.models import User
     from src.modules.catalog.models import Product
     from src.modules.orders.models import Order
-    from src.modules.users.models import User
 
 
 class Inventory(BaseModel):

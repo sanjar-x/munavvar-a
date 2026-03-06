@@ -6,12 +6,12 @@ from typing import Any
 from src.application.order.schemas import CartValidationResponse, OrderCreate
 from src.application.order.uow import OrderUnitOfWork
 from src.core.exceptions import ConflictError
+from src.infrastructure.database.models import Order
 from src.modules.catalog.enums import ProductType
-from src.modules.finances.models import TransactionStatus
+from src.modules.finances.enums import TransactionStatus
 from src.modules.inventory.enums import TransferStatus, TransferType
 from src.modules.orders.enums import OrderStatus, PaymentMethod
 from src.modules.orders.exceptions import EmptyCartError
-from src.modules.orders.models import Order
 
 
 class OrderService:

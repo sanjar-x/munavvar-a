@@ -4,9 +4,10 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query, Security, status
 
 from src.core.security.permissions import Scope
+from src.infrastructure.database.models import User
 from src.modules.auth.dependencies import get_current_user
 from src.modules.users.dependencies import get_user_service
-from src.modules.users.models import Role, User
+from src.modules.users.enums import Role
 from src.modules.users.schemas import (
     UserAdminCreate,
     UserAdminUpdate,
@@ -49,9 +50,7 @@ async def get_users(
     ],
     user_service: Annotated[UserService, Depends(get_user_service)],
     page: Annotated[int, Query(ge=1, description="Номер страницы")] = 1,
-    size: Annotated[
-        int, Query(ge=1, le=100, description="Размер страницы")
-    ] = 50,
+    size: Annotated[int, Query(ge=1, le=100, description="Размер страницы")] = 50,
     role: Annotated[Role | None, Query(description="Фильтр по роли")] = None,
     search: Annotated[str | None, Query(description="Поиск по ФИО")] = None,
 ):

@@ -1,7 +1,7 @@
 # src/infrastructure/database/models.py
 from src.infrastructure.database.base import BaseModel
 from src.modules.catalog.models import Product
-from src.modules.finances.models import Account
+from src.modules.finances.models import Account, Transaction
 from src.modules.inventory.models import (
     Balance,
     Inventory,
@@ -16,6 +16,7 @@ __all__ = [
     "BaseModel",
     "Product",
     "Account",
+    "Transaction",
     "Balance",
     "Inventory",
     "StockTransaction",

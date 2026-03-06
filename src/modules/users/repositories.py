@@ -214,9 +214,6 @@ class UserRepository(BaseRepository[User]):
             select(self.model)
             .where(self.model.id == courier_id, self.model.role == Role.COURIER)
             .options(
-                selectinload(self.model.identities),
-                selectinload(self.model.accounts),
-                selectinload(self.model.inventories),
                 selectinload(self.model.courier_orders).options(
                     joinedload(Order.client_inventory),
                     joinedload(Order.client),

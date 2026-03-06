@@ -5,8 +5,8 @@ from typing import Annotated
 from fastapi import APIRouter, Security
 
 from src.core.security.permissions import Scope
+from src.infrastructure.database.models import User
 from src.modules.auth.dependencies import get_current_user
-from src.modules.users.models import User
 from src.modules.users.schemas import UserResponse
 
 profile_router = APIRouter()

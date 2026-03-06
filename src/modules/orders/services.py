@@ -4,6 +4,7 @@ from collections.abc import Sequence
 from datetime import datetime
 
 from src.common.service import BaseService
+from src.infrastructure.database.models import Order
 from src.modules.catalog.services import CatalogService
 from src.modules.orders.enums import OrderStatus, PaymentMethod
 from src.modules.orders.exceptions import (
@@ -13,16 +14,13 @@ from src.modules.orders.exceptions import (
     OrderNotFoundError,
     ProductsUnavailableError,
 )
-from src.modules.orders.models import Order
 from src.modules.orders.repositories import OrderRepository
 from src.modules.orders.schemas import OrderCreate
 from src.modules.orders.uow import BaseOrderUnitOfWork
 
 
 class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
-    def __init__(
-        self, uow: BaseOrderUnitOfWork, catalog_service: CatalogService
-    ):
+    def __init__(self, uow: BaseOrderUnitOfWork, catalog_service: CatalogService):
         super().__init__(uow=uow)
         self.catalog_service = catalog_service
 
@@ -32,9 +30,7 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
 
     # --- БИЗНЕС-ЛОГИКА ---
 
-    async def create_order(
-        self, client_id: uuid.UUID, dto: OrderCreate
-    ) -> Order:
+    async def create_order(self, client_id: uuid.UUID, dto: OrderCreate) -> Order:
         """
         Процесс Checkout'а.
         Формирует корзину заказа (OrderItem) и высчитывает (total_amount),
@@ -61,24 +57,20 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
             current_price = price_map[item.product_id]
             total_amount += current_price * item.quantity
 
-            order_items_data.append(
-                {
-                    "product_id": item.product_id,
-                    "quantity": item.quantity,
-                    "unit_price": current_price,  # Snapshot Pattern
-                }
-            )
+            order_items_data.append({
+                "product_id": item.product_id,
+                "quantity": item.quantity,
+                "unit_price": current_price,  # Snapshot Pattern
+            })
 
         async with self.uow:
             # 3. Сохраняем шапку Заказа с подсчитанной суммой
-            new_order = await self.uow.orders.add(
-                {
-                    "client_id": client_id,
-                    "payment_method": dto.payment_method,
-                    "status": OrderStatus.NEW,
-                    "total_amount": total_amount,
-                }
-            )
+            new_order = await self.uow.orders.add({
+                "client_id": client_id,
+                "payment_method": dto.payment_method,
+                "status": OrderStatus.NEW,
+                "total_amount": total_amount,
+            })
 
             # 4. Привязываем строки корзины к новому заказу
             for item_data in order_items_data:
@@ -140,15 +132,11 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
 
             # Бизнес-проверка: менять можно только новые заказы
             if order.status != OrderStatus.NEW:
-                raise ValueError(
-                    "Нельзя менять состав заказа в текущем статусе"
-                )
+                raise ValueError("Нельзя менять состав заказа в текущем статусе")
 
             # 3. Ищем, есть ли уже такой товар в заказе
-            existing_item = (
-                await self.uow.order_items.get_by_order_and_product(
-                    order_id=order_id, product_id=product_id
-                )
+            existing_item = await self.uow.order_items.get_by_order_and_product(
+                order_id=order_id, product_id=product_id
             )
 
             if existing_item:
@@ -157,14 +145,12 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
                     order_item_id=existing_item.id, new_quantity=new_quantity
                 )
             else:
-                await self.uow.order_items.add(
-                    {
-                        "order_id": order_id,
-                        "product_id": product_id,
-                        "quantity": quantity,
-                        "unit_price": current_price,
-                    }
-                )
+                await self.uow.order_items.add({
+                    "order_id": order_id,
+                    "product_id": product_id,
+                    "quantity": quantity,
+                    "unit_price": current_price,
+                })
 
             amount_to_add = current_price * quantity
             new_total = order.total_amount + amount_to_add
@@ -190,14 +176,10 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
                 raise OrderNotFoundError(order_id=order_id)
 
             if order.status != OrderStatus.NEW:
-                raise ValueError(
-                    "Нельзя менять состав заказа в текущем статусе"
-                )
+                raise ValueError("Нельзя менять состав заказа в текущем статусе")
 
-            existing_item = (
-                await self.uow.order_items.get_by_order_and_product(
-                    order_id=order_id, product_id=product_id
-                )
+            existing_item = await self.uow.order_items.get_by_order_and_product(
+                order_id=order_id, product_id=product_id
             )
 
             # Если товара и так нет, просто отдаем текущий заказ
@@ -205,9 +187,7 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
                 return order
 
             # 3. Высчитываем сумму для вычета до удаления
-            amount_to_subtract = (
-                existing_item.unit_price * existing_item.quantity
-            )
+            amount_to_subtract = existing_item.unit_price * existing_item.quantity
 
             # 4. Удаляем строку
             await self.uow.order_items.delete_by_order_and_product(
@@ -223,9 +203,7 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
             await self.uow.commit()
             return updated_order
 
-    async def assign_courier(
-        self, order_id: uuid.UUID, courier_id: uuid.UUID
-    ) -> Order:
+    async def assign_courier(self, order_id: uuid.UUID, courier_id: uuid.UUID) -> Order:
         """
         Диспетчеризация: Логист назначает заказ конкретному курьеру.
         """
@@ -263,9 +241,7 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
         self, order_id: uuid.UUID, new_status: OrderStatus
     ) -> Order:
         async with self.uow:
-            updated_order = await self.uow.orders.update_status(
-                order_id, new_status
-            )
+            updated_order = await self.uow.orders.update_status(order_id, new_status)
             if not updated_order:
                 raise OrderNotFoundError(order_id=order_id)
             await self.uow.commit()
@@ -282,9 +258,7 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
                 client_id=client_id, skip=skip, limit=limit
             )
 
-    async def get_courier_tasks(
-        self, courier_id: uuid.UUID
-    ) -> Sequence[Order]:
+    async def get_courier_tasks(self, courier_id: uuid.UUID) -> Sequence[Order]:
         """Активные заказы на сегодня для терминала курьера."""
         async with self.uow:
             return await self.uow.orders.get_active_courier_orders(

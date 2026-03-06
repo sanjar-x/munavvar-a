@@ -4,7 +4,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from src.modules.orders.models import OrderStatus, PaymentMethod
+from src.modules.orders.enums import OrderStatus, PaymentMethod
 
 
 class Item(BaseModel):

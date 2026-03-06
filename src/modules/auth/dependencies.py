@@ -9,9 +9,9 @@ from src.core.config import settings
 from src.core.exceptions import ForbiddenError, UnauthorizedError
 from src.core.security.jwt import decode_access_token
 from src.core.security.permissions import Scope
+from src.infrastructure.database.models import User
 from src.modules.auth.services import AuthService
 from src.modules.users.dependencies import get_user_service
-from src.modules.users.models import User
 from src.modules.users.services import UserService
 
 # 1. ДИНАМИЧЕСКАЯ ГЕНЕРАЦИЯ SCOPES ДЛЯ SWAGGER

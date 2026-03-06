@@ -9,13 +9,16 @@ from sqlalchemy.orm import joinedload, selectinload
 
 from src.common.repository import BaseRepository
 from src.core.config import settings
-from src.modules.catalog.models import Product
-from src.modules.inventory.models import (
+from src.infrastructure.database.models import (
+    Balance,
     Inventory,
-    InventoryType,
+    Product,
     StockTransaction,
     StockTransfer,
     StockTransferItem,
+)
+from src.modules.inventory.enums import (
+    InventoryType,
     TransferStatus,
     TransferType,
 )
@@ -24,6 +27,15 @@ from src.modules.inventory.models import (
 class InventoryRepository(BaseRepository[Inventory]):
     def __init__(self, session: AsyncSession):
         super().__init__(model=Inventory, session=session)
+
+    async def create_courier_inventory(
+        self, user_id: uuid.UUID, inventory_name: str
+    ) -> Inventory:
+        return await self.add({
+            "user_id": user_id,
+            "type": InventoryType.COURIER,
+            "name": inventory_name,
+        })
 
     async def create_client_inventory(
         self, user_id: uuid.UUID, inventory_name: str
@@ -49,22 +61,21 @@ class InventoryRepository(BaseRepository[Inventory]):
 
     async def get_courier_inventory(
         self,
-        user_id: uuid.UUID,
-    ) -> Inventory:
+        courier_id: uuid.UUID,
+    ) -> Inventory | None:
         query = (
             select(self.model)
             .where(
-                self.model.user_id == user_id,
+                self.model.user_id == courier_id,
                 self.model.type == InventoryType.COURIER,
                 self.model.is_active.is_(True),
             )
-            .options(joinedload(self.model.user))
+            .options(selectinload(self.model.balances).joinedload(attr=Balance.product))
         )
-
         result = await self.session.execute(query)
-        return result.scalar_one()
+        return result.unique().scalar_one_or_none()
 
-    async def get_couriers_inventories(
+    async def get_couriers_inventory(
         self,
         offset: int = 0,
         limit: int = 100,
@@ -85,16 +96,9 @@ class InventoryRepository(BaseRepository[Inventory]):
 
     # --- СЦЕНАРИИ КЛИЕНТА (B2C / B2B) ---
 
-    async def get_client_inventories(self, user_id: uuid.UUID) -> Sequence[Inventory]:
-        return await self.get_multi(user_id=user_id, type=InventoryType.CLIENT)
-
     async def get_client_inventory(
         self, user_id: uuid.UUID, inventory_id: uuid.UUID
     ) -> Inventory | None:
-        """
-        Security Alert (Защита от IDOR):
-        Использовать при оформлении заказа с фронтенда!
-        """
         query = select(self.model).where(
             self.model.id == inventory_id,
             self.model.user_id == user_id,
@@ -103,8 +107,6 @@ class InventoryRepository(BaseRepository[Inventory]):
         )
         result = await self.session.execute(query)
         return result.scalar_one_or_none()
-
-    # --- СИСТЕМНЫЕ И АДМИНСКИЕ СЦЕНАРИИ ---
 
     async def search_inventories(
         self,
@@ -120,20 +122,6 @@ class InventoryRepository(BaseRepository[Inventory]):
             query = query.where(self.model.type == inv_type)
 
         query = query.limit(limit)
-        result = await self.session.execute(query)
-        return result.scalars().all()
-
-    async def get_by_ids(self, inventory_ids: list[uuid.UUID]) -> Sequence[Inventory]:
-        """
-        Bulk запрос для отчетов и агрегаций (чтобы избежать N+1 запросов к БД).
-        Например, маппинг списка складов для аналитики.
-        """
-        if not inventory_ids:
-            return []
-
-        query = select(self.model).where(
-            self.model.id.in_(inventory_ids), self.model.is_active.is_(True)
-        )
         result = await self.session.execute(query)
         return result.scalars().all()
 

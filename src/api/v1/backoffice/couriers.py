@@ -11,9 +11,9 @@ from src.application.courier.schemas import (
 )
 from src.application.courier.service import CourierService
 from src.core.security.permissions import Scope
+from src.infrastructure.database.models import User
 from src.modules.auth.dependencies import get_current_user
 from src.modules.users.dependencies import get_user_service
-from src.modules.users.models import User
 from src.modules.users.schemas import UserAdminUpdate, UserResponse
 from src.modules.users.services import UserService
 

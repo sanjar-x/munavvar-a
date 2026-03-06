@@ -13,9 +13,8 @@ from src.application.courier.uow import CourierUnitOfWork
 from src.application.inventories.schemas import InventoryCreate
 from src.core.exceptions import ConflictError
 from src.core.security.password import get_password_hash
-from src.modules.finances.enums import AccountType
 from src.modules.inventory.enums import InventoryType
-from src.modules.users.models import AuthProvider, Role
+from src.modules.users.enums import AuthProvider, Role
 
 
 class CourierService:
@@ -45,11 +44,10 @@ class CourierService:
                     "password_hash": hashed_pwd,
                 })
 
-                await self.uow.accounts.add({
-                    "type": AccountType.COURIER,
-                    "user_id": courier.id,
-                    "name": f"Счет курьера: {courier.username}",
-                })
+                await self.uow.accounts.create_courier_account(
+                    courier_id=courier.id,
+                    courier_name=courier.username,
+                )
 
                 await self.uow.commit()
 
@@ -125,40 +123,16 @@ class CourierService:
             if not courier:
                 raise CourierNotFoundError(courier_id=courier_id)
 
-            car_inventory = next(
-                (
-                    inv
-                    for inv in courier.inventories
-                    if inv.type == InventoryType.COURIER
-                ),
-                None,
-            )
-
-            car_data = None
-            if car_inventory:
-                balances = await self.uow.stock_transactions.get_balances(
-                    inventory_id=car_inventory.id
-                )
-                car_data = {
-                    "inventory": car_inventory,
-                    "balances": balances,
-                }
-
-            phone = next(
-                (
-                    i.provider_identity_id
-                    for i in courier.identities
-                    if i.provider == AuthProvider.LOCAL
-                ),
-                None,
-            )
+            identity = await self.uow.identities.get_local_by_user(courier.id)
+            account = await self.uow.accounts.get_courier_account(courier.id)
+            inventory = await self.uow.inventories.get_courier_inventory(courier_id)
 
             return {
                 "id": courier.id,
                 "username": courier.username,
-                "phone": phone,
+                "phone": identity.provider_identity_id,
                 "is_active": courier.is_active,
-                "account": courier.accounts[0] if courier.accounts else None,
-                "inventory": car_data,
+                "account": account,
+                "inventory": inventory,
                 "orders": courier.courier_orders,
             }

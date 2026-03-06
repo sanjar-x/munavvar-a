@@ -8,7 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field, computed_field
 from src.modules.catalog.enums import ProductType
 from src.modules.inventory.enums import InventoryType
 from src.modules.orders.enums import OrderStatus, PaymentMethod
-from src.modules.users.models import Role
+from src.modules.users.enums import Role
 
 
 class ClientRole(enum.StrEnum):

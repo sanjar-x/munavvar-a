@@ -4,8 +4,9 @@ from typing import Any
 
 from src.common.service import BaseService
 from src.core.security.password import get_password_hash
+from src.infrastructure.database.models import User
+from src.modules.users.enums import AuthProvider, Role
 from src.modules.users.exceptions import UserAlreadyExistsError
-from src.modules.users.models import AuthProvider, Role, User
 from src.modules.users.repositories import UserRepository
 from src.modules.users.schemas import UserAdminCreate
 from src.modules.users.uow import UserUnitOfWork

@@ -10,8 +10,8 @@ from src.infrastructure.database.base import BaseModel
 from src.modules.finances.enums import AccountType, TransactionStatus
 
 if TYPE_CHECKING:
+    from src.infrastructure.database.models import User
     from src.modules.orders.models import Order
-    from src.modules.users.models import User
 
 account_type_enum = Enum(
     AccountType, name="account_type_enum", native_enum=True, create_type=True

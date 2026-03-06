@@ -10,10 +10,10 @@ from src.infrastructure.database.base import BaseModel
 from src.modules.orders.enums import OrderStatus, PaymentMethod
 
 if TYPE_CHECKING:
+    from src.infrastructure.database.models import User
     from src.modules.catalog.models import Product
     from src.modules.finances.models import Transaction
     from src.modules.inventory.models import Inventory, StockTransfer
-    from src.modules.users.models import User
 
 
 class Order(BaseModel):

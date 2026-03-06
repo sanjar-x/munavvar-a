@@ -6,12 +6,11 @@ from sqlalchemy import select
 
 from src.core.config import settings
 from src.core.security.password import get_password_hash
+from src.infrastructure.database.models import Account, Identity, Inventory, User
 from src.infrastructure.database.session import async_session_maker
 from src.modules.finances.enums import AccountType
-from src.modules.finances.models import Account
 from src.modules.inventory.enums import InventoryType
-from src.modules.inventory.models import Inventory
-from src.modules.users.models import AuthProvider, Identity, Role, User
+from src.modules.users.enums import AuthProvider, Role
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

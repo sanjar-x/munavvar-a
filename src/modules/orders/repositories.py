@@ -8,8 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 
 from src.common.repository import BaseRepository
+from src.infrastructure.database.models import Order, OrderItem
 from src.modules.orders.enums import OrderStatus, PaymentMethod
-from src.modules.orders.models import Order, OrderItem
 
 
 class OrderItemRepository(BaseRepository[OrderItem]):
@@ -71,9 +71,7 @@ class OrderRepository(BaseRepository[Order]):
         result: Result = await self.session.execute(query)
         return result.scalars().all()
 
-    async def get_active_courier_orders(
-        self, courier_id: uuid.UUID
-    ) -> Sequence[Order]:
+    async def get_active_courier_orders(self, courier_id: uuid.UUID) -> Sequence[Order]:
         """
         Для приложения курьера: Список заказов "На сегодня",
         которые еще не доставлены или не отменены.
@@ -82,13 +80,11 @@ class OrderRepository(BaseRepository[Order]):
             select(self.model)
             .where(
                 self.model.courier_id == courier_id,
-                self.model.status.in_(
-                    [
-                        OrderStatus.ASSIGNED,
-                        OrderStatus.IN_TRANSIT,
-                        OrderStatus.ARRIVED,
-                    ]
-                ),
+                self.model.status.in_([
+                    OrderStatus.ASSIGNED,
+                    OrderStatus.IN_TRANSIT,
+                    OrderStatus.ARRIVED,
+                ]),
             )
             .options(
                 joinedload(self.model.client),
@@ -151,9 +147,7 @@ class OrderRepository(BaseRepository[Order]):
         if client_id:
             query = query.where(self.model.client_id == client_id)
         if client_inventory_id:
-            query = query.where(
-                self.model.client_inventory_id == client_inventory_id
-            )
+            query = query.where(self.model.client_inventory_id == client_inventory_id)
 
         # Диапазоны дат (предполагается, что created_at есть в BaseModel)
         if date_from:
@@ -169,7 +163,8 @@ class OrderRepository(BaseRepository[Order]):
 
         # Жадная загрузка связей и пагинация
         query = (
-            query.options(
+            query
+            .options(
                 joinedload(self.model.client),
                 joinedload(self.model.client_inventory),
                 joinedload(self.model.courier),
