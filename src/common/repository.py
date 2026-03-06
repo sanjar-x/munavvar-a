@@ -29,9 +29,7 @@ class BaseRepository[ModelType: BaseModel]:
         result = await self.session.execute(query)
         return result.scalar_one_or_none()
 
-    async def get_by(
-        self, active_only: bool = True, **kwargs: Any
-    ) -> ModelType | None:
+    async def get_by(self, active_only: bool = True, **kwargs: Any) -> ModelType | None:
         query = select(self.model).filter_by(**kwargs)
         if active_only:
             query = query.where(self.model.is_active.is_(True))
@@ -62,9 +60,7 @@ class BaseRepository[ModelType: BaseModel]:
         await self.session.flush()
         return db_obj
 
-    async def add_many(
-        self, objs_data: list[dict[str, Any]]
-    ) -> Sequence[ModelType]:
+    async def add_many(self, objs_data: list[dict[str, Any]]) -> Sequence[ModelType]:
         """Bulk Insert для массового добавления товаров в накладную/леджер."""
         if not objs_data:
             return []
@@ -73,9 +69,7 @@ class BaseRepository[ModelType: BaseModel]:
         result = await self.session.execute(stmt)
         return result.scalars().all()
 
-    async def update(
-        self, id: uuid.UUID, obj_data: dict[str, Any]
-    ) -> ModelType:
+    async def update(self, id: uuid.UUID, obj_data: dict[str, Any]) -> ModelType:
         # Защита от случайного обновления ID
         obj_data.pop("id", None)
 
@@ -90,9 +84,7 @@ class BaseRepository[ModelType: BaseModel]:
 
     async def archive(self, id: uuid.UUID) -> bool:
         statement = (
-            update(self.model)
-            .where(self.model.id == id)
-            .values(is_active=False)
+            update(self.model).where(self.model.id == id).values(is_active=False)
         )
         result = await self.session.execute(statement)
         return result.rowcount > 0

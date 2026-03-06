@@ -6,7 +6,6 @@ from fastapi import APIRouter, Depends, Query, Security, status
 from src.application.client.dependencies import get_client_service
 from src.application.client.schemas import (
     ClientCreate,
-    ClientResponse,
     ClientsResponse,
 )
 from src.application.client.service import ClientService
@@ -17,7 +16,7 @@ from src.modules.users.dependencies import get_user_service
 from src.modules.users.schemas import UserAdminUpdate, UserResponse
 from src.modules.users.services import UserService
 
-clients_router = APIRouter(prefix="/clients", tags=["Clients (Backoffice)"])
+clients_router = APIRouter()
 
 
 @clients_router.post(
@@ -42,19 +41,14 @@ async def create_client(
 async def get_clients(
     client_service: Annotated[ClientService, Depends(get_client_service)],
     skip: int = Query(0, ge=0, description="Сколько записей пропустить"),
-    limit: int = Query(
-        50, ge=1, le=100, description="Сколько записей вернуть"
-    ),
+    limit: int = Query(50, ge=1, le=100, description="Сколько записей вернуть"),
     search: str | None = Query(None, description="Поиск по ФИО или телефону"),
 ):
-    return await client_service.get_clients(
-        skip=skip, limit=limit, search=search
-    )
+    return await client_service.get_clients(skip=skip, limit=limit, search=search)
 
 
 @clients_router.get(
     "/{client_id}",
-    response_model=ClientResponse,
     summary="Получить карточку клиента",
     description="Возвращает полную информацию о клиенте: профиль, баланс счета, остатки на адресах и историю заказов.",
 )

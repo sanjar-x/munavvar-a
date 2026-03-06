@@ -12,6 +12,16 @@ class IdentityRepository(BaseRepository[Identity]):
     def __init__(self, session):
         super().__init__(model=Identity, session=session)
 
+    async def get_by_provider_and_id(
+        self, provider: AuthProvider, provider_identity_id: str
+    ) -> Identity | None:
+        query = select(self.model).where(
+            self.model.provider == provider,
+            self.model.provider_identity_id == provider_identity_id,
+        )
+        result = await self.session.execute(query)
+        return result.scalar_one_or_none()
+
 
 class UserRepository(BaseRepository[User]):
     def __init__(self, session):
@@ -50,9 +60,7 @@ class UserRepository(BaseRepository[User]):
         result = await self.session.execute(statement)
         return result.scalar_one_or_none()
 
-    async def _get_all_active_by_roles(
-        self, roles: list[Role] | Role
-    ) -> list[User]:
+    async def _get_all_active_by_roles(self, roles: list[Role] | Role) -> list[User]:
         if isinstance(roles, Role):
             roles = [roles]
 
@@ -77,20 +85,14 @@ class UserRepository(BaseRepository[User]):
 
         if search:
             # Поиск по ФИО без учета регистра (ILIKE)
-            statement = statement.where(
-                self.model.username.ilike(f"%{search}%")
-            )
+            statement = statement.where(self.model.username.ilike(f"%{search}%"))
 
-        count_statement = select(func.count()).select_from(
-            statement.subquery()
-        )
+        count_statement = select(func.count()).select_from(statement.subquery())
         total_count = await self.session.scalar(count_statement) or 0
 
         # 4. Применяем пагинацию и сортировку (свежие сверху)
         statement = (
-            statement.order_by(self.model.created_at.desc())
-            .offset(skip)
-            .limit(limit)
+            statement.order_by(self.model.created_at.desc()).offset(skip).limit(limit)
         )
 
         result = await self.session.execute(statement)
@@ -154,11 +156,7 @@ class UserRepository(BaseRepository[User]):
             selectinload(self.model.accounts),
             selectinload(self.model.inventories),
         )
-        query = (
-            query.order_by(self.model.created_at.desc())
-            .offset(skip)
-            .limit(limit)
-        )
+        query = query.order_by(self.model.created_at.desc()).offset(skip).limit(limit)
 
         result = await self.session.scalars(query)
         return total_count, result.all()
@@ -175,9 +173,7 @@ class UserRepository(BaseRepository[User]):
         )
 
     async def get_clients(self) -> list[User]:
-        return await self._get_all_active_by_roles(
-            [Role.CLIENT_B2B, Role.CLIENT_B2C]
-        )
+        return await self._get_all_active_by_roles([Role.CLIENT_B2B, Role.CLIENT_B2C])
 
     async def get_client_with_details(self, client_id: UUID) -> User | None:
         query = (
@@ -223,7 +219,8 @@ class UserRepository(BaseRepository[User]):
         if total_count == 0:
             return 0, []
         query = (
-            query.options(
+            query
+            .options(
                 selectinload(self.model.identities),
                 selectinload(self.model.client_orders),
             )

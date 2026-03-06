@@ -19,15 +19,11 @@ class AccountRepository(BaseRepository[Account]):
         super().__init__(model=Account, session=session)
 
     async def get_for_update(self, account_id: uuid.UUID) -> Account | None:
-        query = (
-            select(Account).where(Account.id == account_id).with_for_update()
-        )
+        query = select(Account).where(Account.id == account_id).with_for_update()
         result: Result = await self.session.execute(query)
         return result.scalar_one_or_none()
 
-    async def get_many_for_update(
-        self, account_ids: list[uuid.UUID]
-    ) -> list[Account]:
+    async def get_many_for_update(self, account_ids: list[uuid.UUID]) -> list[Account]:
         query = (
             select(Account)
             .where(Account.id.in_(account_ids))
@@ -48,30 +44,22 @@ class AccountRepository(BaseRepository[Account]):
         result = await self.session.execute(query)
         return result.scalar_one()
 
-    async def get_system_revenue_account(
-        self, system_user_id: uuid.UUID
-    ) -> Account:
+    async def get_system_revenue_account(self, system_user_id: uuid.UUID) -> Account:
         return await self.get_system_account(
             account_type=AccountType.REVENUE, system_user_id=system_user_id
         )
 
-    async def get_system_cash_account(
-        self, system_user_id: uuid.UUID
-    ) -> Account:
+    async def get_system_cash_account(self, system_user_id: uuid.UUID) -> Account:
         return await self.get_system_account(
             account_type=AccountType.CASH, system_user_id=system_user_id
         )
 
-    async def get_system_card_account(
-        self, system_user_id: uuid.UUID
-    ) -> Account:
+    async def get_system_card_account(self, system_user_id: uuid.UUID) -> Account:
         return await self.get_system_account(
             account_type=AccountType.CARD, system_user_id=system_user_id
         )
 
-    async def get_system_bank_account(
-        self, system_user_id: uuid.UUID
-    ) -> Account:
+    async def get_system_bank_account(self, system_user_id: uuid.UUID) -> Account:
         return await self.get_system_account(
             account_type=AccountType.BANK, system_user_id=system_user_id
         )
@@ -97,9 +85,7 @@ class AccountRepository(BaseRepository[Account]):
             account_type=AccountType.CLIENT, user_id=client_id
         )
 
-    async def get_courier_account(
-        self, courier_id: uuid.UUID
-    ) -> Account | None:
+    async def get_courier_account(self, courier_id: uuid.UUID) -> Account | None:
         """Получает счет курьера (например, для учета принятых наличных)."""
         return await self.get_account(
             account_type=AccountType.COURIER, user_id=courier_id
@@ -113,9 +99,7 @@ class AccountRepository(BaseRepository[Account]):
         result: Result = await self.session.execute(query)
         return list(result.scalars().all())
 
-    async def get_all_by_type(
-        self, account_type: AccountType
-    ) -> Sequence[Account]:
+    async def get_all_by_type(self, account_type: AccountType) -> Sequence[Account]:
         query = select(Account).where(
             Account.type == account_type,
             Account.is_active.is_(True),
@@ -128,9 +112,7 @@ class TransactionRepository(BaseRepository[Transaction]):
     def __init__(self, session: AsyncSession):
         super().__init__(model=Transaction, session=session)
 
-    async def get_for_update(
-        self, transaction_id: uuid.UUID
-    ) -> Transaction | None:
+    async def get_for_update(self, transaction_id: uuid.UUID) -> Transaction | None:
         query = (
             select(Transaction)
             .where(Transaction.id == transaction_id)
@@ -139,9 +121,7 @@ class TransactionRepository(BaseRepository[Transaction]):
         result: Result = await self.session.execute(query)
         return result.scalar_one_or_none()
 
-    async def get_by_order_id(
-        self, order_id: uuid.UUID
-    ) -> Sequence[Transaction]:
+    async def get_by_order_id(self, order_id: uuid.UUID) -> Sequence[Transaction]:
         """
         Получить все финансовые движения по конкретному заказу (Аудит).
         """

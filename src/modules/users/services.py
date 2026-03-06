@@ -26,7 +26,6 @@ class UserService(BaseService[User, UserAdminCreate, UserUnitOfWork]):
     async def get_client(self, id: uuid.UUID) -> User | None:
         async with self.uow:
             return await self._repo.get_client(id=id)
-            # Или await self.uow.users.get_client(id=id) - это одно и то же
 
     async def get_courier(self, id: uuid.UUID) -> User | None:
         async with self.uow:

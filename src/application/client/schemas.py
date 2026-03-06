@@ -1,17 +1,55 @@
 import uuid
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from src.modules.catalog.enums import ProductType
 from src.modules.orders.enums import OrderStatus, PaymentMethod
 from src.modules.users.models import Role
 
-# --- 1. КАТАЛОГ И БАЛАНСЫ ---
+
+# --- CREATE CLIENT ---
+class ClientCreate(BaseModel):
+    username: str = Field(..., description="ФИО или Название компании")
+    phone: str = Field(..., description="Номер телефона клиента (будет Identity)")
+    role: Role = Field(
+        default=Role.CLIENT_B2C,
+        description="Тип клиента: физическое (client_b2c) или юридическое лицо (client_b2b)",
+    )
+    address_name: str | None = Field(
+        default=None, description="Название первого адреса (Инвентаря)"
+    )
+
+    @field_validator("role")
+    @classmethod
+    def validate_role(cls, v: Role) -> Role:
+        if v not in (Role.CLIENT_B2C, Role.CLIENT_B2B):
+            raise ValueError(
+                "Разрешено создавать только роли client_b2c или client_b2b"
+            )
+        return v
 
 
-class ProductDTO(BaseModel):
+# --- CLIENTS LIST ---
+class Client(BaseModel):
+    id: uuid.UUID
+    username: str
+    phone: str | None = None
+    is_active: bool
+    orders: int
+    created_at: datetime
+
+
+class ClientsResponse(BaseModel):
+    total_count: int
+    clients: list[Client]
+
+
+# --- CLIENT DETAIL ---
+
+
+class Product(BaseModel):
     id: uuid.UUID
     type: ProductType
     name: str
@@ -25,34 +63,28 @@ class ProductDTO(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class InventoryResponse(BaseModel):
+class Inventory(BaseModel):
     id: uuid.UUID
     name: str
 
 
-class InventoryBalanceDTO(BaseModel):
+class InventoryBalance(BaseModel):
     quantity: int
-    product: ProductDTO
+    product: Product
 
 
-class ClientInventoryAndBalancesDTO(BaseModel):
-    inventory: InventoryResponse
-    balances: list[InventoryBalanceDTO]
+class InventoryAndBalances(BaseModel):
+    inventory: Inventory
+    balances: list[InventoryBalance]
 
     model_config = ConfigDict(from_attributes=True)
 
 
-# --- 2. ФИНАНСЫ ---
-
-
-class AccountDTO(BaseModel):
+class Account(BaseModel):
     id: uuid.UUID
     name: str
     balance: int
     model_config = ConfigDict(from_attributes=True)
-
-
-# --- 3. ЗАКАЗЫ ---
 
 
 class OrderCourierShortDTO(BaseModel):
@@ -69,16 +101,15 @@ class OrderInventoryShortDTO(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class OrderItemDTO(BaseModel):
+class OrderItem(BaseModel):
     id: uuid.UUID
     quantity: int
     unit_price: int
-    product: ProductDTO
-
+    product: Product
     model_config = ConfigDict(from_attributes=True)
 
 
-class OrderDTO(BaseModel):
+class Order(BaseModel):
     id: uuid.UUID
     status: OrderStatus
     payment_method: PaymentMethod
@@ -89,52 +120,26 @@ class OrderDTO(BaseModel):
     # Вложенные связи заказа
     client_inventory: OrderInventoryShortDTO
     courier: OrderCourierShortDTO | None = None
-    items: list[OrderItemDTO]
+    items: list[OrderItem]
 
     model_config = ConfigDict(from_attributes=True)
 
 
-# --- 4. КОРНЕВАЯ СХЕМА КЛИЕНТА (DASHBOARD 360) ---
-
-
-class ClientResponse(BaseModel):
-    """Полная карточка клиента для возврата из API"""
-
+class FullClientResponse(BaseModel):
     id: uuid.UUID
     username: str
     phone: str | None = None
-    account: AccountDTO | None = None
-    inventories: list[ClientInventoryAndBalancesDTO]
-    orders: list[OrderDTO]
+    account: Account | None = None
+    inventories: list[InventoryAndBalances]
+    orders: list[Order]
 
     model_config = ConfigDict(from_attributes=True)
 
 
-class ClientCreate(BaseModel):
-    username: str = Field(..., description="ФИО или Название компании")
-    phone: str = Field(
-        ..., description="Номер телефона клиента (будет Identity)"
+class ClientUpdate(BaseModel):
+    username: str | None = Field(default=None, description="ФИО или Название компании")
+    phone: str | None = Field(default=None, description="Новый номер телефона")
+    role: Literal[Role.CLIENT_B2C, Role.CLIENT_B2B] | None = Field(
+        default=None,
+        description="Тип клиента: физическое или юридическое лицо",
     )
-    role: Role = Field(default=Role.CLIENT_B2C)
-    address_name: str | None = Field(
-        default=None, description="Название первого адреса (Инвентаря)"
-    )
-
-
-# --- ГЛАВНАЯ СХЕМА ---
-
-
-class ClientDTO(BaseModel):
-    id: uuid.UUID
-    username: str
-    phone: str | None = None
-    is_active: bool
-    orders: int
-    created_at: datetime
-
-    model_config = ConfigDict(from_attributes=True)
-
-
-class ClientsResponse(BaseModel):
-    total_count: int
-    clients: list[ClientDTO]

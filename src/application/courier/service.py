@@ -13,23 +13,19 @@ class CourierService:
 
     async def create_courier(self, data: CourierCreate) -> dict[str, Any]:
         async with self.uow:
-            courier = await self.uow.users.add(
-                {
-                    "username": data.username,
-                    "role": Role.COURIER,
-                    "is_active": True,
-                }
-            )
+            courier = await self.uow.users.add({
+                "username": data.username,
+                "role": Role.COURIER,
+                "is_active": True,
+            })
             await self.uow.session.flush()
 
-            courier_account = await self.uow.accounts.add(
-                {
-                    "type": AccountType.COURIER,
-                    "user_id": courier.id,
-                    "name": f"Счет курьера: {courier.username}",
-                    "balance": 0,
-                }
-            )
+            courier_account = await self.uow.accounts.add({
+                "type": AccountType.COURIER,
+                "user_id": courier.id,
+                "name": f"Счет курьера: {courier.username}",
+                "balance": 0,
+            })
 
             await self.uow.commit()
 
