@@ -5,7 +5,7 @@ from typing import Any
 from src.common.service import BaseService
 from src.core.security.password import get_password_hash
 from src.infrastructure.database.models import User
-from src.modules.users.enums import AuthProvider, Role
+from src.modules.users.enums import AuthProvider
 from src.modules.users.exceptions import UserAlreadyExistsError
 from src.modules.users.repositories import UserRepository
 from src.modules.users.schemas import UserAdminCreate
@@ -56,13 +56,6 @@ class UserService(BaseService[User, UserAdminCreate, UserUnitOfWork]):
                 })
 
             return {"total_count": total, "couriers": items}
-
-    async def get_users_list(
-        self, skip: int, limit: int, role: Role | None, search: str | None
-    ) -> dict[str, Any]:
-        async with self.uow:
-            total, items = await self._repo.get_list(skip, limit, role, search)
-            return {"total_count": total, "users": items}
 
     async def get_user_local_identity(self, identity_id: str):
         async with self.uow:

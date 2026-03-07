@@ -1,6 +1,10 @@
+import uuid
+from typing import Any, Sequence
 from uuid import UUID
 
-from sqlalchemy import Sequence, func, or_, select
+from sqlalchemy import delete, func, insert, inspect, or_, select, update
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 
 from src.common.repository import BaseRepository
@@ -13,10 +17,14 @@ from src.infrastructure.database.models import (
     User,
 )
 from src.modules.users.enums import AuthProvider, Role
+from src.modules.users.exceptions import (
+    UserDeleteConflictError,
+    UserUpdateConflictError,
+)
 
 
 class IdentityRepository(BaseRepository[Identity]):
-    def __init__(self, session):
+    def __init__(self, session: AsyncSession):
         super().__init__(model=Identity, session=session)
 
     async def add_local(self, user_id: UUID, provider_identity_id: str) -> Identity:
@@ -34,7 +42,7 @@ class IdentityRepository(BaseRepository[Identity]):
             self.model.provider == provider,
         )
         result = await self.session.execute(query)
-        return result.scalar_one_or_none()
+        return result.scalar_one()
 
     async def get_by_id_and_provider(
         self,
@@ -45,8 +53,7 @@ class IdentityRepository(BaseRepository[Identity]):
             self.model.provider == provider,
             self.model.provider_identity_id == provider_identity_id,
         )
-        result = await self.session.execute(query)
-        return result.scalar_one_or_none()
+        return await self.session.scalar(query)
 
     async def get_local_by_id(self, provider_identity_id: str) -> Identity | None:
         return await self.get_by_id_and_provider(
@@ -58,26 +65,57 @@ class IdentityRepository(BaseRepository[Identity]):
         return await self.get_by_user_and_provider(user_id, AuthProvider.LOCAL)
 
 
-class UserRepository(BaseRepository[User]):
-    def __init__(self, session):
-        super().__init__(model=User, session=session)
+class UserRepository:
+    _insertable_keys: frozenset[str] = frozenset()
+    _updatable_keys: frozenset[str] = frozenset()
 
-    # --- МЕТОДЫ СОЗДАНИЯ (Семантический сахар) ---
+    def __init__(self, session: AsyncSession):
+        self.session = session
+        self.model = User
+        self._ensure_insertable_keys()
+        self._ensure_updatable_keys()
 
-    async def add_with_role(self, role: Role, **kwargs) -> User:
-        return await self.add({**kwargs, "role": role})
+    @classmethod
+    def _ensure_insertable_keys(cls) -> None:
+        if not cls._insertable_keys:
+            mapper = inspect(subject=User).mapper
+            cls._insertable_keys = frozenset(col.key for col in mapper.columns)
 
-    async def add_accountant(self, **kwargs) -> User:
+    @classmethod
+    def _ensure_updatable_keys(cls) -> None:
+        if not cls._updatable_keys:
+            mapper = inspect(subject=User).mapper
+            valid_columns = {col.key for col in mapper.columns}
+            restricted_columns = {"id", "created_at", "updated_at"}
+            cls._updatable_keys = frozenset(valid_columns - restricted_columns)
+
+    async def add(self, data: dict[str, Any]) -> User:
+        insert_data = {k: v for k, v in data.items() if k in self._insertable_keys}
+        statement = insert(self.model).values(insert_data).returning(self.model)
+        result = await self.session.execute(statement)
+        return result.scalar_one()
+
+    async def add_with_role(self, role: Role, **kwargs: Any) -> User:
+        data = {"role": role, **kwargs}
+        return await self.add(data)
+
+    async def add_accountant(self, **kwargs: Any) -> User:
         return await self.add_with_role(role=Role.ACCOUNTANT, **kwargs)
 
-    async def add_storekeeper(self, **kwargs) -> User:
+    async def add_storekeeper(self, **kwargs: Any) -> User:
         return await self.add_with_role(role=Role.STOREKEEPER, **kwargs)
 
-    async def add_cashier(self, **kwargs) -> User:
+    async def add_cashier(self, **kwargs: Any) -> User:
         return await self.add_with_role(role=Role.CASHIER, **kwargs)
 
-    async def add_courier(self, **kwargs) -> User:
+    async def add_courier(self, **kwargs: Any) -> User:
         return await self.add_with_role(role=Role.COURIER, **kwargs)
+
+    async def get_by_id(self, id: uuid.UUID) -> User | None:
+        query = select(self.model).where(
+            self.model.id == id, self.model.is_active.is_(True)
+        )
+        return await self.session.scalar(query)
 
     async def _get_active_by_role_and_id(
         self, id: UUID, roles: list[Role] | Role
@@ -90,53 +128,11 @@ class UserRepository(BaseRepository[User]):
             self.model.role.in_(roles),
             self.model.is_active.is_(True),
         )
-        result = await self.session.execute(statement)
-        return result.scalar_one_or_none()
-
-    async def _get_all_active_by_roles(self, roles: list[Role] | Role) -> list[User]:
-        if isinstance(roles, Role):
-            roles = [roles]
-
-        statement = select(self.model).where(
-            self.model.role.in_(roles), self.model.is_active.is_(True)
-        )
-        result = await self.session.execute(statement)
-        return list(result.scalars().all())
-
-    async def get_list(
-        self,
-        skip: int,
-        limit: int,
-        role: Role | None = None,
-        search: str | None = None,
-    ) -> tuple[int, list[User]]:
-        # 1. Базовый запрос
-        statement = select(self.model)
-
-        if role:
-            statement = statement.where(self.model.role == role)
-
-        if search:
-            # Поиск по ФИО без учета регистра (ILIKE)
-            statement = statement.where(self.model.username.ilike(f"%{search}%"))
-
-        count_statement = select(func.count()).select_from(statement.subquery())
-        total_count = await self.session.scalar(count_statement) or 0
-
-        # 4. Применяем пагинацию и сортировку (свежие сверху)
-        statement = (
-            statement.order_by(self.model.created_at.desc()).offset(skip).limit(limit)
-        )
-
-        result = await self.session.execute(statement)
-        items = list(result.scalars().all())
-
-        return total_count, items
+        return await self.session.scalar(statement)
 
     async def get_with_identity(
         self, provider: AuthProvider, provider_identity_id: str
     ) -> tuple[User, Identity] | None:
-
         statement = (
             select(User, Identity)
             .join(Identity, Identity.user_id == User.id)
@@ -149,11 +145,10 @@ class UserRepository(BaseRepository[User]):
         result = await self.session.execute(statement)
         return result.first()
 
-    async def get_all_by_role(self, role: Role) -> list[User]:
-        return await self._get_all_active_by_roles(role)
-
     async def get_system_user(self) -> User:
-        statement = select(self.model).where(self.model.role == Role.SYSTEM)
+        statement = select(self.model).where(
+            self.model.role == Role.SYSTEM, self.model.is_active.is_(True)
+        )
         result = await self.session.execute(statement)
         return result.scalar_one()
 
@@ -169,12 +164,12 @@ class UserRepository(BaseRepository[User]):
     async def get_accountant(self, id: UUID) -> User | None:
         return await self._get_active_by_role_and_id(id, Role.ACCOUNTANT)
 
-    # --- СПИСКИ ---
-
     async def get_couriers_with_details(
         self, skip: int, limit: int, search: str | None = None
     ) -> tuple[int, Sequence[User]]:
-        query = select(self.model).where(self.model.role == Role.COURIER)
+        query = select(self.model).where(
+            self.model.role == Role.COURIER, self.model.is_active.is_(True)
+        )
 
         if search:
             search_pattern = f"%{search}%"
@@ -186,8 +181,7 @@ class UserRepository(BaseRepository[User]):
                     ),
                 )
             )
-
-        count_query = select(func.count()).select_from(query.subquery())
+        count_query = query.with_only_columns(func.count()).order_by(None)
         total_count = await self.session.scalar(count_query) or 0
 
         if total_count == 0:
@@ -201,7 +195,7 @@ class UserRepository(BaseRepository[User]):
                 selectinload(self.model.inventories),
                 selectinload(self.model.courier_orders),
             )
-            .order_by(self.model.created_at.desc())
+            .order_by(self.model.created_at.desc(), self.model.id.desc())
             .offset(skip)
             .limit(limit)
         )
@@ -212,7 +206,11 @@ class UserRepository(BaseRepository[User]):
     async def get_courier_with_details(self, courier_id: UUID) -> User | None:
         query = (
             select(self.model)
-            .where(self.model.id == courier_id, self.model.role == Role.COURIER)
+            .where(
+                self.model.id == courier_id,
+                self.model.role == Role.COURIER,
+                self.model.is_active.is_(True),
+            )
             .options(
                 selectinload(self.model.courier_orders).options(
                     joinedload(Order.client_inventory),
@@ -221,18 +219,29 @@ class UserRepository(BaseRepository[User]):
                 ),
             )
         )
-        result = await self.session.execute(query)
-        return result.scalar_one_or_none()
+        return await self.session.scalar(query)
 
     async def get_client(self, id: UUID) -> User | None:
         return await self._get_active_by_role_and_id(
             id, [Role.CLIENT_B2B, Role.CLIENT_B2C]
         )
 
+    async def get_client_by_id(self, id: UUID) -> User | None:
+        statement = select(self.model).where(
+            self.model.id == id,
+            self.model.role.in_([Role.CLIENT_B2B, Role.CLIENT_B2C]),
+            self.model.is_active.is_(True),
+        )
+        return await self.session.scalar(statement)
+
     async def get_client_with_details(self, client_id: UUID) -> User | None:
         query = (
             select(self.model)
-            .where(self.model.id == client_id, self.model.is_active.is_(True))
+            .where(
+                self.model.id == client_id,
+                self.model.is_active.is_(True),
+                self.model.role.in_([Role.CLIENT_B2B, Role.CLIENT_B2C]),
+            )
             .options(
                 selectinload(self.model.inventories).options(
                     selectinload(Inventory.balances).joinedload(Balance.product)
@@ -244,8 +253,7 @@ class UserRepository(BaseRepository[User]):
                 ),
             )
         )
-        result = await self.session.execute(query)
-        return result.unique().scalar_one_or_none()
+        return await self.session.scalar(query)
 
     async def get_clients_with_details(
         self, skip: int, limit: int, search: str | None = None
@@ -265,21 +273,73 @@ class UserRepository(BaseRepository[User]):
                 )
             )
 
-        count_query = select(func.count()).select_from(query.subquery())
+        count_query = query.with_only_columns(func.count()).order_by(None)
         total_count = await self.session.scalar(count_query) or 0
 
         if total_count == 0:
             return 0, []
+
         query = (
             query
             .options(
                 selectinload(self.model.identities),
                 selectinload(self.model.client_orders),
             )
-            .order_by(self.model.created_at.desc())
+            .order_by(self.model.created_at.desc(), self.model.id.desc())
             .offset(skip)
             .limit(limit)
         )
 
         result = await self.session.scalars(query)
         return total_count, result.all()
+
+    async def update(self, id: uuid.UUID, data: dict[str, Any]) -> User | None:
+        update_data = {k: v for k, v in data.items() if k in self._updatable_keys}
+
+        if not update_data:
+            query = select(self.model).where(
+                self.model.id == id, self.model.is_active.is_(True)
+            )
+            return await self.session.scalar(query)
+
+        statement = (
+            update(self.model)
+            .where(self.model.id == id, self.model.is_active.is_(True))
+            .values(update_data)
+            .returning(self.model)
+            .execution_options(synchronize_session="fetch")
+        )
+
+        try:
+            result = await self.session.execute(statement)
+            return result.scalar_one_or_none()
+        except IntegrityError as e:
+            raise UserUpdateConflictError(
+                user_id=id, reason="Нарушение уникальности или ограничения базы данных"
+            ) from e
+
+    async def archive(self, id: uuid.UUID) -> bool:
+        statement = (
+            update(self.model)
+            .where(self.model.id == id, self.model.is_active.is_(True))
+            .values({"is_active": False})
+            .execution_options(synchronize_session="fetch")
+        )
+        result = await self.session.execute(statement)
+        return result.rowcount > 0
+
+    async def delete(self, id: uuid.UUID) -> bool:
+        statement = (
+            delete(self.model)
+            .where(self.model.id == id)
+            .execution_options(synchronize_session="fetch")
+        )
+        try:
+            result = await self.session.execute(statement)
+            return result.rowcount > 0
+
+        except IntegrityError as e:
+            raise UserDeleteConflictError(
+                user_id=id,
+                reason="Невозможно удалить пользователя из-за связанных финансовых или системных данных",
+            ) from e

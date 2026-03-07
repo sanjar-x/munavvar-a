@@ -2,8 +2,6 @@
 import uuid
 from typing import Any
 
-from sqlalchemy.exc import IntegrityError
-
 from src.application.client.exceptions import (
     ClientAlreadyExistsError,
     ClientNotFoundError,
@@ -15,6 +13,7 @@ from src.application.client.schemas import (
     InventoryCreate,
 )
 from src.application.client.uow import ClientUnitOfWork
+from src.infrastructure.database.models import User
 from src.modules.inventory.enums import InventoryType
 from src.modules.users.enums import Role
 
@@ -29,49 +28,43 @@ class ClientService:
             if existing_identity:
                 raise ClientAlreadyExistsError(phone=data.phone)
 
-            try:
-                client_data = {
-                    "username": data.username,
-                    "role": Role(data.role.value),
-                }
-                client = await self.uow.users.add(client_data)
+            client_data = {
+                "username": data.username,
+                "role": Role(data.role.value),
+            }
 
-                await self.uow.identities.add_local(
+            client = await self.uow.users.add(client_data)
+
+            await self.uow.identities.add_local(
+                user_id=client.id,
+                provider_identity_id=data.phone,
+            )
+
+            await self.uow.accounts.create_client_account(
+                client_id=client.id,
+                client_name=data.username,
+            )
+            if data.address_name:
+                await self.uow.inventories.create_client_inventory(
                     user_id=client.id,
-                    provider_identity_id=data.phone,
+                    inventory_name=data.address_name,
                 )
 
-                await self.uow.accounts.create_client_account(
-                    client_id=client.id,
-                    client_name=data.username,
-                )
-                if data.address_name:
-                    await self.uow.inventories.create_client_inventory(
-                        user_id=client.id,
-                        inventory_name=data.address_name,
-                    )
-
-                await self.uow.commit()
-                return await self.get_client(client.id)
-
-            except IntegrityError as e:
-                await self.uow.rollback()
-                if "uq_identities_provider_identity_id" in str(e.orig):
-                    raise ClientAlreadyExistsError(phone=data.phone)
-                raise e
+            await self.uow.commit()
+            return await self.get_client(client_id=client.id)
 
     async def create_client_inventory(
         self, client_id: uuid.UUID, data: InventoryCreate
     ) -> ClientResponse:
         async with self.uow:
-            user = await self.uow.users.get(id=client_id)
-            if not user:
+            client: User | None = await self.uow.users.get_by_id(id=client_id)
+            if not client:
                 raise ClientNotFoundError(client_id)
 
             await self.uow.inventories.add({
                 "name": data.name,
                 "type": InventoryType.CLIENT,
-                "user_id": client_id,
+                "user_id": client.id,
             })
             await self.uow.commit()
 

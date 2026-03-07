@@ -23,10 +23,6 @@ class CatalogService(BaseService[Product, ProductCreate, CatalogUnitOfWork]):
     def _repo(self) -> ProductRepository:
         return self.uow.products
 
-    # ==========================================
-    # QUERIES (ЧТЕНИЕ)
-    # ==========================================
-
     async def get_catalog(
         self,
         skip: int = 0,

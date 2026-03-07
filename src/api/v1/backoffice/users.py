@@ -1,18 +1,16 @@
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query, Security, status
+from fastapi import APIRouter, Depends, Security, status
 
 from src.core.security.permissions import Scope
 from src.infrastructure.database.models import User
 from src.modules.auth.dependencies import get_current_user
 from src.modules.users.dependencies import get_user_service
-from src.modules.users.enums import Role
 from src.modules.users.schemas import (
     UserAdminCreate,
     UserAdminUpdate,
     UserResponse,
-    UserResponseList,
 )
 from src.modules.users.services import UserService
 
@@ -37,28 +35,6 @@ async def create_user(
     """
     user = await user_service.register_local_user(schema)
     return user
-
-
-@users_router.get(
-    "/",
-    response_model=UserResponseList,
-    summary="Список пользователей (Сотрудники, Клиенты)",
-)
-async def get_users(
-    current_admin: Annotated[
-        User, Security(get_current_user, scopes=[Scope.USERS_READ])
-    ],
-    user_service: Annotated[UserService, Depends(get_user_service)],
-    page: Annotated[int, Query(ge=1, description="Номер страницы")] = 1,
-    size: Annotated[int, Query(ge=1, le=100, description="Размер страницы")] = 50,
-    role: Annotated[Role | None, Query(description="Фильтр по роли")] = None,
-    search: Annotated[str | None, Query(description="Поиск по ФИО")] = None,
-):
-    skip = (page - 1) * size
-
-    return await user_service.get_users_list(
-        skip=skip, limit=size, role=role, search=search
-    )
 
 
 @users_router.get(

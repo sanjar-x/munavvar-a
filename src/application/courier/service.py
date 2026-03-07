@@ -62,7 +62,7 @@ class CourierService:
         self, courier_id: uuid.UUID, data: InventoryCreate
     ) -> dict[str, Any]:
         async with self.uow:
-            courier = await self.uow.users.get(id=courier_id)
+            courier = await self.uow.users.get_by_id(id=courier_id)
             if not courier:
                 raise CourierNotFoundError(courier_id=courier_id)
 

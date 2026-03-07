@@ -63,3 +63,29 @@ class UserServiceUnavailableError(ServiceUnavailableError):
             message="Сервис пользователей временно недоступен.",
             error_code="USER_SERVICE_UNAVAILABLE",
         )
+
+
+class UserUpdateConflictError(ConflictError):
+    def __init__(self, user_id: uuid.UUID, reason: str | None = None):
+        details = {"user_id": user_id}
+        if reason:
+            details["reason"] = reason
+
+        super().__init__(
+            message=f"Не удалось обновить данные пользователя {user_id} из-за конфликта состояний.",
+            error_code="USER_UPDATE_CONFLICT",
+            details=details,
+        )
+
+
+class UserDeleteConflictError(ConflictError):
+    def __init__(self, user_id: uuid.UUID, reason: str | None = None):
+        details = {"user_id": user_id}
+        if reason:
+            details["reason"] = reason
+
+        super().__init__(
+            message=f"Отказ физического удаления. Пользователь {user_id} имеет жесткие связи в базе данных.",
+            error_code="USER_DELETE_CONFLICT",
+            details=details,
+        )
