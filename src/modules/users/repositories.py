@@ -221,11 +221,6 @@ class UserRepository:
         )
         return await self.session.scalar(query)
 
-    async def get_client(self, id: UUID) -> User | None:
-        return await self._get_active_by_role_and_id(
-            id, [Role.CLIENT_B2B, Role.CLIENT_B2C]
-        )
-
     async def get_client_by_id(self, id: UUID) -> User | None:
         statement = select(self.model).where(
             self.model.id == id,
