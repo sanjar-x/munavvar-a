@@ -22,6 +22,9 @@ from src.modules.inventory.enums import (
     TransferType,
 )
 from src.modules.orders.enums import OrderStatus
+from src.modules.orders.exceptions import (
+    ProductsUnavailableError,
+)
 from src.modules.users.enums import Role
 
 
@@ -229,6 +232,10 @@ class ClientService:
                 product_ids = [item.product_id for item in data.order.items]
                 products = await self.catalog_service.get_by_ids(product_ids)
                 price_map = {p.id: p.price for p in products}
+
+                missing_ids = [pid for pid in product_ids if pid not in price_map]
+                if missing_ids:
+                    raise ProductsUnavailableError(missing_product_ids=missing_ids)
 
                 total_amount = 0
                 for item in data.order.items:

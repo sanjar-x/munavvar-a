@@ -5,7 +5,6 @@ from typing import Annotated
 
 from fastapi import APIRouter, Body, Depends, Query, Security
 
-from src.application.order.dependencies import get_order_service
 from src.core.security.permissions import Scope
 from src.infrastructure.database.models import User
 from src.modules.auth.dependencies import get_current_user
@@ -63,7 +62,7 @@ async def create_order(
     client_id: Annotated[uuid.UUID, Query(description="ID клиента")],
     dto: OrderCreate,
     admin: Annotated[User, Security(get_current_user, scopes=[Scope.ORDERS_EDIT])],
-    order_service: Annotated[BaseOrderService, Depends(get_order_service)],
+    order_service: Annotated[BaseOrderService, Depends(get_base_order_service)],
 ):
     """Создание заказа администратором от лица клиента."""
     return await order_service.create_order(client_id=client_id, dto=dto)
