@@ -16,7 +16,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-async def create_initial_data() -> None:
+async def init_data() -> None:
     logger.info("Начало инициализации базы данных...")
 
     async with async_session_maker() as session:
@@ -132,4 +132,4 @@ async def create_initial_data() -> None:
 
 # if __name__ == "__main__":
 #     import asyncio
-#     asyncio.run(create_initial_data())
+#     asyncio.run(init_data())
