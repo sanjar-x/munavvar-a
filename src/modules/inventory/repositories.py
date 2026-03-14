@@ -125,19 +125,37 @@ class InventoryRepository(BaseRepository[Inventory]):
         result = await self.session.execute(query)
         return result.scalars().all()
 
-    async def get_with_balances(self, inventory_id: uuid.UUID) -> Inventory | None:
-        """Получить транспорт (инвентарь курьера) с актуальными остатками."""
-        query = (
-            select(self.model)
-            .where(
-                self.model.id == inventory_id,
-                self.model.type == InventoryType.COURIER,
-                self.model.is_active.is_(True),
-            )
-            .options(selectinload(self.model.balances).joinedload(Balance.product))
+    async def get_inventory_with_balances(
+        self, inventory_id: uuid.UUID, inv_type: InventoryType | None = None
+    ) -> Inventory | None:
+        """Получить инвентарь (склад/транспорт) с актуальными остатками."""
+        query = select(self.model).where(
+            self.model.id == inventory_id,
+            self.model.is_active.is_(True),
+        )
+        if inv_type:
+            query = query.where(self.model.type == inv_type)
+
+        query = query.options(
+            selectinload(self.model.balances).joinedload(Balance.product)
         )
         result = await self.session.execute(query)
         return result.unique().scalar_one_or_none()
+
+    async def get_all_warehouses_with_balances(self) -> Sequence[Inventory]:
+        """Получить все склады с их полными товарными остатками."""
+        query = (
+            select(self.model)
+            .where(
+                self.model.type == InventoryType.WAREHOUSE,
+                self.model.is_active.is_(True),
+            )
+            .options(
+                selectinload(self.model.balances).joinedload(Balance.product)
+            )
+        )
+        result = await self.session.execute(query)
+        return result.unique().scalars().all()
 
 
 class StockTransferItemRepository(BaseRepository[StockTransferItem]):

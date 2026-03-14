@@ -273,3 +273,65 @@ class TransportResponse(BaseModel):
 
 class TransportDetailResponse(TransportResponse):
     balances: list[BalanceResponse] = []
+
+
+# --- СКЛАДЫ (WAREHOUSES) ---
+
+
+class WarehouseCreate(BaseModel):
+    user_id: uuid.UUID = Field(..., description="ID материально ответственного")
+    name: str = Field(..., max_length=255)
+
+
+class BalanceItem(BaseModel):
+    product: ProductSimpleResponse
+    quantity: int
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class WarehouseDetailResponse(BaseModel):
+    id: uuid.UUID
+    name: str
+    user_id: uuid.UUID
+    balances: list[BalanceItem] = []
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# --- НАКЛАДНЫЕ (TRANSFERS) ---
+
+
+class TransferCreate(BaseModel):
+    from_id: uuid.UUID
+    to_id: uuid.UUID
+    type: TransferType
+
+
+class TransferItemCreate(BaseModel):
+    product_id: uuid.UUID
+    quantity: int = Field(..., gt=0)
+
+
+class TransferCompleteRequest(BaseModel):
+    accepted_by_id: uuid.UUID = Field(..., description="Кто физически принял товар")
+
+
+class TransferItemResponse(BaseModel):
+    product: ProductSimpleResponse
+    quantity: int
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class TransferResponse(BaseModel):
+    id: uuid.UUID
+    from_id: uuid.UUID
+    to_id: uuid.UUID
+    created_by_id: uuid.UUID
+    accepted_by_id: uuid.UUID | None
+    status: TransferStatus
+    type: TransferType
+    items: list[TransferItemResponse] = []
+
+    model_config = ConfigDict(from_attributes=True)

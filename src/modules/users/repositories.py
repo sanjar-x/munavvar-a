@@ -65,13 +65,12 @@ class IdentityRepository(BaseRepository[Identity]):
         return await self.get_by_user_and_provider(user_id, AuthProvider.LOCAL)
 
 
-class UserRepository:
+class UserRepository(BaseRepository[User]):
     _insertable_keys: frozenset[str] = frozenset()
     _updatable_keys: frozenset[str] = frozenset()
 
     def __init__(self, session: AsyncSession):
-        self.session = session
-        self.model = User
+        super().__init__(model=User, session=session)
         self._ensure_insertable_keys()
         self._ensure_updatable_keys()
 
@@ -89,8 +88,8 @@ class UserRepository:
             restricted_columns = {"id", "created_at", "updated_at"}
             cls._updatable_keys = frozenset(valid_columns - restricted_columns)
 
-    async def add(self, data: dict[str, Any]) -> User:
-        insert_data = {k: v for k, v in data.items() if k in self._insertable_keys}
+    async def add(self, obj_data: dict[str, Any]) -> User:
+        insert_data = {k: v for k, v in obj_data.items() if k in self._insertable_keys}
         statement = insert(self.model).values(insert_data).returning(self.model)
         result = await self.session.execute(statement)
         return result.scalar_one()
@@ -288,14 +287,15 @@ class UserRepository:
         result = await self.session.scalars(query)
         return total_count, result.all()
 
-    async def update(self, id: uuid.UUID, data: dict[str, Any]) -> User | None:
-        update_data = {k: v for k, v in data.items() if k in self._updatable_keys}
+    async def update(self, id: uuid.UUID, obj_data: dict[str, Any]) -> User:
+        update_data = {k: v for k, v in obj_data.items() if k in self._updatable_keys}
 
         if not update_data:
             query = select(self.model).where(
                 self.model.id == id, self.model.is_active.is_(True)
             )
-            return await self.session.scalar(query)
+            result = await self.session.execute(query)
+            return result.scalar_one()
 
         statement = (
             update(self.model)
@@ -307,7 +307,7 @@ class UserRepository:
 
         try:
             result = await self.session.execute(statement)
-            return result.scalar_one_or_none()
+            return result.scalar_one()
         except IntegrityError as e:
             raise UserUpdateConflictError(
                 user_id=id, reason="Нарушение уникальности или ограничения базы данных"

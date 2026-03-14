@@ -5,8 +5,10 @@ from src.api.v1.backoffice.clients import clients_router
 from src.api.v1.backoffice.couriers import couriers_router
 from src.api.v1.backoffice.orders import orders_router
 from src.api.v1.backoffice.profile import profile_router
+from src.api.v1.backoffice.transfers import transfers_router
 from src.api.v1.backoffice.transport import transport_router
 from src.api.v1.backoffice.users import users_router
+from src.api.v1.backoffice.warehouses import warehouses_router
 
 backoffice = APIRouter()
 backoffice.include_router(
@@ -25,5 +27,11 @@ backoffice.include_router(
 )
 backoffice.include_router(
     transport_router, prefix="/transports", tags=["Backoffice | Transports"]
+)
+backoffice.include_router(
+    warehouses_router, prefix="/warehouses", tags=["Backoffice | Warehouses"]
+)
+backoffice.include_router(
+    transfers_router, prefix="/transfers", tags=["Backoffice | Transfers"]
 )
 backoffice.include_router(orders_router, prefix="/orders", tags=["Backoffice | Orders"])
