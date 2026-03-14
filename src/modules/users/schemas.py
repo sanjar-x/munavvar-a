@@ -60,6 +60,12 @@ class UserCreate(BaseModel):
 class UserAdminCreate(UserBase):
     phone: str
     password: PasswordStr
+    initial_tare_quantity: int | None = Field(
+        None, gt=0, description="Начальное количество тары при регистрации"
+    )
+    tare_product_id: uuid.UUID | None = Field(
+        None, description="ID продукта тары для начисления"
+    )
 
 
 class CourierAdminCreate(CourierBase):

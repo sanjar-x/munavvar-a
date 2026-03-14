@@ -5,7 +5,13 @@ from typing import Any
 from src.common.service import BaseService
 from src.core.security.password import get_password_hash
 from src.infrastructure.database.models import User
-from src.modules.users.enums import AuthProvider
+from src.modules.finances.enums import AccountType
+from src.modules.inventory.enums import (
+    InventoryType,
+    TransferStatus,
+    TransferType,
+)
+from src.modules.users.enums import AuthProvider, Role
 from src.modules.users.exceptions import UserAlreadyExistsError
 from src.modules.users.repositories import UserRepository
 from src.modules.users.schemas import UserAdminCreate
@@ -61,7 +67,7 @@ class UserService(BaseService[User, UserAdminCreate, UserUnitOfWork]):
             )
 
     async def register_client(self, schema: UserAdminCreate) -> User:
-        """Регистрация пользователя по номеру телефона"""
+        """Регистрация клиента с созданием счета, инвентаря и стартовой тары"""
         async with self.uow:
             # 1. Проверяем, нет ли уже такого телефона в базе
             result = await self.uow.users.get_with_identity(
@@ -72,21 +78,61 @@ class UserService(BaseService[User, UserAdminCreate, UserUnitOfWork]):
             if result:
                 raise UserAlreadyExistsError(identity_id=schema.phone)
 
-            # 2. Создаем запись User
-            user_data = {"username": schema.username, "role": schema.role}
-
-            # поэтому user.id сразу доступен. Явный uow.flush() здесь не нужен.
+            # 2. Создаем запись User (Role.CLIENT_B2C по умолчанию, если не передано)
+            role = schema.role or Role.CLIENT_B2C
+            user_data = {"username": schema.username, "role": role}
             user = await self.uow.users.add(user_data)
 
             # 3. Создаем запись Identity (учетные данные)
+            hashed_password = get_password_hash(schema.password)
             identity_data = {
                 "user_id": user.id,
                 "provider": AuthProvider.LOCAL,
                 "provider_identity_id": schema.phone,
+                "password_hash": hashed_password,
             }
             await self.uow.identities.add(identity_data)
-            await self.uow.commit()
 
+            # 4. Создаем Счет клиента (Task 5 context)
+            await self.uow.accounts.add({
+                "user_id": user.id,
+                "type": AccountType.CLIENT,
+                "name": f"Лицевой счет: {user.username}",
+                "balance": 0,
+            })
+
+            # 5. Создаем Инвентарь клиента (Адрес доставки)
+            inventory = await self.uow.inventories.add({
+                "user_id": user.id,
+                "type": InventoryType.CLIENT,
+                "name": f"Адрес: {user.username}",
+            })
+
+            # 6. Начисляем стартовую тару (Task 4)
+            if schema.initial_tare_quantity and schema.tare_product_id:
+                # Получаем виртуальный склад поставщика
+                vendor_inv = await self.uow.inventories.get_vendor_inventory()
+
+                # Создаем и проводим StockTransfer
+                transfer = await self.uow.transfers.add({
+                    "from_id": vendor_inv.id,
+                    "to_id": inventory.id,
+                    "type": TransferType.FACTORY_RECEIPT,
+                    "status": TransferStatus.COMPLETED,
+                    "created_by_id": user.id,  # Условно
+                    "accepted_by_id": user.id,
+                })
+
+                # Фиксируем проводку в леджере
+                await self.uow.transactions.add({
+                    "product_id": schema.tare_product_id,
+                    "transfer_id": transfer.id,
+                    "from_id": vendor_inv.id,
+                    "to_id": inventory.id,
+                    "quantity": schema.initial_tare_quantity,
+                })
+
+            await self.uow.commit()
             return user
 
     async def register_local_user(self, schema: UserAdminCreate) -> User:

@@ -2,13 +2,23 @@
 
 from src.common.uow import IUnitOfWork
 from src.infrastructure.database.uow import BaseSQLAlchemyUoW
+from src.modules.finances.repositories import AccountRepository
+from src.modules.inventory.repositories import (
+    InventoryRepository,
+    StockTransactionRepository,
+    StockTransferRepository,
+)
 from src.modules.users.repositories import IdentityRepository, UserRepository
 
 
 # 1. Доменный интерфейс (Абстракция для сервисов)
 class IUserUnitOfWork(IUnitOfWork):
     users: UserRepository
-    identity: IdentityRepository
+    identities: IdentityRepository
+    accounts: AccountRepository
+    inventories: InventoryRepository
+    transfers: StockTransferRepository
+    transactions: StockTransactionRepository
 
 
 # 2. Доменная реализация (Связывает инфраструктуру и домен)
@@ -18,5 +28,9 @@ class UserUnitOfWork(BaseSQLAlchemyUoW, IUserUnitOfWork):
 
         self.users = UserRepository(session=self.session)
         self.identities = IdentityRepository(session=self.session)
+        self.accounts = AccountRepository(session=self.session)
+        self.inventories = InventoryRepository(session=self.session)
+        self.transfers = StockTransferRepository(session=self.session)
+        self.transactions = StockTransactionRepository(session=self.session)
 
         return self

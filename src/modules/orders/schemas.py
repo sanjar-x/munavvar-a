@@ -32,10 +32,10 @@ class OrderCreate(BaseModel):
         description="Намерение клиента по оплате: Наличные, Карта ",
         examples=[PaymentMethod.CASH],
     )
-    inventory_id: uuid.UUID = Field(
+    client_inventory_id: uuid.UUID = Field(
         ...,
-        min_length=1,
-        title="ID адресса клиента",
+        title="ID адреса клиента",
+        description="Инвентарь клиента, куда будет доставлен заказ",
     )
 
 
@@ -49,6 +49,22 @@ class OrderStatusUpdateRequest(BaseModel):
     """Схема для курьера: изменить статус заказа (например, на DELIVERED)."""
 
     status: OrderStatus = Field(..., title="Новый статус заказа")
+
+
+class OrderItemActual(BaseModel):
+    """Фактически доставленное количество товара."""
+
+    product_id: uuid.UUID
+    quantity: int = Field(ge=0)
+
+
+class OrderDeliverRequest(BaseModel):
+    """Запрос курьера на завершение доставки с возможной корректировкой."""
+
+    actual_items: list[OrderItemActual] | None = Field(
+        default=None,
+        description="Фактический состав (если отличается от заказа)",
+    )
 
 
 # =====================================================================

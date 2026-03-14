@@ -9,7 +9,7 @@ from src.infrastructure.database.models import User
 from src.modules.auth.dependencies import get_current_user
 from src.modules.orders.dependencies import get_base_order_service
 from src.modules.orders.enums import OrderStatus
-from src.modules.orders.schemas import OrderCreate, OrderResponse
+from src.modules.orders.schemas import OrderCreate, OrderDeliverRequest, OrderResponse
 from src.modules.orders.services import BaseOrderService
 
 orders_router = APIRouter()
@@ -58,6 +58,21 @@ async def remove_product_from_order(
     """Полностью удалить позицию товара из заказа."""
     return await base_order_service.remove_product_from_order(
         order_id=order_id, product_id=product_id
+    )
+
+
+@orders_router.post("/{order_id}/deliver", response_model=OrderResponse)
+async def deliver_order(
+    order_id: uuid.UUID,
+    dto: OrderDeliverRequest,
+    courier: Annotated[User, Security(get_current_user, scopes=[Scope.ORDERS_EDIT])],
+    base_order_service: Annotated[BaseOrderService, Depends(get_base_order_service)],
+):
+    """Завершение доставки курьером (поддерживает частичный возврат/отказ)."""
+    return await base_order_service.update_status(
+        order_id=order_id,
+        new_status=OrderStatus.DELIVERED,
+        actual_items=dto.actual_items,
     )
 
 

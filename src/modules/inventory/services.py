@@ -74,6 +74,16 @@ class TransportService:
 
     async def delete_transport(self, transport_id: uuid.UUID) -> bool:
         async with self.uow:
+            transport = await self.uow.inventories.get(transport_id)
+            if not transport:
+                return False
+
+            if transport.type in (
+                InventoryType.VIRTUAL_VENDOR,
+                InventoryType.VIRTUAL_LOSS,
+            ):
+                raise ValueError("Удаление системных складов запрещено")
+
             success = await self.uow.inventories.delete(transport_id)
             await self.uow.commit()
             return success
@@ -208,7 +218,12 @@ class StockTransferService:
             if transfer.status != TransferStatus.DRAFT:
                 raise ValueError("Only draft transfers can be completed")
 
-            # 1. Validate balances in from_inventory
+            # 1. Захватываем блокировку на инвентарь-отправитель (Race Condition Protection)
+            await self.uow.inventories.get_inventory_with_balances(
+                transfer.from_id, with_for_update=True
+            )
+
+            # 2. Validate balances in from_inventory
             product_ids = [item.product_id for item in transfer.items]
             balances = await self.uow.transactions.get_balances_for_products(
                 transfer.from_id, product_ids

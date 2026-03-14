@@ -46,10 +46,14 @@ class InventoryRepository(BaseRepository[Inventory]):
             "name": inventory_name,
         })
 
-    async def get_system_inventory(self, inv_type: InventoryType) -> Inventory:
+    async def get_system_inventory(
+        self, inv_type: InventoryType, with_for_update: bool = False
+    ) -> Inventory:
         query = select(self.model).where(
             self.model.user_id == settings.SYSTEM_USER_ID, self.model.type == inv_type
         )
+        if with_for_update:
+            query = query.with_for_update()
         result = await self.session.execute(query)
         return result.scalar_one()
 
@@ -126,7 +130,10 @@ class InventoryRepository(BaseRepository[Inventory]):
         return result.scalars().all()
 
     async def get_inventory_with_balances(
-        self, inventory_id: uuid.UUID, inv_type: InventoryType | None = None
+        self,
+        inventory_id: uuid.UUID,
+        inv_type: InventoryType | None = None,
+        with_for_update: bool = False,
     ) -> Inventory | None:
         """Получить инвентарь (склад/транспорт) с актуальными остатками."""
         query = select(self.model).where(
@@ -135,6 +142,9 @@ class InventoryRepository(BaseRepository[Inventory]):
         )
         if inv_type:
             query = query.where(self.model.type == inv_type)
+
+        if with_for_update:
+            query = query.with_for_update()
 
         query = query.options(
             selectinload(self.model.balances).joinedload(Balance.product)
@@ -150,9 +160,7 @@ class InventoryRepository(BaseRepository[Inventory]):
                 self.model.type == InventoryType.WAREHOUSE,
                 self.model.is_active.is_(True),
             )
-            .options(
-                selectinload(self.model.balances).joinedload(Balance.product)
-            )
+            .options(selectinload(self.model.balances).joinedload(Balance.product))
         )
         result = await self.session.execute(query)
         return result.unique().scalars().all()
@@ -509,7 +517,10 @@ class StockTransactionRepository(BaseRepository[StockTransaction]):
                     self.model.from_id == inventory_id,
                 )
             )
-            .options(selectinload(self.model.transfer))
+            .options(
+                selectinload(self.model.transfer),
+                joinedload(self.model.product),
+            )
             .order_by(self.model.created_at.desc())
         )
 

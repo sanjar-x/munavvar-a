@@ -131,16 +131,11 @@ class LoadCourierTruckRequest(BaseModel):
 
 
 class CloseShiftRequest(BaseModel):
-    """Вечерняя сдача смены курьером (Инкассация тары)."""
+    """Вечерняя сдача смены курьером (Инкассация и возврат остатков)."""
 
-    route_sheet_id: uuid.UUID
-    warehouse_id: uuid.UUID = Field(description="Склад, на который сдается факт")
-    actual_full_water: int = Field(ge=0, description="Факт: нераспроданная полная вода")
-    actual_empty_bottles: int = Field(ge=0, description="Факт: собранные пустые бутыли")
-    actual_equipment: list[Item] = Field(
-        default_factory=list,
-        description="Остальное оборудование (кулеры, помпы)",
-    )
+    courier_id: uuid.UUID
+    returned_inventory: list[Item]
+    cash_collected: float = Field(ge=0, description="Сумма собранных наличных")
 
 
 # ==========================================
@@ -212,11 +207,19 @@ class StockTransferItemResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class ProductSimpleResponse(BaseModel):
+    id: uuid.UUID
+    name: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class StockTransactionResponse(BaseModel):
     """Строка Леджера (фактическое движение)"""
 
     id: uuid.UUID
     product_id: uuid.UUID
+    product: ProductSimpleResponse
     quantity: int
     from_id: uuid.UUID
     to_id: uuid.UUID
@@ -234,11 +237,6 @@ class UpdateItemQuantityDto(BaseModel):
 # --- ТРАНСПОРТ (BACKOFFICE) ---
 
 
-class ProductSimpleResponse(BaseModel):
-    id: uuid.UUID
-    name: str
-
-    model_config = ConfigDict(from_attributes=True)
 
 
 class BalanceResponse(BaseModel):

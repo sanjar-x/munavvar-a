@@ -3,6 +3,7 @@
 import uuid
 from typing import TYPE_CHECKING
 
+import sqlalchemy as sa
 from sqlalchemy import (
     CheckConstraint,
     Enum,
@@ -67,6 +68,12 @@ class Inventory(BaseModel):
         back_populates="inventory", cascade="all, delete-orphan"
     )
     __table_args__ = (
+        Index(
+            "uq_active_courier_inventory",
+            "user_id",
+            unique=True,
+            postgresql_where=sa.text("type = 'COURIER' AND is_active = true"),
+        ),
         Index("idx_inventory_user_type", "user_id", "type"),
         {
             "comment": "Реестр всех физических и виртуальных мест хранения (склады, машины, клиенты)"

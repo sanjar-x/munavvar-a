@@ -42,60 +42,80 @@ class Seeder:
     async def seed_products(self):
         logger.info("Step 1: Seeding products...")
         async with self.session_factory() as session:
-            # Check if products already exist to avoid duplicates
-            existing = await session.execute(select(Product))
-            if existing.scalars().first():
-                logger.info("Products already exist, skipping...")
-                for p in await session.scalars(select(Product)):
-                    self.products[p.name] = p.id
-                return
-
             # 1. Containers
-            tara_hayot = Product(
-                name="[MOCK] Тара Hayot 19Л",
-                type=ProductType.CONTAINER,
-                price=50000,  # 500 units (e.g. 50000 cents/tiyin)
-                is_active=True,
-            )
-            tara_munavvar = Product(
-                name="[MOCK] Тара MunavvarA 18.9Л",
-                type=ProductType.CONTAINER,
-                price=50000,
-                is_active=True,
-            )
-            session.add_all([tara_hayot, tara_munavvar])
+            containers_data = [
+                {"name": "[MOCK] Тара Hayot 19Л", "price": 50000},
+                {"name": "[MOCK] Тара MunavvarA 18.9Л", "price": 50000},
+            ]
+            for c_data in containers_data:
+                existing = await session.execute(
+                    select(Product).where(Product.name == c_data["name"])
+                )
+                if not existing.scalars().first():
+                    product = Product(
+                        name=c_data["name"],
+                        type=ProductType.CONTAINER,
+                        price=c_data["price"],
+                        is_active=True,
+                    )
+                    session.add(product)
             await session.flush()
 
+            # Map containers for water links
+            all_prods = (await session.execute(select(Product))).scalars().all()
+            prod_map = {p.name: p for p in all_prods}
+
             # 2. Water (linked to containers)
-            voda_hayot = Product(
-                name="[MOCK] Вода Hayot 19Л",
-                type=ProductType.WATER,
-                price=20000,
-                returnable_item_id=tara_hayot.id,
-                is_active=True,
-            )
-            voda_munavvar = Product(
-                name="[MOCK] Вода MunavvarA 18.9Л",
-                type=ProductType.WATER,
-                price=25000,
-                returnable_item_id=tara_munavvar.id,
-                is_active=True,
-            )
+            water_data = [
+                {
+                    "name": "[MOCK] Вода Hayot 19Л",
+                    "price": 20000,
+                    "container": "[MOCK] Тара Hayot 19Л",
+                },
+                {
+                    "name": "[MOCK] Вода MunavvarA 18.9Л",
+                    "price": 25000,
+                    "container": "[MOCK] Тара MunavvarA 18.9Л",
+                },
+            ]
+            for w_data in water_data:
+                existing = await session.execute(
+                    select(Product).where(Product.name == w_data["name"])
+                )
+                if not existing.scalars().first():
+                    container = prod_map.get(w_data["container"])
+                    product = Product(
+                        name=w_data["name"],
+                        type=ProductType.WATER,
+                        price=w_data["price"],
+                        returnable_item_id=container.id if container else None,
+                        is_active=True,
+                    )
+                    session.add(product)
 
             # 3. Equipment
-            pompa = Product(
-                name="[MOCK] Помпа механическая",
-                type=ProductType.EQUIPMENT,
-                price=15000,
-                is_active=True,
-            )
+            equipment_data = [{"name": "[MOCK] Помпа механическая", "price": 15000}]
+            for e_data in equipment_data:
+                existing = await session.execute(
+                    select(Product).where(Product.name == e_data["name"])
+                )
+                if not existing.scalars().first():
+                    product = Product(
+                        name=e_data["name"],
+                        type=ProductType.EQUIPMENT,
+                        price=e_data["price"],
+                        is_active=True,
+                    )
+                    session.add(product)
 
-            session.add_all([voda_hayot, voda_munavvar, pompa])
             await session.commit()
 
-            logger.info("Products seeded.")
-            for p in [tara_hayot, tara_munavvar, voda_hayot, voda_munavvar, pompa]:
+            # Populate total mapping
+            all_final = (await session.execute(select(Product))).scalars().all()
+            for p in all_final:
                 self.products[p.name] = p.id
+
+            logger.info(f"Products seeded. Total in map: {len(self.products)}")
 
     async def seed_warehouses(self):
         logger.info("Step 2: Seeding warehouses...")
@@ -105,7 +125,7 @@ class Seeder:
                 await session.execute(select(User).where(User.role == Role.SYSTEM))
             ).scalar_one()
 
-            # Ensure Virtual Warehouses exist (usually handled by init_data)
+            # Ensure Virtual Warehouses exist
             vendor = (
                 await session.execute(
                     select(Inventory).where(
@@ -151,8 +171,15 @@ class Seeder:
                 session.add(main_warehouse)
 
             await session.commit()
-            self.inventories["vendor"] = vendor.id
-            self.inventories["main"] = main_warehouse.id
+
+            # Refresh inventories mapping reliably
+            all_invs = (await session.execute(select(Inventory))).scalars().all()
+            for inv in all_invs:
+                if inv.type == InventoryType.VIRTUAL_VENDOR:
+                    self.inventories["vendor"] = inv.id
+                elif inv.name == "[MOCK] Главный Склад":
+                    self.inventories["main"] = inv.id
+
             logger.info("Warehouses seeded.")
 
     async def seed_users(self):
@@ -193,16 +220,6 @@ class Seeder:
                     )
                     session.add(inventory)
                     await session.flush()
-                    self.users[phone] = user.id
-                    self.inventories[phone] = inventory.id
-                else:
-                    self.users[phone] = existing.id
-                    inv = (
-                        await session.execute(
-                            select(Inventory).where(Inventory.user_id == existing.id)
-                        )
-                    ).scalar_one()
-                    self.inventories[phone] = inv.id
 
             # Clients
             clients_data = [
@@ -241,19 +258,29 @@ class Seeder:
                     )
                     session.add(inventory)
                     await session.flush()
-                    self.users[phone] = user.id
-                    self.inventories[phone] = inventory.id
-                else:
-                    self.users[phone] = existing.id
-                    inv = (
-                        await session.execute(
-                            select(Inventory).where(Inventory.user_id == existing.id)
-                        )
-                    ).scalar_one()
-                    self.inventories[phone] = inv.id
 
             await session.commit()
-            logger.info("Users and inventories seeded.")
+
+            # Robust population of user/inventory mappings
+            all_u = (
+                await session.execute(
+                    select(User, Identity.provider_identity_id).join(Identity)
+                )
+            ).all()
+            for u_rec, phone in all_u:
+                self.users[phone] = u_rec.id
+
+            all_inv = (
+                await session.execute(
+                    select(Inventory, User.username, Identity.provider_identity_id)
+                    .join(User)
+                    .join(Identity)
+                )
+            ).all()
+            for inv_rec, _, phone in all_inv:
+                self.inventories[phone] = inv_rec.id
+
+            logger.info(f"Users seeded. Total in maps: {len(self.users)}")
 
     async def _create_transfer(
         self,
@@ -268,7 +295,6 @@ class Seeder:
             StockTransferItem,
         )
 
-        # Get System User ID
         system_user = (
             await session.execute(select(User).where(User.role == Role.SYSTEM))
         ).scalar_one()
@@ -276,7 +302,7 @@ class Seeder:
         transfer = StockTransfer(
             from_id=from_inv_id,
             to_id=to_inv_id,
-            type=TransferType.FACTORY_RECEIPT,  # Simplified
+            type=TransferType.FACTORY_RECEIPT,
             status=status,
             created_by_id=system_user.id,
         )
@@ -284,7 +310,18 @@ class Seeder:
         await session.flush()
 
         for product_name, qty in items.items():
-            product_id = self.products[product_name]
+            product_id = self.products.get(product_name)
+            if not product_id:
+                res = await session.execute(
+                    select(Product).where(Product.name == product_name)
+                )
+                p = res.scalars().first()
+                if p:
+                    product_id = p.id
+                    self.products[product_name] = p.id
+                else:
+                    raise KeyError(f"Product '{product_name}' does not exist")
+
             item = StockTransferItem(
                 transfer_id=transfer.id, product_id=product_id, quantity=qty
             )
@@ -352,101 +389,55 @@ class Seeder:
             )
 
             await session.commit()
-            logger.info("Stock movements seeded.")
 
     async def seed_orders(self):
         logger.info("Step 5: Seeding orders...")
         from src.infrastructure.database.models import Order, OrderItem
 
         async with self.session_factory() as session:
-            orders_data = cast(
-                list[dict[str, Any]],
-                [
-                    # Order 1: NEW, Client 2 (Peter), 2 Water Hayot + 2 Tara Hayot
-                    {
-                        "client_phone": "+998000000012",
-                        "status": OrderStatus.NEW,
-                        "items": [
-                            {"name": "[MOCK] Вода Hayot 19Л", "qty": 2},
-                            {"name": "[MOCK] Тара Hayot 19Л", "qty": 2},
-                        ],
-                    },
-                    # Order 2: IN_TRANSIT, Client 1 (Ivan), 2 Water Hayot, Courier 1
-                    {
-                        "client_phone": "+998000000011",
-                        "status": OrderStatus.IN_TRANSIT,
-                        "courier_phone": "+998000000002",
-                        "items": [{"name": "[MOCK] Вода Hayot 19Л", "qty": 2}],
-                    },
-                    {
-                        "client_phone": "+998000000013",
-                        "status": OrderStatus.DELIVERED,
-                        "courier_phone": "+998000000003",
-                        "items": [{"name": "[MOCK] Вода MunavvarA 18.9Л", "qty": 10}],
-                    },
-                    # Order 4: NEW, Client 4 (Anna), 1 Water Hayot + 1 Pump
-                    {
-                        "client_phone": "+998000000014",
-                        "status": OrderStatus.NEW,
-                        "items": [
-                            {"name": "[MOCK] Вода Hayot 19Л", "qty": 1},
-                            {"name": "[MOCK] Помпа механическая", "qty": 1},
-                        ],
-                    },
-                    # Order 5: IN_TRANSIT, Client 5 (Restaurant)
-                    {
-                        "client_phone": "+998000000015",
-                        "status": OrderStatus.IN_TRANSIT,
-                        "courier_phone": "+998000000003",
-                        "items": [{"name": "[MOCK] Вода MunavvarA 18.9Л", "qty": 15}],
-                    },
-                    # Order 6: CANCELLED, Client 1 (Ivan)
-                    {
-                        "client_phone": "+998000000011",
-                        "status": OrderStatus.CANCELLED,
-                        "items": [{"name": "[MOCK] Вода Hayot 19Л", "qty": 1}],
-                    },
-                    # Order 7: NEW, Client 3 (Office IT)
-                    {
-                        "client_phone": "+998000000013",
-                        "status": OrderStatus.NEW,
-                        "items": [
-                            {"name": "[MOCK] Вода Hayot 19Л", "qty": 5},
-                            {"name": "[MOCK] Тара Hayot 19Л", "qty": 5},
-                        ],
-                    },
-                    # Order 8: DELIVERED, Client 5 (Restaurant)
-                    {
-                        "client_phone": "+998000000015",
-                        "status": OrderStatus.DELIVERED,
-                        "courier_phone": "+998000000002",
-                        "items": [{"name": "[MOCK] Вода Hayot 19Л", "qty": 5}],
-                    },
-                    # Order 9: IN_TRANSIT, Client 4 (Anna)
-                    {
-                        "client_phone": "+998000000014",
-                        "status": OrderStatus.IN_TRANSIT,
-                        "courier_phone": "+998000000004",
-                        "items": [
-                            {"name": "[MOCK] Вода MunavvarA 18.9Л", "qty": 2},
-                            {"name": "[MOCK] Тара MunavvarA 18.9Л", "qty": 2},
-                        ],
-                    },
-                    {
-                        "client_phone": "+998000000012",
-                        "status": OrderStatus.NEW,
-                        "items": [
-                            {"name": "[MOCK] Вода MunavvarA 18.9Л", "qty": 1},
-                            {"name": "[MOCK] Тара MunavvarA 18.9Л", "qty": 1},
-                        ],
-                    },
-                ],
-            )
+            orders_data: list[dict[str, Any]] = [
+                {
+                    "client_phone": "+998000000012",
+                    "status": OrderStatus.NEW,
+                    "items": [
+                        {"name": "[MOCK] Вода Hayot 19Л", "qty": 2},
+                        {"name": "[MOCK] Тара Hayot 19Л", "qty": 2},
+                    ],
+                },
+                {
+                    "client_phone": "+998000000011",
+                    "status": OrderStatus.IN_TRANSIT,
+                    "courier_phone": "+998000000002",
+                    "items": [{"name": "[MOCK] Вода Hayot 19Л", "qty": 2}],
+                },
+                {
+                    "client_phone": "+998000000013",
+                    "status": OrderStatus.DELIVERED,
+                    "courier_phone": "+998000000003",
+                    "items": [{"name": "[MOCK] Вода MunavvarA 18.9Л", "qty": 10}],
+                },
+                {
+                    "client_phone": "+998000000014",
+                    "status": OrderStatus.NEW,
+                    "items": [
+                        {"name": "[MOCK] Вода Hayot 19Л", "qty": 1},
+                        {"name": "[MOCK] Помпа механическая", "qty": 1},
+                    ],
+                },
+                {
+                    "client_phone": "+998000000015",
+                    "status": OrderStatus.IN_TRANSIT,
+                    "courier_phone": "+998000000003",
+                    "items": [{"name": "[MOCK] Вода MunavvarA 18.9Л", "qty": 15}],
+                },
+            ]
 
             for o_data in orders_data:
-                client_id = self.users[o_data["client_phone"]]
-                courier_id = self.users.get(o_data.get("courier_phone"))
+                client_id = self.users.get(o_data["client_phone"])
+                if not client_id:
+                    continue
 
+                courier_id = self.users.get(o_data.get("courier_phone", ""))
                 order = Order(
                     client_id=client_id,
                     courier_id=courier_id,
@@ -459,9 +450,12 @@ class Seeder:
 
                 total = 0
                 items_main = cast(list[dict[str, Any]], o_data["items"])
-
                 for it in items_main:
-                    p_id = self.products[it["name"]]
+                    p_name = cast(str, it["name"])
+                    p_id = self.products.get(p_name)
+                    if not p_id:
+                        continue
+
                     product = (
                         await session.execute(select(Product).where(Product.id == p_id))
                     ).scalar_one()
@@ -469,60 +463,64 @@ class Seeder:
                     item = OrderItem(
                         order_id=order.id,
                         product_id=p_id,
-                        quantity=it["qty"],
+                        quantity=cast(int, it["qty"]),
                         unit_price=product.price,
                     )
                     session.add(item)
-                    total += product.price * it["qty"]
+                    total += product.price * cast(int, it["qty"])
 
                 order.total_amount = total
 
                 if o_data["status"] == OrderStatus.DELIVERED and courier_id:
-                    courier_inv_id = self.inventories[o_data["courier_phone"]]
-                    client_inv_id = self.inventories[o_data["client_phone"]]
-
-                    items_list = cast(list[dict[str, Any]], o_data["items"])
-
-                    filled_items = {it["name"]: it["qty"] for it in items_list}
-                    await self._create_transfer(
-                        courier_inv_id, client_inv_id, filled_items, session
-                    )
-
-                    empty_items = {}
-                    for it in items_list:
-                        product_id = self.products[it["name"]]
-                        product = (
-                            await session.execute(
-                                select(Product).where(Product.id == product_id)
-                            )
-                        ).scalar_one()
-                        if (
-                            product.type == ProductType.WATER
-                            and product.returnable_item_id
-                        ):
-                            container = (
-                                await session.execute(
-                                    select(Product).where(
-                                        Product.id == product.returnable_item_id
-                                    )
-                                )
-                            ).scalar_one()
-                            empty_items[container.name] = it["qty"]
-
-                    if empty_items:
-                        await self._create_transfer(
-                            client_inv_id, courier_inv_id, empty_items, session
-                        )
+                    await self._handle_delivered_order(session, o_data, items_main)
 
             await session.commit()
             logger.info("Orders seeded.")
+
+    async def _handle_delivered_order(self, session, o_data, items_main):
+        """Processes stock transfers for delivered orders during seeding."""
+        c_phone = cast(str, o_data.get("courier_phone", ""))
+        cl_phone = cast(str, o_data["client_phone"])
+
+        c_inv_id = self.inventories.get(c_phone)
+        cl_inv_id = self.inventories.get(cl_phone)
+
+        if not (c_inv_id and cl_inv_id):
+            return
+
+        # 1. Courier -> Client (Filled)
+        filled = {cast(str, i["name"]): cast(int, i["qty"]) for i in items_main}
+        await self._create_transfer(c_inv_id, cl_inv_id, filled, session)
+
+        # 2. Client -> Courier (Empty containers)
+        empty_items = {}
+        for it in items_main:
+            p_name = cast(str, it["name"])
+            p_id = self.products.get(p_name)
+            if not p_id:
+                continue
+
+            p = (
+                await session.execute(select(Product).where(Product.id == p_id))
+            ).scalar_one()
+
+            if p.type == ProductType.WATER and p.returnable_item_id:
+                ret_p = (
+                    await session.execute(
+                        select(Product).where(Product.id == p.returnable_item_id)
+                    )
+                ).scalar_one()
+                empty_items[ret_p.name] = cast(int, it["qty"])
+
+        if empty_items:
+            await self._create_transfer(cl_inv_id, c_inv_id, empty_items, session)
 
 
 if __name__ == "__main__":
     from src.core.init import init_data
 
     async def run():
-        await init_data()  # Ensure system user and base stuff exists
+        await init_data()
         seeder = Seeder()
         await seeder.seed_all()
 
