@@ -17,6 +17,8 @@ class InventoryResponse(BaseModel):
     user: UserResponse
     is_active: bool
 
+    model_config = ConfigDict(from_attributes=True)
+
 
 class InventoryBalance(BaseModel):
     quantity: int

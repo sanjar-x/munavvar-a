@@ -264,7 +264,7 @@ class Seeder:
             # Robust population of user/inventory mappings
             all_u = (
                 await session.execute(
-                    select(User, Identity.provider_identity_id).join(Identity)
+                    select(User, Identity.provider_identity_id).join(User.identities)
                 )
             ).all()
             for u_rec, phone in all_u:
@@ -273,8 +273,8 @@ class Seeder:
             all_inv = (
                 await session.execute(
                     select(Inventory, User.username, Identity.provider_identity_id)
-                    .join(User)
-                    .join(Identity)
+                    .join(Inventory.user)
+                    .join(User.identities)
                 )
             ).all()
             for inv_rec, _, phone in all_inv:
@@ -438,8 +438,11 @@ class Seeder:
                     continue
 
                 courier_id = self.users.get(o_data.get("courier_phone", ""))
+                client_inv_id = self.inventories.get(o_data["client_phone"])
+
                 order = Order(
                     client_id=client_id,
+                    client_inventory_id=client_inv_id,
                     courier_id=courier_id,
                     status=o_data["status"],
                     payment_method=PaymentMethod.CASH,

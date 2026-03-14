@@ -319,15 +319,15 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
         if actual_items_dto:
             actual_map = {item.product_id: item.quantity for item in actual_items_dto}
             new_total = 0
-            
+
             # Обновляем строки заказа
             for item in order.items:
                 if item.product_id in actual_map:
                     item.quantity = actual_map[item.product_id]
                     await self.uow.order_items.update_quantity(item.id, item.quantity)
-                
+
                 new_total += item.unit_price * item.quantity
-            
+
             # Обновляем итоговую сумму заказа
             order.total_amount = new_total
             await self.uow.orders.update(order.id, {"total_amount": new_total})

@@ -34,6 +34,9 @@ class Settings(BaseSettings):
 
     SYSTEM_USER_ID: uuid.UUID = uuid.UUID(int=0)
 
+    ADMIN_PHONE: str | None = None
+    ADMIN_PASSWORD: SecretStr | None = None
+
     PGHOST: str
     PGPORT: int
     PGUSER: str

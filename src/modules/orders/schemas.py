@@ -4,7 +4,11 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from src.modules.catalog.schemas import ProductResponse
+from src.modules.inventory.enums import InventoryType
+from src.modules.inventory.schemas import TransferResponse
 from src.modules.orders.enums import OrderStatus, PaymentMethod
+from src.modules.users.schemas import UserResponse
 
 
 class Item(BaseModel):
@@ -77,9 +81,19 @@ class OrderItemResponse(BaseModel):
 
     id: uuid.UUID
     product_id: uuid.UUID
+    product: ProductResponse
     quantity: int = Field(description="Количество")
     unit_price: int = Field(description="Историческая цена на момент покупки")
     total: int = Field(description="quantity * unit_price")
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class InventoryResponse(BaseModel):
+    id: uuid.UUID
+    name: str
+    type: InventoryType
+    is_active: bool
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -89,11 +103,16 @@ class OrderResponse(BaseModel):
 
     id: uuid.UUID
     client_id: uuid.UUID
-    courier_id: uuid.UUID | None
+    client: UserResponse
+    client_inventory_id: uuid.UUID
+    client_inventory: InventoryResponse
+    courier_id: uuid.UUID | None = None
+    courier: UserResponse | None = None
     status: OrderStatus
     total_amount: int
 
     items: list[OrderItemResponse]
+    stock_transfers: list[TransferResponse] = []
 
     created_at: datetime
     updated_at: datetime

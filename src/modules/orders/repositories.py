@@ -8,7 +8,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 
 from src.common.repository import BaseRepository
-from src.infrastructure.database.models import Order, OrderItem
+from src.infrastructure.database.models import (
+    Inventory,
+    Order,
+    OrderItem,
+    StockTransfer,
+)
 from src.modules.orders.enums import OrderStatus, PaymentMethod
 
 
@@ -62,7 +67,7 @@ class OrderRepository(BaseRepository[Order]):
             .where(self.model.client_id == client_id)
             .options(
                 joinedload(self.model.courier),
-                joinedload(self.model.client_inventory),
+                joinedload(self.model.client_inventory).joinedload(Inventory.user),
             )
             .order_by(desc(self.model.created_at))
             .offset(skip)
@@ -88,7 +93,7 @@ class OrderRepository(BaseRepository[Order]):
             )
             .options(
                 joinedload(self.model.client),
-                joinedload(self.model.client_inventory),
+                joinedload(self.model.client_inventory).joinedload(Inventory.user),
                 selectinload(self.model.items).joinedload(OrderItem.product),
             )
             .order_by(self.model.created_at.asc())
@@ -104,10 +109,12 @@ class OrderRepository(BaseRepository[Order]):
             .where(self.model.id == order_id)
             .options(
                 joinedload(self.model.client),
-                joinedload(self.model.client_inventory),
+                joinedload(self.model.client_inventory).joinedload(Inventory.user),
                 joinedload(self.model.courier),
                 selectinload(self.model.items).joinedload(OrderItem.product),
-                selectinload(self.model.stock_transfers),
+                selectinload(self.model.stock_transfers).selectinload(
+                    StockTransfer.items
+                ),
             )
         )
 
@@ -169,7 +176,9 @@ class OrderRepository(BaseRepository[Order]):
                 joinedload(self.model.client_inventory),
                 joinedload(self.model.courier),
                 selectinload(self.model.items).joinedload(OrderItem.product),
-                selectinload(self.model.stock_transfers),
+                selectinload(self.model.stock_transfers).selectinload(
+                    StockTransfer.items
+                ),
             )
             .order_by(desc(self.model.updated_at))
             .offset(skip)

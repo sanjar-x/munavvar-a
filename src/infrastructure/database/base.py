@@ -3,7 +3,7 @@ import re
 import uuid
 from datetime import datetime
 
-from sqlalchemy import BOOLEAN, TIMESTAMP, func
+from sqlalchemy import BOOLEAN, TIMESTAMP, func, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, declared_attr, mapped_column
 
@@ -25,6 +25,7 @@ class BaseModel(DeclarativeBase):
     is_active: Mapped[bool] = mapped_column(
         BOOLEAN,
         default=True,
+        server_default=text("true"),
         nullable=False,
         comment="Флаг активности записи. False означает логическое удаление.",
     )

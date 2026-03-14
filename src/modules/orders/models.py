@@ -117,6 +117,10 @@ class OrderItem(BaseModel):
         comment="Цена за 1 шт на момент оформления (фиксируется исторически)",
     )
 
+    @property
+    def total(self) -> int:
+        return self.quantity * self.unit_price
+
     # --- Связи ---
     order: Mapped["Order"] = relationship(back_populates="items")
     product: Mapped["Product"] = relationship()

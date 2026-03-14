@@ -88,8 +88,12 @@ async def init_data() -> None:
                 logger.info(f"Виртуальный склад '{inv_name}' уже существует.")
 
         # --- 4. СОЗДАНИЕ ГЛАВНОГО АДМИНИСТРАТОРА ---
-        admin_phone = os.getenv("ADMIN_PHONE")
-        admin_password = os.getenv("ADMIN_PASSWORD")
+        admin_phone = settings.ADMIN_PHONE
+        admin_password = (
+            settings.ADMIN_PASSWORD.get_secret_value()
+            if settings.ADMIN_PASSWORD
+            else None
+        )
 
         if not admin_phone or not admin_password:
             logger.warning(
