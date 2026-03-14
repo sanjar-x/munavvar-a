@@ -250,7 +250,10 @@ class StockTransaction(BaseModel):
     to_inventory: Mapped["Inventory"] = relationship(
         foreign_keys=[to_id], back_populates="incoming_transactions"
     )
-    transfer: Mapped["StockTransfer"] = relationship(back_populates="transactions")
+    transfer: Mapped["StockTransfer"] = relationship(
+        back_populates="transactions",
+        overlaps="incoming_transactions,to_inventory,outgoing_transactions,from_inventory",
+    )
 
     __table_args__ = (
         CheckConstraint("quantity > 0", name="ck_stock_transaction_quantity_positive"),
