@@ -1,8 +1,13 @@
 import uuid
 from collections.abc import Sequence
+from datetime import datetime
 
 from src.infrastructure.database.models import Inventory, StockTransfer
-from src.modules.inventory.enums import InventoryType, TransferStatus
+from src.modules.inventory.enums import (
+    InventoryType,
+    TransferStatus,
+    TransferType,
+)
 from src.modules.inventory.schemas import (
     TransferCreate,
     TransferItemCreate,
@@ -121,6 +126,29 @@ class WarehouseService:
 class StockTransferService:
     def __init__(self, uow: InventoryUnitOfWork):
         self.uow = uow
+
+    async def search_transfers(
+        self,
+        skip: int = 0,
+        limit: int = 50,
+        status: TransferStatus | None = None,
+        transfer_type: TransferType | None = None,
+        from_inventory_id: uuid.UUID | None = None,
+        to_inventory_id: uuid.UUID | None = None,
+        date_from: datetime | None = None,
+        date_to: datetime | None = None,
+    ) -> Sequence[StockTransfer]:
+        async with self.uow:
+            return await self.uow.transfers.search_transfers(
+                skip=skip,
+                limit=limit,
+                status=status,
+                transfer_type=transfer_type,
+                from_inventory_id=from_inventory_id,
+                to_inventory_id=to_inventory_id,
+                date_from=date_from,
+                date_to=date_to,
+            )
 
     async def create_draft_transfer(
         self, created_by_id: uuid.UUID, schema: TransferCreate

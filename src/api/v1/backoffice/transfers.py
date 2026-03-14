@@ -8,7 +8,6 @@ from src.core.security.permissions import Scope
 from src.infrastructure.database.models import User
 from src.modules.auth.dependencies import get_current_user
 from src.modules.inventory.dependencies import (
-    get_inventory_uow,
     get_stock_transfer_service,
 )
 from src.modules.inventory.schemas import (
@@ -18,7 +17,6 @@ from src.modules.inventory.schemas import (
     TransferResponse,
 )
 from src.modules.inventory.services import StockTransferService
-from src.modules.inventory.uow import InventoryUnitOfWork
 
 transfers_router = APIRouter()
 
@@ -29,7 +27,9 @@ transfers_router = APIRouter()
     summary="Журнал всех накладных",
 )
 async def get_transfers(
-    uow: Annotated[InventoryUnitOfWork, Depends(get_inventory_uow)],
+    transfer_service: Annotated[
+        StockTransferService, Depends(get_stock_transfer_service)
+    ],
     current_admin: Annotated[
         User, Security(get_current_user, scopes=[Scope.USERS_WRITE])
     ],
@@ -37,8 +37,7 @@ async def get_transfers(
     size: int = Query(20, ge=1, le=100),
 ):
     skip = (page - 1) * size
-    transfers = await uow.transfers.search_transfers(skip=skip, limit=size)
-    return transfers
+    return await transfer_service.search_transfers(skip=skip, limit=size)
 
 
 @transfers_router.post(
