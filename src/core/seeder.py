@@ -1,7 +1,7 @@
 # src/core/seeder.py
 import asyncio
 import uuid
-from typing import Any
+from typing import Any, cast
 
 import structlog
 from sqlalchemy import select
@@ -359,88 +359,89 @@ class Seeder:
         from src.infrastructure.database.models import Order, OrderItem
 
         async with self.session_factory() as session:
-            orders_data = [
-                # Order 1: NEW, Client 2 (Peter), 2 Water Hayot + 2 Tara Hayot
-                {
-                    "client_phone": "+998000000012",
-                    "status": OrderStatus.NEW,
-                    "items": [
-                        {"name": "[MOCK] Вода Hayot 19Л", "qty": 2},
-                        {"name": "[MOCK] Тара Hayot 19Л", "qty": 2},
-                    ],
-                },
-                # Order 2: IN_PROGRESS, Client 1 (Ivan), 2 Water Hayot, Courier 1
-                {
-                    "client_phone": "+998000000011",
-                    "status": OrderStatus.IN_TRANSIT,
-                    "courier_phone": "+998000000002",
-                    "items": [{"name": "[MOCK] Вода Hayot 19Л", "qty": 2}],
-                },
-                # Order 3: DELIVERED, Client 3 (Office IT), 10 Water MunavvarA, Courier 2
-                {
-                    "client_phone": "+998000000013",
-                    "status": OrderStatus.DELIVERED,
-                    "courier_phone": "+998000000003",
-                    "items": [{"name": "[MOCK] Вода MunavvarA 18.9Л", "qty": 10}],
-                },
-                # Order 4: NEW, Client 4 (Anna), 1 Water Hayot + 1 Pump
-                {
-                    "client_phone": "+998000000014",
-                    "status": OrderStatus.NEW,
-                    "items": [
-                        {"name": "[MOCK] Вода Hayot 19Л", "qty": 1},
-                        {"name": "[MOCK] Помпа механическая", "qty": 1},
-                    ],
-                },
-                # Order 5: IN_PROGRESS, Client 5 (Restaurant), 15 Water MunavvarA, Courier 2
-                {
-                    "client_phone": "+998000000015",
-                    "status": OrderStatus.IN_TRANSIT,
-                    "courier_phone": "+998000000003",
-                    "items": [{"name": "[MOCK] Вода MunavvarA 18.9Л", "qty": 15}],
-                },
-                # Order 6: CANCELLED, Client 1 (Ivan), 1 Water Hayot
-                {
-                    "client_phone": "+998000000011",
-                    "status": OrderStatus.CANCELLED,
-                    "items": [{"name": "[MOCK] Вода Hayot 19Л", "qty": 1}],
-                },
-                # Order 7: NEW, Client 3 (Office IT), 5 Water Hayot + 5 Tara Hayot
-                {
-                    "client_phone": "+998000000013",
-                    "status": OrderStatus.NEW,
-                    "items": [
-                        {"name": "[MOCK] Вода Hayot 19Л", "qty": 5},
-                        {"name": "[MOCK] Тара Hayot 19Л", "qty": 5},
-                    ],
-                },
-                # Order 8: DELIVERED, Client 5 (Restaurant), 5 Water Hayot, Courier 1
-                {
-                    "client_phone": "+998000000015",
-                    "status": OrderStatus.DELIVERED,
-                    "courier_phone": "+998000000002",
-                    "items": [{"name": "[MOCK] Вода Hayot 19Л", "qty": 5}],
-                },
-                # Order 9: IN_PROGRESS, Client 4 (Anna), 2 Water MunavvarA + 2 Tara MunavvarA, Courier 3
-                {
-                    "client_phone": "+998000000014",
-                    "status": OrderStatus.IN_TRANSIT,
-                    "courier_phone": "+998000000004",
-                    "items": [
-                        {"name": "[MOCK] Вода MunavvarA 18.9Л", "qty": 2},
-                        {"name": "[MOCK] Тара MunavvarA 18.9Л", "qty": 2},
-                    ],
-                },
-                # Order 10: NEW, Client 2 (Peter), 1 Water MunavvarA + 1 Tara MunavvarA
-                {
-                    "client_phone": "+998000000012",
-                    "status": OrderStatus.NEW,
-                    "items": [
-                        {"name": "[MOCK] Вода MunavvarA 18.9Л", "qty": 1},
-                        {"name": "[MOCK] Тара MunavvarA 18.9Л", "qty": 1},
-                    ],
-                },
-            ]
+            orders_data = cast(
+                list[dict[str, Any]],
+                [
+                    # Order 1: NEW, Client 2 (Peter), 2 Water Hayot + 2 Tara Hayot
+                    {
+                        "client_phone": "+998000000012",
+                        "status": OrderStatus.NEW,
+                        "items": [
+                            {"name": "[MOCK] Вода Hayot 19Л", "qty": 2},
+                            {"name": "[MOCK] Тара Hayot 19Л", "qty": 2},
+                        ],
+                    },
+                    # Order 2: IN_TRANSIT, Client 1 (Ivan), 2 Water Hayot, Courier 1
+                    {
+                        "client_phone": "+998000000011",
+                        "status": OrderStatus.IN_TRANSIT,
+                        "courier_phone": "+998000000002",
+                        "items": [{"name": "[MOCK] Вода Hayot 19Л", "qty": 2}],
+                    },
+                    {
+                        "client_phone": "+998000000013",
+                        "status": OrderStatus.DELIVERED,
+                        "courier_phone": "+998000000003",
+                        "items": [{"name": "[MOCK] Вода MunavvarA 18.9Л", "qty": 10}],
+                    },
+                    # Order 4: NEW, Client 4 (Anna), 1 Water Hayot + 1 Pump
+                    {
+                        "client_phone": "+998000000014",
+                        "status": OrderStatus.NEW,
+                        "items": [
+                            {"name": "[MOCK] Вода Hayot 19Л", "qty": 1},
+                            {"name": "[MOCK] Помпа механическая", "qty": 1},
+                        ],
+                    },
+                    # Order 5: IN_TRANSIT, Client 5 (Restaurant)
+                    {
+                        "client_phone": "+998000000015",
+                        "status": OrderStatus.IN_TRANSIT,
+                        "courier_phone": "+998000000003",
+                        "items": [{"name": "[MOCK] Вода MunavvarA 18.9Л", "qty": 15}],
+                    },
+                    # Order 6: CANCELLED, Client 1 (Ivan)
+                    {
+                        "client_phone": "+998000000011",
+                        "status": OrderStatus.CANCELLED,
+                        "items": [{"name": "[MOCK] Вода Hayot 19Л", "qty": 1}],
+                    },
+                    # Order 7: NEW, Client 3 (Office IT)
+                    {
+                        "client_phone": "+998000000013",
+                        "status": OrderStatus.NEW,
+                        "items": [
+                            {"name": "[MOCK] Вода Hayot 19Л", "qty": 5},
+                            {"name": "[MOCK] Тара Hayot 19Л", "qty": 5},
+                        ],
+                    },
+                    # Order 8: DELIVERED, Client 5 (Restaurant)
+                    {
+                        "client_phone": "+998000000015",
+                        "status": OrderStatus.DELIVERED,
+                        "courier_phone": "+998000000002",
+                        "items": [{"name": "[MOCK] Вода Hayot 19Л", "qty": 5}],
+                    },
+                    # Order 9: IN_TRANSIT, Client 4 (Anna)
+                    {
+                        "client_phone": "+998000000014",
+                        "status": OrderStatus.IN_TRANSIT,
+                        "courier_phone": "+998000000004",
+                        "items": [
+                            {"name": "[MOCK] Вода MunavvarA 18.9Л", "qty": 2},
+                            {"name": "[MOCK] Тара MunavvarA 18.9Л", "qty": 2},
+                        ],
+                    },
+                    {
+                        "client_phone": "+998000000012",
+                        "status": OrderStatus.NEW,
+                        "items": [
+                            {"name": "[MOCK] Вода MunavvarA 18.9Л", "qty": 1},
+                            {"name": "[MOCK] Тара MunavvarA 18.9Л", "qty": 1},
+                        ],
+                    },
+                ],
+            )
 
             for o_data in orders_data:
                 client_id = self.users[o_data["client_phone"]]
@@ -457,8 +458,7 @@ class Seeder:
                 await session.flush()
 
                 total = 0
-                # Explicitly typing the list to resolve inference issues
-                items_main: list[dict[str, Any]] = o_data["items"]  # type: ignore
+                items_main = cast(list[dict[str, Any]], o_data["items"])
 
                 for it in items_main:
                     p_id = self.products[it["name"]]
@@ -477,25 +477,17 @@ class Seeder:
 
                 order.total_amount = total
 
-                # Special logic for DELIVERED orders: create transfers (stock fulfillment)
                 if o_data["status"] == OrderStatus.DELIVERED and courier_id:
-                    # Courier -> Client (Filled)
-                    # For simplicity, we just move items as-is in this seeder
-                    # Real logic involves returnable bottles, but we follow the requirement:
-                    # "Курьер отдал 5 полных, забрал 5 пустых"
                     courier_inv_id = self.inventories[o_data["courier_phone"]]
                     client_inv_id = self.inventories[o_data["client_phone"]]
 
-                    # Explicitly typing the list to resolve inference issues
-                    items_list: list[dict[str, Any]] = o_data["items"]  # type: ignore
+                    items_list = cast(list[dict[str, Any]], o_data["items"])
 
                     filled_items = {it["name"]: it["qty"] for it in items_list}
                     await self._create_transfer(
                         courier_inv_id, client_inv_id, filled_items, session
                     )
 
-                    # Client -> Courier (Empty)
-                    # Find empty containers for each water item
                     empty_items = {}
                     for it in items_list:
                         product_id = self.products[it["name"]]
