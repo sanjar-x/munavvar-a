@@ -236,7 +236,6 @@ class OrderService:
             client_account = await self.uow.accounts.get_client_account(order.client_id)
             if not client_account:
                 return
-            system_user = await self.uow.users.get_system_user()
             revenue_account = await self.uow.accounts.get_system_revenue_account()
 
             client_account.balance += order.total_amount
@@ -321,7 +320,6 @@ class OrderService:
                         "to_id": order.client_inventory_id,
                     })
 
-            # Возврат от клиента
             for pid in required_tara.keys() | actual_returned_tara.keys():
                 qty = actual_returned_tara.get(
                     pid, max(0, required_tara[pid] - explicit_items[pid])

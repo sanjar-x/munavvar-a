@@ -3,7 +3,7 @@ import uuid
 from collections.abc import Sequence
 from typing import Any
 
-from sqlalchemy import delete, insert, select, update
+from sqlalchemy import delete, func, insert, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.infrastructure.database.base import BaseModel
@@ -93,3 +93,14 @@ class BaseRepository[ModelType: BaseModel]:
         statement = delete(self.model).where(self.model.id == id)
         result = await self.session.execute(statement)
         return result.rowcount > 0
+
+    async def count(self, active_only: bool = True, **kwargs: Any) -> int:
+        """Подсчет количества записей с учетом фильтров."""
+        query = select(func.count()).select_from(self.model)
+        if kwargs:
+            query = query.filter_by(**kwargs)
+        if active_only:
+            query = query.where(self.model.is_active.is_(True))
+
+        result = await self.session.execute(query)
+        return result.scalar() or 0

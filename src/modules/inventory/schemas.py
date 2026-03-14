@@ -229,3 +229,47 @@ class UpdateItemQuantityDto(BaseModel):
     """Для изменения количества товара кладовщиком в DRAFT"""
 
     quantity: int = Field(gt=0)
+
+
+# --- ТРАНСПОРТ (BACKOFFICE) ---
+
+
+class ProductSimpleResponse(BaseModel):
+    id: uuid.UUID
+    name: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class BalanceResponse(BaseModel):
+    product: ProductSimpleResponse
+    quantity: int
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class TransportCreate(BaseModel):
+    user_id: uuid.UUID = Field(
+        ..., description="ID курьера, ответственного за транспорт"
+    )
+    name: str = Field(
+        ..., max_length=255, description="Название транспорта (напр. 'Машина АВ123')"
+    )
+
+
+class TransportUpdate(BaseModel):
+    user_id: uuid.UUID | None = Field(None, description="Новый ответственный курьер")
+    name: str | None = Field(None, max_length=255, description="Новое название")
+
+
+class TransportResponse(BaseModel):
+    id: uuid.UUID
+    user_id: uuid.UUID
+    name: str
+    type: str = "COURIER"
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class TransportDetailResponse(TransportResponse):
+    balances: list[BalanceResponse] = []

@@ -1,10 +1,8 @@
 from pydantic import BaseModel, Field
 
-from src.modules.users.schemas import PhoneStr
-
 
 class LocalLogin(BaseModel):
-    phone: PhoneStr
+    phone: str
     password: str = Field(..., min_length=1, description="Пароль пользователя")
 
 

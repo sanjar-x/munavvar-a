@@ -12,14 +12,6 @@ from src.modules.users.enums import Role
 # ==========================================
 
 # Валидация телефона (международный формат, от 8 до 15 цифр, опциональный +)
-PhoneStr = Annotated[
-    str,
-    Field(
-        pattern=r"^\+?[1-9]\d{7,14}$",
-        json_schema_extra={"example": "+998901234567"},
-        description="Номер телефона в международном формате",
-    ),
-]
 
 FullNameStr = Annotated[
     str,
@@ -61,17 +53,17 @@ class CourierBase(BaseModel):
 
 class UserCreate(BaseModel):
     username: FullNameStr | None = None
-    phone: PhoneStr
+    phone: str
 
 
 # 2. Схема для администратора (Управление доступом)
 class UserAdminCreate(UserBase):
-    phone: PhoneStr
+    phone: str
     password: PasswordStr
 
 
 class CourierAdminCreate(CourierBase):
-    phone: PhoneStr
+    phone: str
     password: PasswordStr
 
 
@@ -158,7 +150,7 @@ class UsersDashboard(BaseModel):
     id: uuid.UUID
     role: Role
     username: FullNameStr
-    phone: PhoneStr
+    phone: str
     model_config = ConfigDict(from_attributes=True)
     inventory: list[InventoryProduct]
     balance: int = Field(description="Задолжность")

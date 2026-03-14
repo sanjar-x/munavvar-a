@@ -125,6 +125,20 @@ class InventoryRepository(BaseRepository[Inventory]):
         result = await self.session.execute(query)
         return result.scalars().all()
 
+    async def get_with_balances(self, inventory_id: uuid.UUID) -> Inventory | None:
+        """Получить транспорт (инвентарь курьера) с актуальными остатками."""
+        query = (
+            select(self.model)
+            .where(
+                self.model.id == inventory_id,
+                self.model.type == InventoryType.COURIER,
+                self.model.is_active.is_(True),
+            )
+            .options(selectinload(self.model.balances).joinedload(Balance.product))
+        )
+        result = await self.session.execute(query)
+        return result.unique().scalar_one_or_none()
+
 
 class StockTransferItemRepository(BaseRepository[StockTransferItem]):
     def __init__(self, session: AsyncSession):
