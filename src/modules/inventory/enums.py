@@ -23,6 +23,7 @@ class TransferType(enum.StrEnum):
     WAREHOUSE_TRANSFER = "WAREHOUSE_TRANSFER"  # Между складами (если их несколько)
     LOSS_WRITE_OFF = "LOSS_WRITE_OFF"  # Списание
     INVENTORY_FINDING = "INVENTORY_FINDING"  # Оприходование
+    INITIAL_BALANCE = "INITIAL_BALANCE"  # Ввод начальных остатков
 
 
 class TransferStatus(enum.StrEnum):

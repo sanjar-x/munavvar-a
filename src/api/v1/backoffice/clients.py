@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, Query, Security, status
 from src.application.client.dependencies import get_client_service
 from src.application.client.schemas import (
     ClientCreate,
+    ClientOnboardingRequest,
     ClientResponse,
     ClientsResponse,
     InventoryCreate,
@@ -19,6 +20,27 @@ from src.modules.users.schemas import UserAdminUpdate, UserResponse
 from src.modules.users.services import UserService
 
 clients_router = APIRouter()
+
+
+@clients_router.post(
+    "/onboard",
+    response_model=ClientResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Единое окно: Быстрый онбординг клиента",
+    description=(
+        "Создает клиента, оприходует начальную тару и создает первый заказ за один запрос."
+    ),
+)
+async def onboard_client(
+    current_admin: Annotated[
+        User, Security(get_current_user, scopes=[Scope.USERS_WRITE])
+    ],
+    data: ClientOnboardingRequest,
+    client_service: Annotated[ClientService, Depends(get_client_service)],
+):
+    return await client_service.onboard_client_with_balance(
+        data=data, creator_id=current_admin.id
+    )
 
 
 @clients_router.post(

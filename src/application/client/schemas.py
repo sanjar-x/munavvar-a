@@ -137,3 +137,34 @@ class ClientUpdate(BaseModel):
         default=None,
         description="Тип клиента: физическое или юридическое лицо",
     )
+
+
+# --- ONBOARDING ---
+
+
+class OnboardingOrderItemSchema(BaseModel):
+    product_id: uuid.UUID
+    quantity: int
+
+
+class OnboardingOrderSchema(BaseModel):
+    items: list[OnboardingOrderItemSchema]
+    payment_method: PaymentMethod
+
+
+class ClientOnboardingRequest(BaseModel):
+    username: str = Field(..., description="ФИО или Название компании")
+    phone: str = Field(..., description="Номер телефона клиента")
+    address_name: str = Field(..., description="Название адреса доставки")
+    role: ClientRole = Field(default=ClientRole.CLIENT_B2C)
+
+    # Оприходование тары
+    initial_balance_product_id: uuid.UUID | None = Field(
+        default=None, description="ID пустой тары для оприходования"
+    )
+    initial_balance_quantity: int = Field(
+        default=0, ge=0, description="Количество тары на руках"
+    )
+
+    # Опциональный первый заказ
+    order: OnboardingOrderSchema | None = None
