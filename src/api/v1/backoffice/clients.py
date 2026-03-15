@@ -15,6 +15,9 @@ from src.application.client.service import ClientService
 from src.core.security.permissions import Scope
 from src.infrastructure.database.models import User
 from src.modules.auth.dependencies import get_current_user
+from src.modules.inventory.dependencies import get_capitalize_tara_service
+from src.modules.inventory.schemas import CapitalizeTaraRequest, CapitalizeTaraResponse
+from src.modules.inventory.services import CapitalizeTaraService
 from src.modules.users.dependencies import get_user_service
 from src.modules.users.schemas import UserAdminUpdate, UserResponse
 from src.modules.users.services import UserService
@@ -127,6 +130,30 @@ async def update_client(
 ):
     updated_user = await user_service.update(client_id, schema)
     return updated_user
+
+
+@clients_router.post(
+    "/{client_id}/inventory/capitalize",
+    response_model=CapitalizeTaraResponse,
+    summary="Оприходовать тару клиента",
+    description=(
+        "Фиксирует наличие тары на руках у клиента (начальный остаток). "
+        "Без лимитов — диспетчер указывает точное количество."
+    ),
+)
+async def capitalize_client_tara(
+    client_id: uuid.UUID,
+    data: CapitalizeTaraRequest,
+    current_admin: Annotated[
+        User, Security(get_current_user, scopes=[Scope.USERS_WRITE])
+    ],
+    capitalize_service: Annotated[
+        CapitalizeTaraService, Depends(get_capitalize_tara_service)
+    ],
+):
+    return await capitalize_service.capitalize_tara(
+        dto=data, created_by_id=current_admin.id
+    )
 
 
 @clients_router.post(

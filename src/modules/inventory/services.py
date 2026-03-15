@@ -3,12 +3,20 @@ from collections.abc import Sequence
 from datetime import datetime
 
 from src.infrastructure.database.models import Inventory, StockTransfer
+from src.modules.catalog.services import CatalogService
 from src.modules.inventory.enums import (
     InventoryType,
     TransferStatus,
     TransferType,
 )
+from src.modules.inventory.exceptions import (
+    InventoryNotFoundError,
+    TaraCapitalizationLimitExceededError,
+)
 from src.modules.inventory.schemas import (
+    CapitalizeDeficitRequest,
+    CapitalizeTaraItem,
+    CapitalizeTaraRequest,
     TransferCreate,
     TransferItemCreate,
     TransportCreate,
@@ -251,3 +259,154 @@ class StockTransferService:
 
             await self.uow.commit()
             return transfer
+
+
+class CapitalizeTaraService:
+    """
+    Оприходование тары клиента (INITIAL_BALANCE).
+    Используется при переходе клиента в онлайн-систему,
+    когда у клиента есть физическая тара, не учтенная в системе.
+    """
+
+    def __init__(self, uow: InventoryUnitOfWork, catalog_service: CatalogService):
+        self.uow = uow
+        self.catalog_service = catalog_service
+
+    async def capitalize_tara(
+        self,
+        dto: CapitalizeTaraRequest,
+        created_by_id: uuid.UUID,
+    ) -> dict:
+        """
+        Оприходование тары администратором (без лимитов).
+        VIRTUAL_VENDOR → ClientInventory.
+        """
+        async with self.uow:
+            inventory = await self.uow.inventories.get_inventory_with_balances(
+                dto.client_inventory_id, inv_type=InventoryType.CLIENT
+            )
+            if not inventory:
+                raise InventoryNotFoundError(inventory_id=dto.client_inventory_id)
+
+            vendor_inv = await self.uow.inventories.get_vendor_inventory()
+
+            transfer = await self.uow.transfers.add({
+                "from_id": vendor_inv.id,
+                "to_id": inventory.id,
+                "type": TransferType.INITIAL_BALANCE,
+                "status": TransferStatus.COMPLETED,
+                "created_by_id": created_by_id,
+                "accepted_by_id": created_by_id,
+            })
+
+            for item in dto.items:
+                await self.uow.transfer_items.add({
+                    "transfer_id": transfer.id,
+                    "product_id": item.product_id,
+                    "quantity": item.quantity,
+                })
+                await self.uow.transactions.add({
+                    "product_id": item.product_id,
+                    "transfer_id": transfer.id,
+                    "from_id": vendor_inv.id,
+                    "to_id": inventory.id,
+                    "quantity": item.quantity,
+                })
+
+            await self.uow.commit()
+
+            return {
+                "transfer_id": transfer.id,
+                "capitalized_items": [
+                    {"product_id": item.product_id, "quantity": item.quantity}
+                    for item in dto.items
+                ],
+            }
+
+    async def capitalize_deficit(
+        self,
+        dto: CapitalizeDeficitRequest,
+        client_id: uuid.UUID,
+    ) -> dict:
+        """
+        Оприходование дефицита тары клиентом.
+        Рассчитывает нехватку автоматически и оприходует ровно столько,
+        сколько не хватает для текущей корзины (защита от фрода).
+        """
+        product_ids = [item.product_id for item in dto.items]
+        products = await self.catalog_service.get_by_ids(product_ids)
+
+        # Определяем какие товары требуют возвратной тары
+        exchange_items = [
+            (p, next(i for i in dto.items if i.product_id == p.id))
+            for p in products
+            if p.returnable_item_id is not None
+        ]
+
+        if not exchange_items:
+            return {"transfer_id": None, "capitalized_items": []}
+
+        async with self.uow:
+            inventory = await self.uow.inventories.get_inventory_with_balances(
+                dto.client_inventory_id, inv_type=InventoryType.CLIENT
+            )
+            if not inventory:
+                raise InventoryNotFoundError(inventory_id=dto.client_inventory_id)
+
+            # Проверяем владельца инвентаря
+            if inventory.user_id != client_id:
+                raise InventoryNotFoundError(inventory_id=dto.client_inventory_id)
+
+            balances = {b.product_id: b.quantity for b in inventory.balances}
+
+            # Рассчитываем дефицит
+            items_to_capitalize: list[CapitalizeTaraItem] = []
+            for product, item in exchange_items:
+                required_tare_id = product.returnable_item_id
+                available = balances.get(required_tare_id, 0)
+                deficit = item.quantity - available
+                if deficit > 0:
+                    items_to_capitalize.append(
+                        CapitalizeTaraItem(
+                            product_id=required_tare_id,
+                            quantity=deficit,
+                        )
+                    )
+
+            if not items_to_capitalize:
+                return {"transfer_id": None, "capitalized_items": []}
+
+            vendor_inv = await self.uow.inventories.get_vendor_inventory()
+
+            transfer = await self.uow.transfers.add({
+                "from_id": vendor_inv.id,
+                "to_id": inventory.id,
+                "type": TransferType.INITIAL_BALANCE,
+                "status": TransferStatus.COMPLETED,
+                "created_by_id": client_id,
+                "accepted_by_id": client_id,
+            })
+
+            for cap_item in items_to_capitalize:
+                await self.uow.transfer_items.add({
+                    "transfer_id": transfer.id,
+                    "product_id": cap_item.product_id,
+                    "quantity": cap_item.quantity,
+                })
+                await self.uow.transactions.add({
+                    "product_id": cap_item.product_id,
+                    "transfer_id": transfer.id,
+                    "from_id": vendor_inv.id,
+                    "to_id": inventory.id,
+                    "quantity": cap_item.quantity,
+                })
+
+            await self.uow.commit()
+
+            return {
+                "transfer_id": transfer.id,
+                "capitalized_items": [
+                    {"product_id": ci.product_id, "quantity": ci.quantity}
+                    for ci in items_to_capitalize
+                ],
+            }

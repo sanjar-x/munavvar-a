@@ -236,6 +236,45 @@ class UpdateItemQuantityDto(BaseModel):
     quantity: int = Field(gt=0)
 
 
+# --- ОПРИХОДОВАНИЕ ТАРЫ (CAPITALIZATION) ---
+
+
+class CapitalizeTaraItem(BaseModel):
+    """Позиция оприходования: ID тары и количество."""
+
+    product_id: uuid.UUID = Field(description="ID возвратной тары (пустая бутыль)")
+    quantity: int = Field(gt=0, description="Количество единиц тары")
+
+
+class CapitalizeTaraRequest(BaseModel):
+    """Запрос на оприходование тары (Backoffice — без лимитов)."""
+
+    client_inventory_id: uuid.UUID = Field(description="ID адреса клиента")
+    items: list[CapitalizeTaraItem] = Field(min_length=1)
+
+
+class CapitalizeDeficitRequest(BaseModel):
+    """
+    Запрос от клиента на оприходование дефицита тары.
+    Система сама рассчитает необходимое количество.
+    """
+
+    items: list[Item] = Field(
+        min_length=1,
+        description="Корзина товаров (как при оформлении заказа)",
+    )
+    client_inventory_id: uuid.UUID = Field(description="ID адреса клиента")
+
+
+class CapitalizeTaraResponse(BaseModel):
+    """Результат оприходования тары."""
+
+    transfer_id: uuid.UUID
+    capitalized_items: list[CapitalizeTaraItem]
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 # --- ТРАНСПОРТ (BACKOFFICE) ---
 
 

@@ -91,8 +91,37 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
                             "deficit": item.quantity - available_tare,
                         })
 
-                if shortages:
+                if shortages and not dto.capitalize_missing_tara:
                     raise InsufficientTaraError(shortages=shortages)
+
+                # Автоматическое оприходование дефицита тары
+                if shortages and dto.capitalize_missing_tara:
+                    vendor_inv = await self.uow.inventories.get_vendor_inventory()
+
+                    transfer = await self.uow.transfers.add({
+                        "from_id": vendor_inv.id,
+                        "to_id": inventory.id,
+                        "type": TransferType.INITIAL_BALANCE,
+                        "status": TransferStatus.COMPLETED,
+                        "created_by_id": client_id,
+                        "accepted_by_id": client_id,
+                    })
+
+                    for shortage in shortages:
+                        await self.uow.transfer_items.add({
+                            "transfer_id": transfer.id,
+                            "product_id": uuid.UUID(shortage["returnable_item_id"]),
+                            "quantity": shortage["deficit"],
+                        })
+                        await self.uow.transactions.add({
+                            "product_id": uuid.UUID(shortage["returnable_item_id"]),
+                            "transfer_id": transfer.id,
+                            "from_id": vendor_inv.id,
+                            "to_id": inventory.id,
+                            "quantity": shortage["deficit"],
+                        })
+
+                    await self.uow.commit()
 
         total_amount = 0
         order_items_data = []

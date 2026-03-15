@@ -299,6 +299,30 @@ class StrictLedgerViolationError(ForbiddenError):
         )
 
 
+class TaraCapitalizationLimitExceededError(ConflictError):
+    """
+    Защита от фрода: клиент пытается оприходовать тару
+    сверх дефицита текущей корзины.
+    """
+
+    def __init__(
+        self,
+        max_allowed: int,
+        requested: int,
+        product_id: uuid.UUID | str,
+        message: str = "Превышен лимит оприходования тары",
+    ):
+        super().__init__(
+            message=message,
+            error_code="TARA_CAPITALIZATION_LIMIT_EXCEEDED",
+            details={
+                "product_id": str(product_id),
+                "max_allowed": max_allowed,
+                "requested": requested,
+            },
+        )
+
+
 class ReversalNotAllowedError(ForbiddenError):
     """Попытка отменить/отреверсировать накладную, которую отменять нельзя (например, Инвентаризацию)."""
 

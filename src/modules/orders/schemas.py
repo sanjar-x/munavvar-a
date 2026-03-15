@@ -41,6 +41,14 @@ class OrderCreate(BaseModel):
         title="ID адреса клиента",
         description="Инвентарь клиента, куда будет доставлен заказ",
     )
+    capitalize_missing_tara: bool = Field(
+        default=False,
+        title="Оприходовать недостающую тару",
+        description=(
+            "Если True — система автоматически оприходует дефицит тары "
+            "перед созданием заказа (INITIAL_BALANCE)."
+        ),
+    )
 
 
 class OrderAssignCourierRequest(BaseModel):
