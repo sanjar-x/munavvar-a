@@ -468,20 +468,22 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
     async def _process_financial_settlement(self, order: Order) -> None:
         """
         Финансовое закрытие заказа при доставке.
-        Перенесено из OrderService.delivery() для единообразия.
         Создает финансовые транзакции в зависимости от способа оплаты:
         - Начисляет долг клиенту (Revenue → Client)
         - CASH: перебрасывает долг на курьера (Client → Courier)
         - CARD: создает pending-транзакцию на эквайринг (Client → Card)
+
+        ВАЖНО: Балансы accounts.balance обновляются ТРИГГЕРОМ БД
+        (update_account_balances), а не приложением. Приложение
+        только вставляет записи в таблицу transactions.
         """
         client_account = await self.uow.accounts.get_client_account(order.client_id)
         if not client_account:
             return
         revenue_account = await self.uow.accounts.get_system_revenue_account()
 
-        # Начислить долг клиенту
-        client_account.balance += order.total_amount
-        financial_txns = [
+        # Долг клиенту (balance обновит триггер при INSERT)
+        financial_txns: list[dict] = [
             {
                 "from_id": revenue_account.id,
                 "to_id": client_account.id,
@@ -497,8 +499,6 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
                 order.courier_id
             )
             if courier_account:
-                client_account.balance -= order.total_amount
-                courier_account.balance += order.total_amount
                 financial_txns.append({
                     "from_id": client_account.id,
                     "to_id": courier_account.id,
