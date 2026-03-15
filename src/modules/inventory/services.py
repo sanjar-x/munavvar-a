@@ -362,6 +362,8 @@ class CapitalizeTaraService:
             items_to_capitalize: list[CapitalizeTaraItem] = []
             for product, item in exchange_items:
                 required_tare_id = product.returnable_item_id
+                if required_tare_id is None:
+                    continue
                 available = balances.get(required_tare_id, 0)
                 deficit = item.quantity - available
                 if deficit > 0:

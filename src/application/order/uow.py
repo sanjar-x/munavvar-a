@@ -39,9 +39,7 @@ class OrderUnitOfWork(BaseSQLAlchemyUoW, IOrderUnitOfWork):
         self.accounts = AccountRepository(session=self.session)
         self.transactions = TransactionRepository(session=self.session)
         self.inventories = InventoryRepository(session=self.session)
-        self.stock_transactions = StockTransactionRepository(
-            session=self.session
-        )
+        self.stock_transactions = StockTransactionRepository(session=self.session)
         self.stock_transfers = StockTransferRepository(session=self.session)
         self.order_items = OrderItemRepository(session=self.session)
         self.orders = OrderRepository(session=self.session)
