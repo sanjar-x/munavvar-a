@@ -59,13 +59,13 @@ async def search_orders(
 
 @orders_router.post("/", response_model=OrderResponse)
 async def create_order(
-    client_id: Annotated[uuid.UUID, Query(description="ID клиента")],
+    clientId: Annotated[uuid.UUID, Query(description="ID клиента")],
     dto: OrderCreate,
     admin: Annotated[User, Security(get_current_user, scopes=[Scope.ORDERS_EDIT])],
     order_service: Annotated[BaseOrderService, Depends(get_base_order_service)],
 ):
     """Создание заказа администратором от лица клиента."""
-    return await order_service.create_order(client_id=client_id, dto=dto)
+    return await order_service.create_order(client_id=clientId, dto=dto)
 
 
 @orders_router.get("/{order_id}", response_model=OrderResponse)
