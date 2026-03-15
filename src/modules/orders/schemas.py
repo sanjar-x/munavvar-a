@@ -147,6 +147,13 @@ class OrderResponse(BaseModel):
     courier: UserResponse | None = None
     status: OrderStatus
     total_amount: int
+    capitalization_applied: bool = Field(
+        default=False,
+        description=(
+            "True, если при создании заказа было выполнено "
+            "авто-оприходование недостающей тары (INITIAL_BALANCE)."
+        ),
+    )
 
     items: list[OrderItemResponse]
     stock_transfers: list[TransferResponse] = []

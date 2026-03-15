@@ -11,7 +11,6 @@ from src.modules.inventory.enums import (
 )
 from src.modules.inventory.exceptions import (
     InventoryNotFoundError,
-    TaraCapitalizationLimitExceededError,
 )
 from src.modules.inventory.schemas import (
     CapitalizeDeficitRequest,

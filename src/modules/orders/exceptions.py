@@ -77,9 +77,7 @@ class OrderAccessDeniedError(ForbiddenError):
 class EmptyCartError(ConflictError):
     """Выбрасывается при попытке оформить заказ без товаров."""
 
-    def __init__(
-        self, message: str = "Невозможно оформить заказ: корзина пуста"
-    ):
+    def __init__(self, message: str = "Невозможно оформить заказ: корзина пуста"):
         super().__init__(
             message=message,
             error_code="EMPTY_CART",
@@ -100,11 +98,7 @@ class ProductsUnavailableError(ConflictError):
         super().__init__(
             message=message,
             error_code="PRODUCTS_UNAVAILABLE",
-            details={
-                "missing_product_ids": [
-                    str(pid) for pid in missing_product_ids
-                ]
-            },
+            details={"missing_product_ids": [str(pid) for pid in missing_product_ids]},
         )
 
 
@@ -157,6 +151,42 @@ class ClientInventoryNotFoundError(NotFoundError):
             message=message,
             error_code="CLIENT_INVENTORY_NOT_FOUND",
             details={"inventory_id": str(inventory_id)},
+        )
+
+
+class DeliveryQuantityExceededError(ConflictError):
+    """
+    Курьер указал фактическое количество товара больше заказанного.
+    Защита от накрутки долга клиенту.
+    """
+
+    def __init__(
+        self,
+        product_id: uuid.UUID | str,
+        ordered: int,
+        actual: int,
+    ):
+        super().__init__(
+            message="Фактическое количество превышает заказанное",
+            error_code="DELIVERY_QUANTITY_EXCEEDED",
+            details={
+                "product_id": str(product_id),
+                "ordered": ordered,
+                "actual": actual,
+            },
+        )
+
+
+class CannotRemoveLastItemError(ConflictError):
+    """
+    Запрет удаления последнего товара из заказа.
+    Пустой заказ не должен существовать — используйте отмену.
+    """
+
+    def __init__(self):
+        super().__init__(
+            message="Нельзя удалить последний товар. Используйте отмену заказа.",
+            error_code="CANNOT_REMOVE_LAST_ITEM",
         )
 
 

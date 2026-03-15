@@ -7,14 +7,17 @@ from typing import cast
 from src.common.service import BaseService
 from src.infrastructure.database.models import Order
 from src.modules.catalog.services import CatalogService
+from src.modules.finances.enums import TransactionStatus
 from src.modules.inventory.enums import (
     TransferStatus,
     TransferType,
 )
 from src.modules.orders.enums import OrderStatus, PaymentMethod
 from src.modules.orders.exceptions import (
+    CannotRemoveLastItemError,
     ClientInventoryNotFoundError,
     CourierAssignmentError,
+    DeliveryQuantityExceededError,
     EmptyCartError,
     InsufficientTaraError,
     OrderAccessDeniedError,
@@ -64,11 +67,14 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
             if p.returnable_item_id is not None
         ]
 
+        capitalization_applied = False
+
         if exchange_items:
             async with self.uow:
-                # Получаем баланс пустой тары клиента
+                # Получаем баланс пустой тары клиента (с блокировкой от Race Condition)
                 inventory = await self.uow.inventories.get_inventory_with_balances(
-                    dto.client_inventory_id
+                    dto.client_inventory_id,
+                    with_for_update=True,
                 )
                 if not inventory:
                     raise ClientInventoryNotFoundError(
@@ -121,6 +127,7 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
                             "quantity": shortage["deficit"],
                         })
 
+                    capitalization_applied = True
                     await self.uow.commit()
 
         total_amount = 0
@@ -155,6 +162,9 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
             await self.uow.order_items.add_many(order_items_data)
 
             await self.uow.commit()
+
+            # Transient-атрибут для Pydantic-сериализации (не колонка БД)
+            new_order.capitalization_applied = capitalization_applied
             return new_order
 
     async def get_order_with_details(
@@ -261,6 +271,10 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
             if not existing_item:
                 return order
 
+            # Защита: запрет удаления последнего товара (пустой заказ недопустим)
+            if len(order.items) <= 1:
+                raise CannotRemoveLastItemError()
+
             # 3. Высчитываем сумму для вычета до удаления
             amount_to_subtract = existing_item.unit_price * existing_item.quantity
 
@@ -360,10 +374,26 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
             actual_map = {item.product_id: item.quantity for item in actual_items_dto}
             new_total = 0
 
-            # Обновляем строки заказа
+            # Обновляем строки заказа (с защитой от превышения)
             for item in order.items:
                 if item.product_id in actual_map:
-                    item.quantity = actual_map[item.product_id]
+                    original_quantity = item.quantity
+                    requested_quantity = actual_map[item.product_id]
+
+                    if requested_quantity < 0:
+                        raise DeliveryQuantityExceededError(
+                            product_id=item.product_id,
+                            ordered=original_quantity,
+                            actual=requested_quantity,
+                        )
+                    if requested_quantity > original_quantity:
+                        raise DeliveryQuantityExceededError(
+                            product_id=item.product_id,
+                            ordered=original_quantity,
+                            actual=requested_quantity,
+                        )
+
+                    item.quantity = requested_quantity
                     await self.uow.order_items.update_quantity(item.id, item.quantity)
 
                 new_total += item.unit_price * item.quantity
@@ -434,9 +464,66 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
                     "quantity": item_data["quantity"],
                 })
 
-    async def check_tara_availability(
-        self, dto: TaraCheckRequest
-    ) -> dict:
+        # 4. Финансовое закрытие заказа
+        await self._process_financial_settlement(order)
+
+    async def _process_financial_settlement(self, order: Order) -> None:
+        """
+        Финансовое закрытие заказа при доставке.
+        Перенесено из OrderService.delivery() для единообразия.
+        Создает финансовые транзакции в зависимости от способа оплаты:
+        - Начисляет долг клиенту (Revenue → Client)
+        - CASH: перебрасывает долг на курьера (Client → Courier)
+        - CARD: создает pending-транзакцию на эквайринг (Client → Card)
+        """
+        client_account = await self.uow.accounts.get_client_account(order.client_id)
+        if not client_account:
+            return
+        revenue_account = await self.uow.accounts.get_system_revenue_account()
+
+        # Начислить долг клиенту
+        client_account.balance += order.total_amount
+        financial_txns = [
+            {
+                "from_id": revenue_account.id,
+                "to_id": client_account.id,
+                "amount": order.total_amount,
+                "order_id": order.id,
+                "status": TransactionStatus.COMPLETED,
+                "reason": "Задолженность за заказ",
+            }
+        ]
+
+        if order.payment_method == PaymentMethod.CASH:
+            courier_account = await self.uow.accounts.get_courier_account(
+                order.courier_id
+            )
+            if courier_account:
+                client_account.balance -= order.total_amount
+                courier_account.balance += order.total_amount
+                financial_txns.append({
+                    "from_id": client_account.id,
+                    "to_id": courier_account.id,
+                    "amount": order.total_amount,
+                    "order_id": order.id,
+                    "status": TransactionStatus.COMPLETED,
+                    "reason": "Оплата наличными курьеру",
+                })
+
+        elif order.payment_method == PaymentMethod.CARD:
+            card_account = await self.uow.accounts.get_system_card_account()
+            financial_txns.append({
+                "from_id": client_account.id,
+                "to_id": card_account.id,
+                "amount": order.total_amount,
+                "order_id": order.id,
+                "status": TransactionStatus.PENDING,
+                "reason": "Перевод на карту",
+            })
+
+        await self.uow.financial_transactions.add_many(financial_txns)
+
+    async def check_tara_availability(self, dto: TaraCheckRequest) -> dict:
         """
         Предварительная проверка тары перед оформлением заказа.
         Возвращает can_order и список нехваток.
@@ -458,9 +545,7 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
                 dto.client_inventory_id
             )
             if not inventory:
-                raise ClientInventoryNotFoundError(
-                    inventory_id=dto.client_inventory_id
-                )
+                raise ClientInventoryNotFoundError(inventory_id=dto.client_inventory_id)
 
             balances = {b.product_id: b.quantity for b in inventory.balances}
 
