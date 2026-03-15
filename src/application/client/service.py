@@ -118,48 +118,6 @@ class ClientService:
             response.phone = identity.provider_identity_id if identity else None
             return response
 
-    # async def update_client(self, client_id: uuid.UUID, data: ClientUpdate):
-    #     async with self.uow:
-    #         client = await self.uow.users.get_client_with_details(client_id=client_id)
-    #         if not client:
-    #             raise ClientNotFoundError(client_id=client_id)
-
-    #         if data.phone:
-    #             existing_identity = await self.uow.identities.get_by_provider_and_id(
-    #                 provider=AuthProvider.LOCAL, provider_identity_id=data.phone
-    #             )
-    #             if existing_identity and existing_identity.user_id != client.id:
-    #                 raise ClientAlreadyExistsError(phone=data.phone)
-
-    #             local_identity = next(
-    #                 i for i in client.identities if i.provider == AuthProvider.LOCAL
-    #             )
-
-    #             if local_identity.provider_identity_id != data.phone:
-    #                 await self.uow.identities.update(
-    #                     id=local_identity.id,
-    #                     obj_data={"provider_identity_id": data.phone},
-    #                 )
-
-    #         user_update_data = data.model_dump(
-    #             exclude_unset=True, exclude_none=True, exclude={"phone"}
-    #         )
-
-    #         if user_update_data:
-    #             await self.uow.users.update(
-    #                 id=client.id,
-    #                 obj_data=user_update_data,
-    #             )
-
-    #         try:
-    #             await self.uow.commit()
-    #         except IntegrityError as e:
-    #             await self.uow.rollback()
-    #             if "uq_identities_provider_identity_id" in str(e.orig):
-    #                 raise ClientAlreadyExistsError(phone=data.phone or "Unknown")
-    #             raise e
-
-    #     return await self.get_client(client_id=client_id)
     async def onboard_client_with_balance(
         self, data: ClientOnboardingRequest, creator_id: uuid.UUID
     ) -> ClientResponse:
