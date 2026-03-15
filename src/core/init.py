@@ -1,6 +1,5 @@
 # src/core/init.py
 import logging
-import os
 
 from sqlalchemy import select
 
