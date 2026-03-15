@@ -10,7 +10,12 @@ from src.infrastructure.database.models import User
 from src.modules.auth.dependencies import get_current_user
 from src.modules.orders.dependencies import get_base_order_service
 from src.modules.orders.enums import OrderStatus, PaymentMethod
-from src.modules.orders.schemas import OrderCreate, OrderResponse
+from src.modules.orders.schemas import (
+    OrderCreate,
+    OrderResponse,
+    TaraCheckRequest,
+    TaraCheckResponse,
+)
 from src.modules.orders.services import BaseOrderService
 
 orders_router = APIRouter()
@@ -61,7 +66,17 @@ async def search_orders(
     )
 
 
-@orders_router.post("/", response_model=OrderResponse)
+@orders_router.post("/check-tara", response_model=TaraCheckResponse)
+async def check_tara_availability(
+    dto: TaraCheckRequest,
+    admin: Annotated[User, Security(get_current_user, scopes=[Scope.ORDERS_READ])],
+    order_service: Annotated[BaseOrderService, Depends(get_base_order_service)],
+):
+    """Предварительная проверка доступности тары перед оформлением заказа."""
+    return await order_service.check_tara_availability(dto=dto)
+
+
+@orders_router.post("/", response_model=OrderResponse, status_code=201)
 async def create_order(
     client_id: Annotated[uuid.UUID, Query(alias="clientId", description="ID клиента")],
     dto: OrderCreate,

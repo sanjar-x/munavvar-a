@@ -71,6 +71,35 @@ class OrderDeliverRequest(BaseModel):
     )
 
 
+class TaraCheckRequest(BaseModel):
+    """Запрос на проверку доступности тары перед оформлением заказа."""
+
+    items: list[Item] = Field(..., min_length=1)
+    client_inventory_id: uuid.UUID = Field(
+        ...,
+        title="ID адреса клиента",
+    )
+
+
+class TaraShortage(BaseModel):
+    product_id: uuid.UUID
+    product_name: str
+    returnable_item_id: uuid.UUID
+    required: int
+    available: int
+    deficit: int
+
+
+class TaraCheckResponse(BaseModel):
+    """Результат проверки тары: можно ли оформить заказ."""
+
+    can_order: bool = Field(description="Можно ли оформить заказ с текущей тарой")
+    shortages: list[TaraShortage] = Field(
+        default_factory=list,
+        description="Список нехваток тары (пуст, если can_order=true)",
+    )
+
+
 # =====================================================================
 # 3. СХЕМЫ ОТВЕТОВ (RESPONSES)
 # =====================================================================

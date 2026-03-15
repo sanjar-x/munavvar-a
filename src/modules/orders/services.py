@@ -13,14 +13,16 @@ from src.modules.inventory.enums import (
 )
 from src.modules.orders.enums import OrderStatus, PaymentMethod
 from src.modules.orders.exceptions import (
+    ClientInventoryNotFoundError,
     CourierAssignmentError,
     EmptyCartError,
+    InsufficientTaraError,
     OrderAccessDeniedError,
     OrderNotFoundError,
     ProductsUnavailableError,
 )
 from src.modules.orders.repositories import OrderRepository
-from src.modules.orders.schemas import OrderCreate, OrderItemActual
+from src.modules.orders.schemas import OrderCreate, OrderItemActual, TaraCheckRequest
 from src.modules.orders.uow import BaseOrderUnitOfWork
 
 
@@ -69,19 +71,28 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
                     dto.client_inventory_id
                 )
                 if not inventory:
-                    raise ValueError("Инвентарь клиента не найден")
+                    raise ClientInventoryNotFoundError(
+                        inventory_id=dto.client_inventory_id
+                    )
 
                 balances = {b.product_id: b.quantity for b in inventory.balances}
 
+                shortages = []
                 for product, item in exchange_items:
                     required_tare_id = product.returnable_item_id
                     available_tare = balances.get(required_tare_id, 0)
                     if available_tare < item.quantity:
-                        raise ValueError(
-                            f"Недостаточно пустой тары ({product.name}). "
-                            f"Требуется: {item.quantity}, в наличии: {available_tare}. "
-                            "Добавьте покупку новой тары в заказ."
-                        )
+                        shortages.append({
+                            "product_id": str(product.id),
+                            "product_name": product.name,
+                            "returnable_item_id": str(required_tare_id),
+                            "required": item.quantity,
+                            "available": available_tare,
+                            "deficit": item.quantity - available_tare,
+                        })
+
+                if shortages:
+                    raise InsufficientTaraError(shortages=shortages)
 
         total_amount = 0
         order_items_data = []
@@ -393,6 +404,52 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
                     "to_id": courier_inventory.id,
                     "quantity": item_data["quantity"],
                 })
+
+    async def check_tara_availability(
+        self, dto: TaraCheckRequest
+    ) -> dict:
+        """
+        Предварительная проверка тары перед оформлением заказа.
+        Возвращает can_order и список нехваток.
+        """
+        product_ids = [item.product_id for item in dto.items]
+        products = await self.catalog_service.get_by_ids(product_ids)
+
+        exchange_items = [
+            (p, next(i for i in dto.items if i.product_id == p.id))
+            for p in products
+            if p.returnable_item_id is not None
+        ]
+
+        if not exchange_items:
+            return {"can_order": True, "shortages": []}
+
+        async with self.uow:
+            inventory = await self.uow.inventories.get_inventory_with_balances(
+                dto.client_inventory_id
+            )
+            if not inventory:
+                raise ClientInventoryNotFoundError(
+                    inventory_id=dto.client_inventory_id
+                )
+
+            balances = {b.product_id: b.quantity for b in inventory.balances}
+
+            shortages = []
+            for product, item in exchange_items:
+                required_tare_id = product.returnable_item_id
+                available_tare = balances.get(required_tare_id, 0)
+                if available_tare < item.quantity:
+                    shortages.append({
+                        "product_id": product.id,
+                        "product_name": product.name,
+                        "returnable_item_id": required_tare_id,
+                        "required": item.quantity,
+                        "available": available_tare,
+                        "deficit": item.quantity - available_tare,
+                    })
+
+            return {"can_order": len(shortages) == 0, "shortages": shortages}
 
     # --- МЕТОДЫ ПОИСКА И СПИСКОВ ---
 

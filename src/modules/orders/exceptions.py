@@ -127,6 +127,39 @@ class CourierAssignmentError(ConflictError):
         )
 
 
+class InsufficientTaraError(ConflictError):
+    """
+    Выбрасывается при оформлении заказа, если у клиента
+    недостаточно пустой тары для обмена.
+    """
+
+    def __init__(
+        self,
+        shortages: list[dict[str, Any]],
+        message: str = "Недостаточно пустой тары для оформления заказа",
+    ):
+        super().__init__(
+            message=message,
+            error_code="INSUFFICIENT_TARA",
+            details={"shortages": shortages},
+        )
+
+
+class ClientInventoryNotFoundError(NotFoundError):
+    """Выбрасывается, когда инвентарь (адрес доставки) клиента не найден."""
+
+    def __init__(
+        self,
+        inventory_id: uuid.UUID | str,
+        message: str = "Инвентарь клиента не найден",
+    ):
+        super().__init__(
+            message=message,
+            error_code="CLIENT_INVENTORY_NOT_FOUND",
+            details={"inventory_id": str(inventory_id)},
+        )
+
+
 class CatalogServiceUnavailableError(ServiceUnavailableError):
     """
     Выбрасывается, если модуль Orders не может получить цены из модуля Catalog.
