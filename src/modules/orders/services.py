@@ -152,6 +152,7 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
                 "payment_method": dto.payment_method,
                 "status": OrderStatus.NEW,
                 "total_amount": total_amount,
+                "capitalization_applied": capitalization_applied,
             })
 
             # 4. Привязываем строки корзины к новому заказу
@@ -162,9 +163,6 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
             await self.uow.order_items.add_many(order_items_data)
 
             await self.uow.commit()
-
-            # Transient-атрибут для Pydantic-сериализации (не колонка БД)
-            new_order.capitalization_applied = capitalization_applied
             return new_order
 
     async def get_order_with_details(
@@ -494,7 +492,7 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
             }
         ]
 
-        if order.payment_method == PaymentMethod.CASH:
+        if order.payment_method == PaymentMethod.CASH and order.courier_id:
             courier_account = await self.uow.accounts.get_courier_account(
                 order.courier_id
             )

@@ -2,7 +2,7 @@
 import uuid
 from typing import TYPE_CHECKING
 
-from sqlalchemy import CheckConstraint, Enum, ForeignKey
+from sqlalchemy import Boolean, CheckConstraint, Enum, ForeignKey
 from sqlalchemy.dialects.postgresql import BIGINT, INTEGER, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -61,6 +61,13 @@ class Order(BaseModel):
         default=0,
         nullable=False,
         comment="Сумма всего заказа",
+    )
+    capitalization_applied: Mapped[bool] = mapped_column(
+        Boolean,
+        default=False,
+        nullable=False,
+        server_default="false",
+        comment="Было ли авто-оприходование тары при создании заказа",
     )
     client: Mapped["User"] = relationship(
         foreign_keys=[client_id],

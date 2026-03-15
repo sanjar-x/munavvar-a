@@ -9,6 +9,7 @@ from src.modules.finances.repositories import (
 from src.modules.inventory.repositories import (
     InventoryRepository,
     StockTransactionRepository,
+    StockTransferItemRepository,
     StockTransferRepository,
 )
 from src.modules.orders.repositories import (
@@ -22,6 +23,7 @@ class BaseOrderUnitOfWork(BaseSQLAlchemyUoW):
     order_items: OrderItemRepository
     inventories: InventoryRepository
     transfers: StockTransferRepository
+    transfer_items: StockTransferItemRepository
     transactions: StockTransactionRepository
     accounts: AccountRepository
     financial_transactions: FinancialTransactionRepository
@@ -33,6 +35,7 @@ class BaseOrderUnitOfWork(BaseSQLAlchemyUoW):
         self.order_items = OrderItemRepository(session=self.session)
         self.inventories = InventoryRepository(session=self.session)
         self.transfers = StockTransferRepository(session=self.session)
+        self.transfer_items = StockTransferItemRepository(session=self.session)
         self.transactions = StockTransactionRepository(session=self.session)
         self.accounts = AccountRepository(session=self.session)
         self.financial_transactions = FinancialTransactionRepository(
