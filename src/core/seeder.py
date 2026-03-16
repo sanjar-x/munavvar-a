@@ -8,6 +8,7 @@ from sqlalchemy import select
 
 from src.core.security.password import get_password_hash
 from src.infrastructure.database.models import (
+    Account,
     Identity,
     Inventory,
     Product,
@@ -16,6 +17,7 @@ from src.infrastructure.database.models import (
 )
 from src.infrastructure.database.session import async_session_maker
 from src.modules.catalog.enums import ProductType
+from src.modules.finances.enums import AccountType
 from src.modules.inventory.enums import InventoryType, TransferStatus, TransferType
 from src.modules.orders.enums import OrderStatus, PaymentMethod
 from src.modules.users.enums import AuthProvider, Role
@@ -214,7 +216,12 @@ class Seeder:
                         password_hash=password_hash,
                     )
                     session.add(identity)
-
+                    account = Account(
+                        user_id=user.id,
+                        type=AccountType.COURIER,
+                        name=f"Касса {name}",
+                    )
+                    session.add(account)
                     inventory = Inventory(
                         user_id=user.id, name=car, type=InventoryType.COURIER
                     )
@@ -251,6 +258,12 @@ class Seeder:
                     )
                     session.add(identity)
 
+                    account = Account(
+                        user_id=user.id,
+                        type=AccountType.CLIENT,
+                        name=f"Cчёт клиента {name}",
+                    )
+                    session.add(account)
                     inventory = Inventory(
                         user_id=user.id,
                         name=f"Inventory for {name}",
