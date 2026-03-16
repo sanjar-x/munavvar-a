@@ -56,6 +56,7 @@ class Balance(BaseModel):
 
 class Inventory(BaseModel):
     model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
     type: InventoryType
     name: str
     balances: list[Balance]
