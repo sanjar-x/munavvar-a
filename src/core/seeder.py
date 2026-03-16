@@ -216,11 +216,13 @@ class Seeder:
                         password_hash=password_hash,
                     )
                     session.add(identity)
+                    await session.flush()
                     account = Account(
                         user_id=user.id,
                         type=AccountType.COURIER,
                         name=f"Касса {name}",
                     )
+                    await session.flush()
                     session.add(account)
                     inventory = Inventory(
                         user_id=user.id, name=car, type=InventoryType.COURIER
@@ -257,13 +259,14 @@ class Seeder:
                         password_hash=password_hash,
                     )
                     session.add(identity)
-
+                    await session.flush()
                     account = Account(
                         user_id=user.id,
                         type=AccountType.CLIENT,
                         name=f"Cчёт клиента {name}",
                     )
                     session.add(account)
+                    await session.flush()
                     inventory = Inventory(
                         user_id=user.id,
                         name=f"Inventory for {name}",
