@@ -76,7 +76,7 @@ async def check_tara_availability(
     return await order_service.check_tara_availability(dto=dto)
 
 
-@orders_router.post("/", response_model=OrderResponse, status_code=201)
+@orders_router.post("/", status_code=201)
 async def create_order(
     client_id: Annotated[uuid.UUID, Query(alias="clientId", description="ID клиента")],
     dto: OrderCreate,
