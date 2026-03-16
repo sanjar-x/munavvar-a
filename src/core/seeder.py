@@ -197,14 +197,16 @@ class Seeder:
             ]
 
             for phone, name, car in couriers_data:
-                existing = (
+                # 1. Проверяем пользователя
+                user = (
                     await session.execute(
                         select(User)
                         .join(Identity)
                         .where(Identity.provider_identity_id == phone)
                     )
                 ).scalar_one_or_none()
-                if not existing:
+
+                if not user:
                     user = User(username=name, role=Role.COURIER, is_active=True)
                     session.add(user)
                     await session.flush()
@@ -217,13 +219,34 @@ class Seeder:
                     )
                     session.add(identity)
                     await session.flush()
+
+                # 2. Проверяем наличие аккаунта
+                account = (
+                    await session.execute(
+                        select(Account).where(Account.user_id == user.id)
+                    )
+                ).scalar_one_or_none()
+
+                if not account:
                     account = Account(
                         user_id=user.id,
                         type=AccountType.COURIER,
                         name=f"Касса {name}",
                     )
-                    await session.flush()
                     session.add(account)
+                    await session.flush()
+
+                # 3. Проверяем наличие инвентаря
+                inventory = (
+                    await session.execute(
+                        select(Inventory).where(
+                            Inventory.user_id == user.id,
+                            Inventory.type == InventoryType.COURIER,
+                        )
+                    )
+                ).scalar_one_or_none()
+
+                if not inventory:
                     inventory = Inventory(
                         user_id=user.id, name=car, type=InventoryType.COURIER
                     )
@@ -240,14 +263,16 @@ class Seeder:
             ]
 
             for phone, name, role in clients_data:
-                existing = (
+                # 1. Проверяем пользователя
+                user = (
                     await session.execute(
                         select(User)
                         .join(Identity)
                         .where(Identity.provider_identity_id == phone)
                     )
                 ).scalar_one_or_none()
-                if not existing:
+
+                if not user:
                     user = User(username=name, role=role, is_active=True)
                     session.add(user)
                     await session.flush()
@@ -260,6 +285,15 @@ class Seeder:
                     )
                     session.add(identity)
                     await session.flush()
+
+                # 2. Проверяем наличие аккаунта
+                account = (
+                    await session.execute(
+                        select(Account).where(Account.user_id == user.id)
+                    )
+                ).scalar_one_or_none()
+
+                if not account:
                     account = Account(
                         user_id=user.id,
                         type=AccountType.CLIENT,
@@ -267,6 +301,18 @@ class Seeder:
                     )
                     session.add(account)
                     await session.flush()
+
+                # 3. Проверяем наличие инвентаря
+                inventory = (
+                    await session.execute(
+                        select(Inventory).where(
+                            Inventory.user_id == user.id,
+                            Inventory.type == InventoryType.CLIENT,
+                        )
+                    )
+                ).scalar_one_or_none()
+
+                if not inventory:
                     inventory = Inventory(
                         user_id=user.id,
                         name=f"Inventory for {name}",
