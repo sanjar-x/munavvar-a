@@ -12,7 +12,6 @@ from src.api.middlewares.logger import AccessLoggerMiddleware
 from src.api.middlewares.request_id import RequestIDMiddleware
 from src.api.v1 import api_v1_router
 from src.core.config import settings
-from src.core.init import init_data
 from src.core.logger import setup_logging
 
 setup_logging()
@@ -28,7 +27,7 @@ async def lifespan(app: FastAPI):
         environment=settings.ENVIRONMENT,
     )
     # Инициализация БД и Redis...
-    await init_data()
+    # await init_data()
     yield
     logger.info("Остановка Enterprise API. Очистка ресурсов...")
     # Закрытие пулов...
