@@ -43,15 +43,12 @@ class InventoryShortDTO(BaseModel):
     id: uuid.UUID
     name: str
 
-    model_config = ConfigDict(from_attributes=True)
-
 
 # --- ВЛОЖЕННЫЕ СХЕМЫ (ДЛЯ ОТВЕТОВ) ---
 
 
 class CourierInventoryWithBalancesDTO(InventoryShortDTO):
     balances: list[Any]
-    model_config = ConfigDict(from_attributes=True)
 
 
 # --- ОТВЕТЫ (RESPONSES) ---
