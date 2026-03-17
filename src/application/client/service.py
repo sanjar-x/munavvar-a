@@ -93,6 +93,7 @@ class ClientService:
                 {
                     "id": client.id,
                     "username": client.username,
+                    "role": client.role,
                     "phone": client.identities[0].provider_identity_id
                     if client.identities
                     else None,
