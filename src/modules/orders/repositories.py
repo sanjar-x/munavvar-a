@@ -168,7 +168,6 @@ class OrderRepository(BaseRepository[Order]):
         if max_amount is not None:
             query = query.where(self.model.total_amount <= max_amount)
 
-        # Жадная загрузка связей и пагинация
         query = (
             query
             .options(

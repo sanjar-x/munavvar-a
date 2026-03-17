@@ -55,8 +55,6 @@ class CourierInventoryWithBalancesDTO(InventoryShortDTO):
 
 
 # --- ОТВЕТЫ (RESPONSES) ---
-
-
 class Courier(BaseModel):
     """Схема одного курьера для выдачи в списке (без глубоких связей)"""
 
