@@ -119,6 +119,7 @@ class InventoryUpdate(BaseModel):
 
 class Client(BaseModel):
     id: uuid.UUID
+    role: ClientRole
     username: str
     phone: str | None = None
     is_active: bool
