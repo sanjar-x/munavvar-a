@@ -49,12 +49,8 @@ class InventoryShortDTO(BaseModel):
 # --- ВЛОЖЕННЫЕ СХЕМЫ (ДЛЯ ОТВЕТОВ) ---
 
 
-class CourierInventoryWithBalancesDTO(BaseModel):
-    inventory: InventoryShortDTO  # Убрали Any
-    balances: list[
-        Any
-    ]  # Пока оставим Any для балансов, если у тебя нет схемы StockTransactionDTO
-
+class CourierInventoryWithBalancesDTO(InventoryShortDTO):
+    balances: list[Any]
     model_config = ConfigDict(from_attributes=True)
 
 
