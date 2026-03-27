@@ -21,6 +21,8 @@ class TransferType(enum.StrEnum):
     LOSS_WRITE_OFF = "LOSS_WRITE_OFF"  # Списание
     INVENTORY_FINDING = "INVENTORY_FINDING"  # Оприходование
     INITIAL_BALANCE = "INITIAL_BALANCE"  # Ввод начальных остатков
+    WAREHOUSE_SALE = "WAREHOUSE_SALE"  # Продажа со склада (самовывоз)
+    WAREHOUSE_TARA_RETURN = "WAREHOUSE_TARA_RETURN"  # Возврат тары при самовывозе
 
 
 class TransferStatus(enum.StrEnum):
