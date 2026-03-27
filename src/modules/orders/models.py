@@ -2,12 +2,12 @@
 import uuid
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, CheckConstraint, Enum, ForeignKey
+from sqlalchemy import Boolean, CheckConstraint, Enum, ForeignKey, String
 from sqlalchemy.dialects.postgresql import BIGINT, INTEGER, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.infrastructure.database.base import BaseModel
-from src.modules.orders.enums import OrderStatus, PaymentMethod
+from src.modules.orders.enums import OrderStatus, PaymentMethod, SaleType
 
 if TYPE_CHECKING:
     from src.infrastructure.database.models import User
@@ -74,12 +74,30 @@ class Order(BaseModel):
         server_default="false",
         comment="Было ли авто-оприходование тары при создании заказа",
     )
+    sale_type: Mapped[str] = mapped_column(
+        String(30),
+        default=SaleType.DELIVERY,
+        server_default="delivery",
+        nullable=False,
+        index=True,
+        comment="Тип продажи: delivery (доставка) или warehouse_pickup (самовывоз)",
+    )
+    warehouse_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("inventories.id", ondelete="RESTRICT"),
+        nullable=True,
+        index=True,
+        comment="Склад-источник (заполняется только для самовывоза)",
+    )
     client: Mapped["User"] = relationship(
         foreign_keys=[client_id],
         back_populates="client_orders",
     )
     client_inventory: Mapped["Inventory"] = relationship(
         foreign_keys=[client_inventory_id]
+    )
+    warehouse: Mapped["Inventory | None"] = relationship(
+        foreign_keys=[warehouse_id],
     )
     courier: Mapped["User | None"] = relationship(
         foreign_keys=[courier_id],
