@@ -9,10 +9,11 @@ from src.infrastructure.database.models import Order
 from src.modules.catalog.services import CatalogService
 from src.modules.finances.enums import TransactionStatus
 from src.modules.inventory.enums import (
+    InventoryType,
     TransferStatus,
     TransferType,
 )
-from src.modules.orders.enums import OrderStatus, PaymentMethod
+from src.modules.orders.enums import OrderStatus, PaymentMethod, SaleType
 from src.modules.inventory.exceptions import InsufficientStockError
 from src.modules.orders.exceptions import (
     CannotRemoveLastItemError,
@@ -21,6 +22,7 @@ from src.modules.orders.exceptions import (
     DeliveryQuantityExceededError,
     EmptyCartError,
     InsufficientTaraError,
+    InvalidPickupOperationError,
     OrderAccessDeniedError,
     OrderNotFoundError,
     ProductsUnavailableError,
@@ -30,8 +32,10 @@ from src.modules.orders.schemas import (
     OrderCreate,
     OrderItemActual,
     TaraCheckRequest,
+    WarehouseSaleCreate,
 )
 from src.modules.orders.uow import BaseOrderUnitOfWork
+from src.core.constants import WALKIN_USER_ID
 
 
 class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
@@ -202,6 +206,162 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
             await self.uow.commit()
 
             # 8. Перечитываем с eager-loaded relationships для корректной сериализации
+            return await self.uow.orders.get_with_details(new_order.id)
+
+    async def create_warehouse_sale(
+        self,
+        dto: WarehouseSaleCreate,
+        client_id: uuid.UUID | None,
+        created_by_id: uuid.UUID,
+    ) -> Order:
+        """
+        Создание заказа на самовывоз со склада.
+        Если client_id не передан — используется WALKIN_USER_ID.
+        """
+        effective_client_id = client_id or WALKIN_USER_ID
+
+        if not dto.items:
+            raise EmptyCartError()
+
+        product_ids = [item.product_id for item in dto.items]
+        products = await self.catalog_service.get_by_ids(product_ids)
+        price_map = {p.id: p.price for p in products}
+
+        missing_ids = [pid for pid in product_ids if pid not in price_map]
+        if missing_ids:
+            raise ProductsUnavailableError(missing_product_ids=missing_ids)
+
+        exchange_items = [
+            (p, next(i for i in dto.items if i.product_id == p.id))
+            for p in products
+            if p.returnable_item_id is not None
+        ]
+
+        total_amount = 0
+        order_items_data = []
+        for item in dto.items:
+            current_price = price_map[item.product_id]
+            total_amount += current_price * item.quantity
+            order_items_data.append(
+                {
+                    "product_id": item.product_id,
+                    "quantity": item.quantity,
+                    "unit_price": current_price,
+                }
+            )
+
+        async with self.uow:
+            warehouse = await self.uow.inventories.get_inventory_with_balances(
+                dto.warehouse_id, inv_type=InventoryType.WAREHOUSE
+            )
+            if not warehouse:
+                raise ValueError(f"Склад {dto.warehouse_id} не найден")
+
+            client_inventory = await self.uow.inventories.get_client_inventory(
+                effective_client_id
+            )
+            if not client_inventory:
+                raise ClientInventoryNotFoundError(
+                    inventory_id=effective_client_id
+                )
+
+            capitalization_applied = False
+
+            if exchange_items:
+                inventory = (
+                    await self.uow.inventories.get_inventory_with_balances(
+                        client_inventory.id, with_for_update=True
+                    )
+                )
+                if not inventory:
+                    raise ClientInventoryNotFoundError(
+                        inventory_id=client_inventory.id
+                    )
+
+                balances = {
+                    b.product_id: b.quantity for b in inventory.balances
+                }
+
+                ordering_tare_now = {
+                    item.product_id: item.quantity for item in dto.items
+                }
+
+                shortages = []
+                for product, item in exchange_items:
+                    required_tare_id = product.returnable_item_id
+                    available_in_inventory = balances.get(required_tare_id, 0)
+                    ordering_now = ordering_tare_now.get(required_tare_id, 0)
+                    effective_available = available_in_inventory + ordering_now
+                    if effective_available < item.quantity:
+                        shortages.append(
+                            {
+                                "product_id": str(product.id),
+                                "product_name": product.name,
+                                "returnable_item_id": str(required_tare_id),
+                                "required": item.quantity,
+                                "available": effective_available,
+                                "deficit": item.quantity - effective_available,
+                            }
+                        )
+
+                if shortages and not dto.capitalize_missing_tara:
+                    raise InsufficientTaraError(shortages=shortages)
+
+                if shortages and dto.capitalize_missing_tara:
+                    vendor_inv = (
+                        await self.uow.inventories.get_vendor_inventory()
+                    )
+                    transfer = await self.uow.transfers.add(
+                        {
+                            "from_id": vendor_inv.id,
+                            "to_id": client_inventory.id,
+                            "type": TransferType.INITIAL_BALANCE,
+                            "status": TransferStatus.COMPLETED,
+                            "created_by_id": created_by_id,
+                            "accepted_by_id": created_by_id,
+                        }
+                    )
+                    for shortage in shortages:
+                        await self.uow.transfer_items.add(
+                            {
+                                "transfer_id": transfer.id,
+                                "product_id": uuid.UUID(
+                                    shortage["returnable_item_id"]
+                                ),
+                                "quantity": shortage["deficit"],
+                            }
+                        )
+                        await self.uow.transactions.add(
+                            {
+                                "product_id": uuid.UUID(
+                                    shortage["returnable_item_id"]
+                                ),
+                                "transfer_id": transfer.id,
+                                "from_id": vendor_inv.id,
+                                "to_id": client_inventory.id,
+                                "quantity": shortage["deficit"],
+                            }
+                        )
+                    capitalization_applied = True
+
+            new_order = await self.uow.orders.add(
+                {
+                    "client_id": effective_client_id,
+                    "client_inventory_id": client_inventory.id,
+                    "payment_method": PaymentMethod.CASH,
+                    "status": OrderStatus.NEW,
+                    "total_amount": total_amount,
+                    "capitalization_applied": capitalization_applied,
+                    "sale_type": SaleType.WAREHOUSE_PICKUP,
+                    "warehouse_id": dto.warehouse_id,
+                }
+            )
+
+            for item_data in order_items_data:
+                item_data["order_id"] = new_order.id
+            await self.uow.order_items.add_many(order_items_data)
+
+            await self.uow.commit()
             return await self.uow.orders.get_with_details(new_order.id)
 
     async def get_order_with_details(

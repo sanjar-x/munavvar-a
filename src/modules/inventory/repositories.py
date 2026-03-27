@@ -102,16 +102,15 @@ class InventoryRepository(BaseRepository[Inventory]):
     # --- СЦЕНАРИИ КЛИЕНТА (B2C / B2B) ---
 
     async def get_client_inventory(
-        self, user_id: uuid.UUID, inventory_id: uuid.UUID
+        self, user_id: uuid.UUID
     ) -> Inventory | None:
         query = select(self.model).where(
-            self.model.id == inventory_id,
             self.model.user_id == user_id,
             self.model.type == InventoryType.CLIENT,
             self.model.is_active.is_(True),
         )
         result = await self.session.execute(query)
-        return result.scalar_one_or_none()
+        return result.scalars().first()
 
     async def search_inventories(
         self,
