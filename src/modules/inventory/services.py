@@ -54,7 +54,7 @@ _VALID_ROUTES: dict[
         frozenset({InventoryType.COURIER}),
     ),
     TransferType.LOSS_WRITE_OFF: (
-        frozenset({InventoryType.WAREHOUSE, InventoryType.COURIER, InventoryType.FACTORY}),
+        frozenset({InventoryType.WAREHOUSE, InventoryType.COURIER, InventoryType.FACTORY, InventoryType.CLIENT}),
         frozenset({InventoryType.VIRTUAL_LOSS}),
     ),
     TransferType.INVENTORY_FINDING: (

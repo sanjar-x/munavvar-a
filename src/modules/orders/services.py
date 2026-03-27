@@ -907,7 +907,42 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
                     }
                 )
 
-        # 4. Финансовое закрытие
+        # 4. Cleanup: списание товара с Walk-in inventory
+        # Анонимный покупатель забрал товар и ушёл — обнуляем его inventory
+        if order.client_id == WALKIN_USER_ID:
+            loss_inv = await self.uow.inventories.get_loss_inventory()
+            cleanup_transfer = await self.uow.transfers.add(
+                {
+                    "from_id": order.client_inventory_id,
+                    "to_id": loss_inv.id,
+                    "type": TransferType.LOSS_WRITE_OFF,
+                    "status": TransferStatus.COMPLETED,
+                    "created_by_id": completed_by_id,
+                    "accepted_by_id": completed_by_id,
+                    "order_id": order.id,
+                }
+            )
+            for item in order.items:
+                if item.quantity == 0:
+                    continue
+                await self.uow.transfer_items.add(
+                    {
+                        "transfer_id": cleanup_transfer.id,
+                        "product_id": item.product_id,
+                        "quantity": item.quantity,
+                    }
+                )
+                await self.uow.transactions.add(
+                    {
+                        "product_id": item.product_id,
+                        "transfer_id": cleanup_transfer.id,
+                        "from_id": order.client_inventory_id,
+                        "to_id": loss_inv.id,
+                        "quantity": item.quantity,
+                    }
+                )
+
+        # 5. Финансовое закрытие
         await self._process_pickup_settlement(order)
 
     async def _process_financial_settlement(self, order: Order) -> None:
