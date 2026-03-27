@@ -129,7 +129,7 @@ class OrderRepository(BaseRepository[Order]):
         )
 
         if with_for_update:
-            query = query.with_for_update()
+            query = query.with_for_update(of=self.model)
 
         result: Result = await self.session.execute(query)
         return result.scalar_one_or_none()
