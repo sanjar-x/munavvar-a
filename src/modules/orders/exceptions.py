@@ -196,6 +196,21 @@ class CannotRemoveLastItemError(ConflictError):
         )
 
 
+class InvalidPickupOperationError(ConflictError):
+    """Выбрасывается при попытке выполнить pickup-операцию на обычном заказе."""
+
+    def __init__(
+        self,
+        order_id: uuid.UUID | str,
+        reason: str,
+    ):
+        super().__init__(
+            message=f"Ошибка операции самовывоза: {reason}",
+            error_code="INVALID_PICKUP_OPERATION",
+            details={"order_id": str(order_id)},
+        )
+
+
 class CatalogServiceUnavailableError(ServiceUnavailableError):
     """
     Выбрасывается, если модуль Orders не может получить цены из модуля Catalog.

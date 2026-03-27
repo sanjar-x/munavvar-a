@@ -7,7 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from src.modules.catalog.schemas import ProductResponse
 from src.modules.inventory.enums import InventoryType
 from src.modules.inventory.schemas import TransferResponse
-from src.modules.orders.enums import OrderStatus, PaymentMethod
+from src.modules.orders.enums import OrderStatus, PaymentMethod, SaleType
 from src.modules.users.schemas import UserResponse
 
 
@@ -110,6 +110,32 @@ class TaraCheckResponse(BaseModel):
     )
 
 
+class WarehouseSaleCreate(BaseModel):
+    """Создание заказа на самовывоз со склада."""
+
+    warehouse_id: uuid.UUID = Field(
+        ..., description="ID склада, с которого продаём"
+    )
+    items: list[Item] = Field(
+        ..., min_length=1, title="Корзина товаров"
+    )
+    capitalize_missing_tara: bool = Field(
+        default=False,
+        title="Оприходовать недостающую тару",
+    )
+
+
+class WarehouseSaleCapitalizeTaraRequest(BaseModel):
+    """Оприходование тары, принесённой покупателем на склад."""
+
+    warehouse_id: uuid.UUID = Field(
+        ..., description="ID склада (для контекста)"
+    )
+    items: list[Item] = Field(
+        ..., min_length=1, description="Тара, принесённая покупателем"
+    )
+
+
 # =====================================================================
 # 3. СХЕМЫ ОТВЕТОВ (RESPONSES)
 # =====================================================================
@@ -156,6 +182,14 @@ class OrderResponse(BaseModel):
             "True, если при создании заказа было выполнено "
             "авто-оприходование недостающей тары (INITIAL_BALANCE)."
         ),
+    )
+    sale_type: str = Field(
+        default=SaleType.DELIVERY,
+        description="Тип продажи: delivery или warehouse_pickup",
+    )
+    warehouse_id: uuid.UUID | None = Field(
+        default=None,
+        description="ID склада (только для самовывоза)",
     )
 
     items: list[OrderItemResponse]
