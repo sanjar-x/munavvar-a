@@ -12,6 +12,7 @@ from src.modules.inventory.enums import (
 from src.core.exceptions import ConflictError
 from src.modules.inventory.exceptions import (
     CourierAlreadyAssignedError,
+    InsufficientStockError,
     InventoryNotFoundError,
     InventoryTypeMismatchError,
     RouteLoopError,
@@ -20,8 +21,7 @@ from src.modules.inventory.schemas import (
     CapitalizeDeficitRequest,
     CapitalizeTaraItem,
     CapitalizeTaraRequest,
-    TransferCreate,
-    TransferItemCreate,
+    CreateTransferRequest,
     TransportCreate,
     TransportUpdate,
     WarehouseCreate,
@@ -73,6 +73,14 @@ _VALID_ROUTES: dict[
     TransferType.WAREHOUSE_SALE: (
         frozenset({InventoryType.WAREHOUSE}),
         frozenset({InventoryType.CLIENT}),
+    ),
+    TransferType.FACTORY_SHIPMENT: (
+        frozenset({InventoryType.WAREHOUSE}),
+        frozenset({InventoryType.FACTORY}),
+    ),
+    TransferType.FACTORY_RETURN: (
+        frozenset({InventoryType.FACTORY}),
+        frozenset({InventoryType.WAREHOUSE}),
     ),
     TransferType.WAREHOUSE_TARA_RETURN: (
         frozenset({InventoryType.CLIENT}),
@@ -246,21 +254,46 @@ class StockTransferService:
                 date_to=date_to,
             )
 
-    async def create_draft_transfer(
-        self, created_by_id: uuid.UUID, schema: TransferCreate
+    async def create_transfer(
+        self,
+        created_by_id: uuid.UUID,
+        schema: CreateTransferRequest,
     ) -> StockTransfer:
+        """
+        Единый метод создания и проведения накладной (single-step).
+        """
         async with self.uow:
-            # Защита от «петли» (отправка самому себе)
-            if schema.from_id == schema.to_id:
-                raise RouteLoopError(inventory_id=schema.from_id)
+            # 1. Авто-подстановка виртуальных складов
+            from_id = schema.from_id
+            to_id = schema.to_id
 
-            # Проверяем существование складов и соответствие маршрута типу накладной
-            from_inventory = await self.uow.inventories.get(schema.from_id)
+            if schema.type in (
+                TransferType.INVENTORY_FINDING,
+                TransferType.FACTORY_RECEIPT,
+                TransferType.INITIAL_BALANCE,
+            ):
+                vendor_inv = await self.uow.inventories.get_system_inventory(
+                    InventoryType.VIRTUAL_VENDOR
+                )
+                from_id = vendor_inv.id
+
+            if schema.type == TransferType.LOSS_WRITE_OFF:
+                loss_inv = await self.uow.inventories.get_system_inventory(
+                    InventoryType.VIRTUAL_LOSS
+                )
+                to_id = loss_inv.id
+
+            # 2. Защита от петли
+            if from_id == to_id:
+                raise RouteLoopError(inventory_id=from_id)
+
+            # 3. Валидация маршрута
+            from_inventory = await self.uow.inventories.get(from_id)
             if not from_inventory:
-                raise InventoryNotFoundError(inventory_id=schema.from_id)
-            to_inventory = await self.uow.inventories.get(schema.to_id)
+                raise InventoryNotFoundError(inventory_id=from_id)
+            to_inventory = await self.uow.inventories.get(to_id)
             if not to_inventory:
-                raise InventoryNotFoundError(inventory_id=schema.to_id)
+                raise InventoryNotFoundError(inventory_id=to_id)
 
             route = _VALID_ROUTES.get(schema.type)
             if route:
@@ -278,89 +311,46 @@ class StockTransferService:
                         actual_type=to_inventory.type,
                     )
 
-            transfer = await self.uow.transfers.add({
-                "from_id": schema.from_id,
-                "to_id": schema.to_id,
-                "type": schema.type,
-                "status": TransferStatus.DRAFT,
-                "created_by_id": created_by_id,
-            })
-            await self.uow.commit()
-            return transfer
-
-    async def update_draft_items(
-        self,
-        transfer_id: uuid.UUID,
-        items_schema: list[TransferItemCreate],
-    ) -> StockTransfer:
-        async with self.uow:
-            transfer = await self.uow.transfers.get_with_items_for_update(transfer_id)
-            if not transfer:
-                raise ValueError("Transfer not found")
-            if transfer.status != TransferStatus.DRAFT:
-                raise ValueError("Cannot update non-draft transfer")
-
-            # Simple logic: replace old items with new ones or update
-            # Here we'll clear and add to keep it simple, or find and update
-            # Let's clear and re-add for simplicity in this specific task
-            for item in transfer.items:
-                await self.uow.transfer_items.delete(item.id)
-
-            for item_data in items_schema:
-                await self.uow.transfer_items.add({
-                    "transfer_id": transfer_id,
-                    "product_id": item_data.product_id,
-                    "quantity": item_data.quantity,
-                })
-
-            await self.uow.commit()
-            transfer = await self.uow.transfers.get_transfer(transfer_id)
-            if not transfer:
-                raise ValueError("Transfer not found after update")
-            return transfer
-
-    async def complete_transfer(
-        self,
-        transfer_id: uuid.UUID,
-        accepted_by_id: uuid.UUID,
-    ) -> StockTransfer:
-        async with self.uow:
-            transfer = await self.uow.transfers.get_transfer(transfer_id)
-            if not transfer:
-                raise ValueError("Transfer not found")
-            if transfer.status != TransferStatus.DRAFT:
-                raise ValueError("Only draft transfers can be completed")
-
-            from_inventory = await self.uow.inventories.get_inventory_with_balances(
-                transfer.from_id, with_for_update=True
-            )
-
-            # 2. Validate balances in from_inventory
-            if from_inventory and from_inventory.type != InventoryType.VIRTUAL_VENDOR:
-                product_ids = [item.product_id for item in transfer.items]
-                balances = await self.uow.transactions.get_balances_for_products(
-                    transfer.from_id, product_ids
+            # 4. Блокировка и проверка остатков (пропуск для VIRTUAL_VENDOR)
+            if from_inventory.type != InventoryType.VIRTUAL_VENDOR:
+                from_inventory = await self.uow.inventories.get_inventory_with_balances(
+                    from_id, with_for_update=True
                 )
+                balances = {b.product_id: b.quantity for b in from_inventory.balances}
+                shortages: dict[uuid.UUID, int] = {}
+                for item in schema.items:
+                    available = balances.get(item.product_id, 0)
+                    if available < item.quantity:
+                        shortages[item.product_id] = item.quantity - available
+                if shortages:
+                    raise InsufficientStockError(shortages=shortages)
 
-                for item in transfer.items:
-                    if balances.get(item.product_id, 0) < item.quantity:
-                        raise ValueError(
-                            f"Insufficient balance for product {item.product.name}"
-                        )
+            # 5. Создаём накладную (сразу COMPLETED)
+            transfer = await self.uow.transfers.add({
+                "from_id": from_id,
+                "to_id": to_id,
+                "type": schema.type,
+                "status": TransferStatus.COMPLETED,
+                "created_by_id": created_by_id,
+                "accepted_by_id": created_by_id,
+                "reason": schema.reason,
+                "route_sheet_id": schema.route_sheet_id,
+            })
 
-            # 2. Create StockTransactions
-            for item in transfer.items:
-                await self.uow.transactions.add({
+            # 6. Строки накладной и проводки в леджере
+            for item in schema.items:
+                await self.uow.transfer_items.add({
+                    "transfer_id": transfer.id,
                     "product_id": item.product_id,
-                    "transfer_id": transfer_id,
-                    "from_id": transfer.from_id,
-                    "to_id": transfer.to_id,
                     "quantity": item.quantity,
                 })
-
-            # 3. Update status
-            transfer.status = TransferStatus.COMPLETED
-            transfer.accepted_by_id = accepted_by_id
+                await self.uow.transactions.add({
+                    "product_id": item.product_id,
+                    "transfer_id": transfer.id,
+                    "from_id": from_id,
+                    "to_id": to_id,
+                    "quantity": item.quantity,
+                })
 
             await self.uow.commit()
             return transfer
