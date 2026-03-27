@@ -10,6 +10,7 @@ from src.modules.inventory.enums import (
     TransferType,
 )
 from src.modules.inventory.exceptions import (
+    CourierAlreadyAssignedError,
     InventoryNotFoundError,
 )
 from src.modules.inventory.schemas import (
@@ -77,16 +78,17 @@ class TransportService:
             if not update_data:
                 return await self.uow.inventories.get(transport_id)
 
-            # If reassigning to a new courier, unassign them from their current
-            # active transport first to avoid violating uq_active_courier_inventory.
+            # Guard against violating uq_active_courier_inventory:
+            # user_id is NOT NULL, so we cannot unassign — raise 409 instead.
             new_user_id = update_data.get("user_id")
             if new_user_id is not None:
                 existing = await self.uow.inventories.get_courier_inventory(
                     new_user_id
                 )
                 if existing and existing.id != transport_id:
-                    await self.uow.inventories.update(
-                        existing.id, {"user_id": None}
+                    raise CourierAlreadyAssignedError(
+                        courier_id=new_user_id,
+                        existing_transport_id=existing.id,
                     )
 
             transport = await self.uow.inventories.update(

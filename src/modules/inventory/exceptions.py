@@ -267,6 +267,25 @@ class ProductMismatchInTransitError(ConflictError):
         )
 
 
+class CourierAlreadyAssignedError(ConflictError):
+    """Курьер уже привязан к другому активному транспорту."""
+
+    def __init__(
+        self,
+        courier_id: uuid.UUID | str,
+        existing_transport_id: uuid.UUID | str,
+        message: str = "Курьер уже привязан к другому активному транспорту. Сначала снимите назначение.",
+    ):
+        super().__init__(
+            message=message,
+            error_code="COURIER_ALREADY_ASSIGNED",
+            details={
+                "courier_id": str(courier_id),
+                "existing_transport_id": str(existing_transport_id),
+            },
+        )
+
+
 class CourierRouteMismatchError(ConflictError):
     """Попытка инкассации/разгрузки не своей машины или чужого маршрутного листа."""
 
