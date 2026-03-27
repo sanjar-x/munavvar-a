@@ -4,6 +4,7 @@ import logging
 from sqlalchemy import select
 
 from src.core.config import settings
+from src.core.constants import WALKIN_USER_ID
 from src.core.security.password import get_password_hash
 from src.infrastructure.database.models import (
     Account,
@@ -26,9 +27,7 @@ async def init_data() -> None:
     async with async_session_maker() as session:
         # --- 1. СОЗДАНИЕ СИСТЕМНОГО ПОЛЬЗОВАТЕЛЯ ---
         query_system = select(User).where(User.role == Role.SYSTEM)
-        system_user = (
-            await session.execute(query_system)
-        ).scalar_one_or_none()
+        system_user = (await session.execute(query_system)).scalar_one_or_none()
 
         if not system_user:
             system_user = User(
@@ -56,9 +55,7 @@ async def init_data() -> None:
                 Account.user_id == system_user.id,
                 Account.type == acc_type,
             )
-            existing_acc = (
-                await session.execute(query_acc)
-            ).scalar_one_or_none()
+            existing_acc = (await session.execute(query_acc)).scalar_one_or_none()
 
             if not existing_acc:
                 new_acc = Account(
@@ -82,9 +79,7 @@ async def init_data() -> None:
                 Inventory.user_id == system_user.id,
                 Inventory.type == inv_type,
             )
-            existing_inv = (
-                await session.execute(query_inv)
-            ).scalar_one_or_none()
+            existing_inv = (await session.execute(query_inv)).scalar_one_or_none()
 
             if not existing_inv:
                 new_inv = Inventory(
@@ -93,11 +88,53 @@ async def init_data() -> None:
                     name=inv_name,
                 )
                 session.add(new_inv)
-                logger.info(
-                    f"Виртуальный склад '{inv_name}' ({inv_type.name}) создан."
-                )
+                logger.info(f"Виртуальный склад '{inv_name}' ({inv_type.name}) создан.")
             else:
                 logger.info(f"Виртуальный склад '{inv_name}' уже существует.")
+
+        # --- 3.5 СОЗДАНИЕ WALK-IN ПОЛЬЗОВАТЕЛЯ (АНОНИМНЫЕ ПРОДАЖИ СО СКЛАДА) ---
+        query_walkin = select(User).where(User.id == WALKIN_USER_ID)
+        walkin_user = (await session.execute(query_walkin)).scalar_one_or_none()
+
+        if not walkin_user:
+            walkin_user = User(
+                id=WALKIN_USER_ID,
+                username="Покупатель со склада (Walk-in)",
+                role=Role.CLIENT_B2C,
+                is_active=True,
+            )
+            session.add(walkin_user)
+            await session.flush()
+
+            # Identity для Walk-in
+            walkin_identity = Identity(
+                user_id=walkin_user.id,
+                provider=AuthProvider.LOCAL,
+                provider_identity_id="00000000002",
+                password_hash="!disabled",
+            )
+            session.add(walkin_identity)
+
+            # Inventory для Walk-in
+            walkin_inventory = Inventory(
+                user_id=walkin_user.id,
+                type=InventoryType.CLIENT,
+                name="Самовывоз",
+            )
+            session.add(walkin_inventory)
+
+            # Финансовый счет Walk-in
+            walkin_account = Account(
+                user_id=walkin_user.id,
+                type=AccountType.CLIENT,
+                name="Счёт анонимных покупок",
+            )
+            session.add(walkin_account)
+            await session.flush()
+
+            logger.info("Walk-in пользователь и связанные сущности созданы.")
+        else:
+            logger.info("Walk-in пользователь уже существует.")
 
         # --- 4. СОЗДАНИЕ ГЛАВНОГО АДМИНИСТРАТОРА ---
         admin_phone = settings.ADMIN_PHONE
@@ -138,18 +175,15 @@ async def init_data() -> None:
                     password_hash=hashed_password,
                 )
                 session.add(admin_identity)
-                logger.info(
-                    f"Администратор с номером {admin_phone} успешно создан."
-                )
+                logger.info(f"Администратор с номером {admin_phone} успешно создан.")
             else:
-                logger.info(
-                    f"Администратор с номером {admin_phone} уже существует."
-                )
+                logger.info(f"Администратор с номером {admin_phone} уже существует.")
 
         await session.commit()
         logger.info("Инициализация успешно завершена!")
 
 
-# if __name__ == "__main__":
-#     import asyncio
-#     asyncio.run(init_data())
+if __name__ == "__main__":
+    import asyncio
+
+    asyncio.run(init_data())
