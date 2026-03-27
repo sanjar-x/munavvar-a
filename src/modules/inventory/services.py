@@ -9,6 +9,7 @@ from src.modules.inventory.enums import (
     TransferStatus,
     TransferType,
 )
+from src.core.exceptions import ConflictError
 from src.modules.inventory.exceptions import (
     CourierAlreadyAssignedError,
     InventoryNotFoundError,
@@ -68,6 +69,14 @@ _VALID_ROUTES: dict[
             InventoryType.COURIER,
             InventoryType.FACTORY,
         }),
+    ),
+    TransferType.WAREHOUSE_SALE: (
+        frozenset({InventoryType.WAREHOUSE}),
+        frozenset({InventoryType.CLIENT}),
+    ),
+    TransferType.WAREHOUSE_TARA_RETURN: (
+        frozenset({InventoryType.CLIENT}),
+        frozenset({InventoryType.WAREHOUSE}),
     ),
 }
 
@@ -160,6 +169,18 @@ class WarehouseService:
 
     async def create_warehouse(self, schema: WarehouseCreate) -> Inventory:
         async with self.uow:
+            existing = await self.uow.inventories.search_inventories(
+                search_query=schema.name,
+                inv_type=InventoryType.WAREHOUSE,
+                limit=1,
+            )
+            if existing and existing[0].name == schema.name:
+                raise ConflictError(
+                    message=f"Склад с именем '{schema.name}' уже существует",
+                    error_code="INVENTORY_NAME_DUPLICATE",
+                    details={"name": schema.name, "existing_id": str(existing[0].id)},
+                )
+
             warehouse = await self.uow.inventories.add({
                 "user_id": schema.user_id,
                 "name": schema.name,
