@@ -97,6 +97,7 @@ class UserResponse(UserBase):
     id: uuid.UUID
     role: Role
     is_active: bool
+    phone: str | None = None
     created_at: datetime
     updated_at: datetime
     model_config = ConfigDict(from_attributes=True)

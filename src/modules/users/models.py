@@ -84,6 +84,15 @@ class User(BaseModel):
     inventories: Mapped[list["Inventory"]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
     )
+    @property
+    def phone(self) -> str | None:
+        try:
+            if self.identities:
+                return self.identities[0].provider_identity_id
+        except Exception:
+            pass
+        return None
+
     client_orders: Mapped[list["Order"]] = relationship(
         "Order",
         foreign_keys="[Order.client_id]",

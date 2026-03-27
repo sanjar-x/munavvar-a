@@ -9,10 +9,12 @@ from sqlalchemy.orm import joinedload, selectinload
 
 from src.common.repository import BaseRepository
 from src.infrastructure.database.models import (
+    Identity,
     Inventory,
     Order,
     OrderItem,
     StockTransfer,
+    User,
 )
 from src.modules.orders.enums import OrderStatus, PaymentMethod
 
@@ -66,7 +68,8 @@ class OrderRepository(BaseRepository[Order]):
             select(self.model)
             .where(self.model.client_id == client_id)
             .options(
-                joinedload(self.model.courier),
+                joinedload(self.model.client).selectinload(User.identities),
+                joinedload(self.model.courier).selectinload(User.identities),
                 joinedload(self.model.client_inventory).joinedload(
                     Inventory.user
                 ),
@@ -98,7 +101,8 @@ class OrderRepository(BaseRepository[Order]):
                 ),
             )
             .options(
-                joinedload(self.model.client),
+                joinedload(self.model.client).selectinload(User.identities),
+                joinedload(self.model.courier).selectinload(User.identities),
                 joinedload(self.model.client_inventory).joinedload(
                     Inventory.user
                 ),
@@ -116,11 +120,11 @@ class OrderRepository(BaseRepository[Order]):
             select(self.model)
             .where(self.model.id == order_id)
             .options(
-                joinedload(self.model.client),
+                joinedload(self.model.client).selectinload(User.identities),
                 joinedload(self.model.client_inventory).joinedload(
                     Inventory.user
                 ),
-                joinedload(self.model.courier),
+                joinedload(self.model.courier).selectinload(User.identities),
                 selectinload(self.model.items).joinedload(OrderItem.product),
                 selectinload(self.model.stock_transfers).selectinload(
                     StockTransfer.items
@@ -182,9 +186,9 @@ class OrderRepository(BaseRepository[Order]):
 
         query = (
             query.options(
-                joinedload(self.model.client),
+                joinedload(self.model.client).selectinload(User.identities),
                 joinedload(self.model.client_inventory),
-                joinedload(self.model.courier),
+                joinedload(self.model.courier).selectinload(User.identities),
                 selectinload(self.model.items).joinedload(OrderItem.product),
                 selectinload(self.model.stock_transfers).selectinload(
                     StockTransfer.items
