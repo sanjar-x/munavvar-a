@@ -116,9 +116,7 @@ class WarehouseSaleCreate(BaseModel):
     warehouse_id: uuid.UUID = Field(
         ..., description="ID склада, с которого продаём"
     )
-    items: list[Item] = Field(
-        ..., min_length=1, title="Корзина товаров"
-    )
+    items: list[Item] = Field(..., min_length=1, title="Корзина товаров")
     capitalize_missing_tara: bool = Field(
         default=False,
         title="Оприходовать недостающую тару",

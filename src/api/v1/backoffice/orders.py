@@ -10,7 +10,10 @@ from src.core.security.permissions import Scope
 from src.infrastructure.database.models import User
 from src.modules.auth.dependencies import get_current_user
 from src.modules.inventory.dependencies import get_capitalize_tara_service
-from src.modules.inventory.schemas import CapitalizeTaraItem, CapitalizeTaraRequest
+from src.modules.inventory.schemas import (
+    CapitalizeTaraItem,
+    CapitalizeTaraRequest,
+)
 from src.modules.inventory.services import CapitalizeTaraService
 from src.modules.orders.dependencies import get_base_order_service
 from src.modules.orders.enums import OrderStatus, PaymentMethod, SaleType
@@ -114,7 +117,9 @@ async def create_order(
     return await order_service.create_order(client_id=client_id, dto=dto)
 
 
-@orders_router.post("/warehouse-sale", status_code=201, response_model=OrderResponse)
+@orders_router.post(
+    "/warehouse-sale", status_code=201, response_model=OrderResponse
+)
 async def create_warehouse_sale(
     dto: WarehouseSaleCreate,
     admin: Annotated[
@@ -125,7 +130,10 @@ async def create_warehouse_sale(
     ],
     client_id: Annotated[
         uuid.UUID | None,
-        Query(alias="clientId", description="ID клиента (если не передан — анонимная продажа)"),
+        Query(
+            alias="clientId",
+            description="ID клиента (если не передан — анонимная продажа)",
+        ),
     ] = None,
 ):
     """Создание заказа на самовывоз со склада."""
@@ -145,25 +153,34 @@ async def capitalize_tara_for_sale(
     ],
     client_id: Annotated[
         uuid.UUID | None,
-        Query(alias="clientId", description="ID клиента (если не передан — walk-in)"),
+        Query(
+            alias="clientId",
+            description="ID клиента (если не передан — walk-in)",
+        ),
     ] = None,
 ):
     """Оприходование тары, принесённой покупателем на склад перед самовывозом."""
     effective_client_id = client_id or WALKIN_USER_ID
 
     async with capitalize_service.uow:
-        client_inv = await capitalize_service.uow.inventories.get_client_inventory(
-            effective_client_id
+        client_inv = (
+            await capitalize_service.uow.inventories.get_client_inventory(
+                effective_client_id
+            )
         )
         if not client_inv:
-            raise ValueError(f"Инвентарь клиента {effective_client_id} не найден")
+            raise ValueError(
+                f"Инвентарь клиента {effective_client_id} не найден"
+            )
         client_inventory_id = client_inv.id
 
     return await capitalize_service.capitalize_tara(
         dto=CapitalizeTaraRequest(
             client_inventory_id=client_inventory_id,
             items=[
-                CapitalizeTaraItem(product_id=item.product_id, quantity=item.quantity)
+                CapitalizeTaraItem(
+                    product_id=item.product_id, quantity=item.quantity
+                )
                 for item in dto.items
             ],
         ),
@@ -171,7 +188,9 @@ async def capitalize_tara_for_sale(
     )
 
 
-@orders_router.patch("/{orderId}/complete-pickup", response_model=OrderResponse)
+@orders_router.patch(
+    "/{orderId}/complete-pickup", response_model=OrderResponse
+)
 async def complete_pickup(
     order_id: Annotated[uuid.UUID, Path(alias="orderId")],
     admin: Annotated[

@@ -60,7 +60,9 @@ class Item(BaseModel):
     """Стандартная единица измерения передачи товара."""
 
     product_id: uuid.UUID
-    quantity: int = Field(gt=0, description="Количество товара (строго больше нуля)")
+    quantity: int = Field(
+        gt=0, description="Количество товара (строго больше нуля)"
+    )
 
 
 class AdjustmentItem(BaseModel):
@@ -126,14 +128,17 @@ class CreateTransferRequest(BaseModel):
 
     type: TransferType
     from_id: uuid.UUID | None = Field(
-        None, description="ID склада-отправителя (авто для INVENTORY_FINDING, INITIAL_BALANCE)"
+        None,
+        description="ID склада-отправителя (авто для INVENTORY_FINDING, INITIAL_BALANCE)",
     )
     to_id: uuid.UUID | None = Field(
         None, description="ID склада-получателя (авто для LOSS_WRITE_OFF)"
     )
     items: list[Item] = Field(min_length=1, description="Список товаров")
     reason: str | None = Field(
-        None, min_length=3, max_length=255,
+        None,
+        min_length=3,
+        max_length=255,
         description="Причина списания (обязательно для LOSS_WRITE_OFF)",
     )
     route_sheet_id: uuid.UUID | None = Field(
@@ -254,7 +259,9 @@ class UpdateItemQuantityDto(BaseModel):
 class CapitalizeTaraItem(BaseModel):
     """Позиция оприходования: ID тары и количество."""
 
-    product_id: uuid.UUID = Field(description="ID возвратной тары (пустая бутыль)")
+    product_id: uuid.UUID = Field(
+        description="ID возвратной тары (пустая бутыль)"
+    )
     quantity: int = Field(gt=0, description="Количество единиц тары")
 
 
@@ -309,8 +316,12 @@ class TransportCreate(BaseModel):
 
 
 class TransportUpdate(BaseModel):
-    user_id: uuid.UUID | None = Field(None, description="Новый ответственный курьер")
-    name: str | None = Field(None, max_length=255, description="Новое название")
+    user_id: uuid.UUID | None = Field(
+        None, description="Новый ответственный курьер"
+    )
+    name: str | None = Field(
+        None, max_length=255, description="Новое название"
+    )
 
 
 class TransportResponse(BaseModel):
@@ -330,7 +341,9 @@ class TransportDetailResponse(TransportResponse):
 
 
 class WarehouseCreate(BaseModel):
-    user_id: uuid.UUID = Field(..., description="ID материально ответственного")
+    user_id: uuid.UUID = Field(
+        ..., description="ID материально ответственного"
+    )
     name: str = Field(..., max_length=255)
 
 

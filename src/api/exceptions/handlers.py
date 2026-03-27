@@ -10,7 +10,9 @@ from src.core.exceptions import AppException
 logger: BoundLogger = structlog.get_logger("api.exceptions")
 
 
-async def app_exception_handler(request: Request, exc: AppException) -> JSONResponse:
+async def app_exception_handler(
+    request: Request, exc: AppException
+) -> JSONResponse:
     """Перехватывает наши кастомные бизнес-ошибки."""
     # Логируем бизнес-ошибки
     log_method = logger.error if exc.status_code >= 500 else logger.warning
@@ -81,7 +83,9 @@ async def http_exception_handler(
     )
 
 
-async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+async def unhandled_exception_handler(
+    request: Request, exc: Exception
+) -> JSONResponse:
     """Перехватывает все непредвиденные системные ошибки (Crash/Panic)."""
     logger.error(
         "Необработанное системное исключение сервера (500)",

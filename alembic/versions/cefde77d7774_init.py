@@ -1,8 +1,8 @@
 """init
 
-Revision ID: 0e04bb949a80
+Revision ID: cefde77d7774
 Revises:
-Create Date: 2026-03-14 17:03:33.583949
+Create Date: 2026-03-27 22:58:49.095144
 
 """
 
@@ -15,7 +15,7 @@ from sqlalchemy.dialects import postgresql
 from alembic import op
 
 # revision identifiers, used by Alembic.
-revision: str = "0e04bb949a80"
+revision: str = "cefde77d7774"
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -51,10 +51,7 @@ def upgrade() -> None:
             comment="Витринное название товара",
         ),
         sa.Column(
-            "price",
-            sa.BIGINT(),
-            nullable=False,
-            comment="Базовая стоимость товара",
+            "price", sa.BIGINT(), nullable=False, comment="Базовая стоимость товара"
         ),
         sa.Column(
             "attributes",
@@ -105,9 +102,7 @@ def upgrade() -> None:
         ["returnable_item_id"],
         unique=False,
     )
-    op.create_index(
-        op.f("ix_products_type"), "products", ["type"], unique=False
-    )
+    op.create_index(op.f("ix_products_type"), "products", ["type"], unique=False)
     op.create_table(
         "users",
         sa.Column(
@@ -161,9 +156,7 @@ def upgrade() -> None:
     op.create_index(op.f("ix_users_role"), "users", ["role"], unique=False)
     op.create_table(
         "accounts",
-        sa.Column(
-            "user_id", sa.UUID(), nullable=False, comment="Владелец счета"
-        ),
+        sa.Column("user_id", sa.UUID(), nullable=False, comment="Владелец счета"),
         sa.Column(
             "type",
             sa.Enum(
@@ -214,18 +207,14 @@ def upgrade() -> None:
             nullable=False,
             comment="Дата и время последнего обновления",
         ),
-        sa.ForeignKeyConstraint(
-            ["user_id"], ["users.id"], ondelete="RESTRICT"
-        ),
+        sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="RESTRICT"),
         sa.PrimaryKeyConstraint("id"),
         comment="Счета для хранения денег (наличные, безнал, долги клиентов)",
     )
     op.create_index(
         "idx_account_user_type", "accounts", ["user_id", "type"], unique=False
     )
-    op.create_index(
-        op.f("ix_accounts_type"), "accounts", ["type"], unique=False
-    )
+    op.create_index(op.f("ix_accounts_type"), "accounts", ["type"], unique=False)
     op.create_table(
         "identities",
         sa.Column(
@@ -343,21 +332,14 @@ def upgrade() -> None:
             nullable=False,
             comment="Дата и время последнего обновления",
         ),
-        sa.ForeignKeyConstraint(
-            ["user_id"], ["users.id"], ondelete="RESTRICT"
-        ),
+        sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="RESTRICT"),
         sa.PrimaryKeyConstraint("id"),
         comment="Реестр всех физических и виртуальных мест хранения (склады, машины, клиенты)",
     )
     op.create_index(
-        "idx_inventory_user_type",
-        "inventories",
-        ["user_id", "type"],
-        unique=False,
+        "idx_inventory_user_type", "inventories", ["user_id", "type"], unique=False
     )
-    op.create_index(
-        op.f("ix_inventories_type"), "inventories", ["type"], unique=False
-    )
+    op.create_index(op.f("ix_inventories_type"), "inventories", ["type"], unique=False)
     op.create_index(
         "uq_active_courier_inventory",
         "inventories",
@@ -370,10 +352,7 @@ def upgrade() -> None:
         sa.Column("inventory_id", sa.UUID(), nullable=False),
         sa.Column("product_id", sa.UUID(), nullable=False),
         sa.Column(
-            "quantity",
-            sa.Integer(),
-            nullable=False,
-            comment="Фактический остаток",
+            "quantity", sa.Integer(), nullable=False, comment="Фактический остаток"
         ),
         sa.Column("id", sa.UUID(), nullable=False, comment="ID (UUIDv7)"),
         sa.Column(
@@ -400,9 +379,7 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(
             ["inventory_id"], ["inventories.id"], ondelete="CASCADE"
         ),
-        sa.ForeignKeyConstraint(
-            ["product_id"], ["products.id"], ondelete="CASCADE"
-        ),
+        sa.ForeignKeyConstraint(["product_id"], ["products.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint(
             "inventory_id", "product_id", name="uq_inventory_product_balance"
@@ -418,10 +395,7 @@ def upgrade() -> None:
     op.create_table(
         "orders",
         sa.Column(
-            "client_id",
-            sa.UUID(),
-            nullable=False,
-            comment="Покупатель (B2B или B2C)",
+            "client_id", sa.UUID(), nullable=False, comment="Покупатель (B2B или B2C)"
         ),
         sa.Column(
             "client_inventory_id",
@@ -455,6 +429,7 @@ def upgrade() -> None:
                 "IN_TRANSIT",
                 "ARRIVED",
                 "DELIVERED",
+                "PICKUP_COMPLETED",
                 "CANCELLED",
                 name="order_status_enum",
                 metadata=MetaData(),
@@ -463,10 +438,27 @@ def upgrade() -> None:
             comment="Текущий статус жизненного цикла заказа",
         ),
         sa.Column(
-            "total_amount",
-            sa.BIGINT(),
+            "total_amount", sa.BIGINT(), nullable=False, comment="Сумма всего заказа"
+        ),
+        sa.Column(
+            "capitalization_applied",
+            sa.Boolean(),
+            server_default="false",
             nullable=False,
-            comment="Сумма всего заказа",
+            comment="Было ли авто-оприходование тары при создании заказа",
+        ),
+        sa.Column(
+            "sale_type",
+            sa.String(length=30),
+            server_default="delivery",
+            nullable=False,
+            comment="Тип продажи: delivery (доставка) или warehouse_pickup (самовывоз)",
+        ),
+        sa.Column(
+            "warehouse_id",
+            sa.UUID(),
+            nullable=True,
+            comment="Склад-источник (заполняется только для самовывоза)",
         ),
         sa.Column("id", sa.UUID(), nullable=False, comment="ID (UUIDv7)"),
         sa.Column(
@@ -490,21 +482,18 @@ def upgrade() -> None:
             nullable=False,
             comment="Дата и время последнего обновления",
         ),
-        sa.ForeignKeyConstraint(
-            ["client_id"], ["users.id"], ondelete="RESTRICT"
-        ),
+        sa.ForeignKeyConstraint(["client_id"], ["users.id"], ondelete="RESTRICT"),
         sa.ForeignKeyConstraint(
             ["client_inventory_id"], ["inventories.id"], ondelete="RESTRICT"
         ),
+        sa.ForeignKeyConstraint(["courier_id"], ["users.id"], ondelete="SET NULL"),
         sa.ForeignKeyConstraint(
-            ["courier_id"], ["users.id"], ondelete="SET NULL"
+            ["warehouse_id"], ["inventories.id"], ondelete="RESTRICT"
         ),
         sa.PrimaryKeyConstraint("id"),
         comment="Главная таблица заказов клиентов",
     )
-    op.create_index(
-        op.f("ix_orders_client_id"), "orders", ["client_id"], unique=False
-    )
+    op.create_index(op.f("ix_orders_client_id"), "orders", ["client_id"], unique=False)
     op.create_index(
         op.f("ix_orders_client_inventory_id"),
         "orders",
@@ -514,18 +503,17 @@ def upgrade() -> None:
     op.create_index(
         op.f("ix_orders_courier_id"), "orders", ["courier_id"], unique=False
     )
+    op.create_index(op.f("ix_orders_sale_type"), "orders", ["sale_type"], unique=False)
+    op.create_index(op.f("ix_orders_status"), "orders", ["status"], unique=False)
     op.create_index(
-        op.f("ix_orders_status"), "orders", ["status"], unique=False
+        op.f("ix_orders_warehouse_id"), "orders", ["warehouse_id"], unique=False
     )
     op.create_table(
         "order_items",
         sa.Column("order_id", sa.UUID(), nullable=False),
         sa.Column("product_id", sa.UUID(), nullable=False),
         sa.Column(
-            "quantity",
-            sa.INTEGER(),
-            nullable=False,
-            comment="Количество позиций",
+            "quantity", sa.INTEGER(), nullable=False, comment="Количество позиций"
         ),
         sa.Column(
             "unit_price",
@@ -557,26 +545,16 @@ def upgrade() -> None:
         ),
         sa.CheckConstraint("quantity > 0", name="ck_order_item_quantity_pos"),
         sa.CheckConstraint("unit_price >= 0", name="ck_order_item_price_pos"),
-        sa.ForeignKeyConstraint(
-            ["order_id"], ["orders.id"], ondelete="CASCADE"
-        ),
-        sa.ForeignKeyConstraint(
-            ["product_id"], ["products.id"], ondelete="RESTRICT"
-        ),
+        sa.ForeignKeyConstraint(["order_id"], ["orders.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(["product_id"], ["products.id"], ondelete="RESTRICT"),
         sa.PrimaryKeyConstraint("id"),
         comment="Строки (позиции) конкретного заказа",
     )
     op.create_index(
-        op.f("ix_order_items_order_id"),
-        "order_items",
-        ["order_id"],
-        unique=False,
+        op.f("ix_order_items_order_id"), "order_items", ["order_id"], unique=False
     )
     op.create_index(
-        op.f("ix_order_items_product_id"),
-        "order_items",
-        ["product_id"],
-        unique=False,
+        op.f("ix_order_items_product_id"), "order_items", ["product_id"], unique=False
     )
     op.create_table(
         "stock_transfers",
@@ -601,19 +579,29 @@ def upgrade() -> None:
             comment="Ссылка на клиентский заказ (если применимо)",
         ),
         sa.Column(
+            "reason",
+            sa.String(length=255),
+            nullable=True,
+            comment="Причина (для списания LOSS_WRITE_OFF)",
+        ),
+        sa.Column(
+            "route_sheet_id",
+            sa.UUID(),
+            nullable=True,
+            comment="ID маршрутного листа (для COURIER_LOAD)",
+        ),
+        sa.Column(
             "type",
             sa.Enum(
-                "FACTORY_RECEIPT",
-                "PURCHASE",
-                "PRODUCTION",
                 "COURIER_LOAD",
                 "COURIER_RETURN",
                 "CLIENT_DELIVERY",
                 "CLIENT_RETURN",
-                "WAREHOUSE_TRANSFER",
                 "LOSS_WRITE_OFF",
                 "INVENTORY_FINDING",
                 "INITIAL_BALANCE",
+                "WAREHOUSE_SALE",
+                "WAREHOUSE_TARA_RETURN",
                 name="transfer_type_enum",
                 metadata=MetaData(),
             ),
@@ -653,35 +641,18 @@ def upgrade() -> None:
             nullable=False,
             comment="Дата и время последнего обновления",
         ),
-        sa.CheckConstraint(
-            "from_id != to_id", name="ck_stock_transfer_no_circular"
-        ),
-        sa.ForeignKeyConstraint(
-            ["accepted_by_id"], ["users.id"], ondelete="RESTRICT"
-        ),
-        sa.ForeignKeyConstraint(
-            ["created_by_id"], ["users.id"], ondelete="RESTRICT"
-        ),
-        sa.ForeignKeyConstraint(
-            ["from_id"], ["inventories.id"], ondelete="RESTRICT"
-        ),
-        sa.ForeignKeyConstraint(
-            ["order_id"], ["orders.id"], ondelete="RESTRICT"
-        ),
-        sa.ForeignKeyConstraint(
-            ["to_id"], ["inventories.id"], ondelete="RESTRICT"
-        ),
+        sa.CheckConstraint("from_id != to_id", name="ck_stock_transfer_no_circular"),
+        sa.ForeignKeyConstraint(["accepted_by_id"], ["users.id"], ondelete="RESTRICT"),
+        sa.ForeignKeyConstraint(["created_by_id"], ["users.id"], ondelete="RESTRICT"),
+        sa.ForeignKeyConstraint(["from_id"], ["inventories.id"], ondelete="RESTRICT"),
+        sa.ForeignKeyConstraint(["order_id"], ["orders.id"], ondelete="RESTRICT"),
+        sa.ForeignKeyConstraint(["to_id"], ["inventories.id"], ondelete="RESTRICT"),
         sa.PrimaryKeyConstraint("id"),
-        sa.UniqueConstraint(
-            "id", "from_id", "to_id", name="uq_stock_transfer_route"
-        ),
+        sa.UniqueConstraint("id", "from_id", "to_id", name="uq_stock_transfer_route"),
         comment="Документы (накладные) на перемещение товаров между складами/клиентами",
     )
     op.create_index(
-        op.f("ix_stock_transfers_from_id"),
-        "stock_transfers",
-        ["from_id"],
-        unique=False,
+        op.f("ix_stock_transfers_from_id"), "stock_transfers", ["from_id"], unique=False
     )
     op.create_index(
         op.f("ix_stock_transfers_order_id"),
@@ -690,31 +661,24 @@ def upgrade() -> None:
         unique=False,
     )
     op.create_index(
-        op.f("ix_stock_transfers_status"),
+        op.f("ix_stock_transfers_route_sheet_id"),
         "stock_transfers",
-        ["status"],
+        ["route_sheet_id"],
         unique=False,
     )
     op.create_index(
-        op.f("ix_stock_transfers_to_id"),
-        "stock_transfers",
-        ["to_id"],
-        unique=False,
+        op.f("ix_stock_transfers_status"), "stock_transfers", ["status"], unique=False
     )
     op.create_index(
-        op.f("ix_stock_transfers_type"),
-        "stock_transfers",
-        ["type"],
-        unique=False,
+        op.f("ix_stock_transfers_to_id"), "stock_transfers", ["to_id"], unique=False
+    )
+    op.create_index(
+        op.f("ix_stock_transfers_type"), "stock_transfers", ["type"], unique=False
     )
     op.create_table(
         "transactions",
-        sa.Column(
-            "from_id", sa.UUID(), nullable=False, comment="Счет списания"
-        ),
-        sa.Column(
-            "to_id", sa.UUID(), nullable=False, comment="Счет зачисления"
-        ),
+        sa.Column("from_id", sa.UUID(), nullable=False, comment="Счет списания"),
+        sa.Column("to_id", sa.UUID(), nullable=False, comment="Счет зачисления"),
         sa.Column(
             "order_id",
             sa.UUID(),
@@ -727,9 +691,7 @@ def upgrade() -> None:
             nullable=True,
             comment="Сотрудник (бухгалтер), подтвердивший перевод",
         ),
-        sa.Column(
-            "amount", sa.BIGINT(), nullable=False, comment="Сумма перевода"
-        ),
+        sa.Column("amount", sa.BIGINT(), nullable=False, comment="Сумма перевода"),
         sa.Column(
             "status",
             sa.Enum(
@@ -771,21 +733,11 @@ def upgrade() -> None:
             comment="Дата и время последнего обновления",
         ),
         sa.CheckConstraint("amount > 0", name="ck_transaction_amount_pos"),
-        sa.CheckConstraint(
-            "from_id != to_id", name="ck_transaction_no_self_transfer"
-        ),
-        sa.ForeignKeyConstraint(
-            ["from_id"], ["accounts.id"], ondelete="RESTRICT"
-        ),
-        sa.ForeignKeyConstraint(
-            ["order_id"], ["orders.id"], ondelete="SET NULL"
-        ),
-        sa.ForeignKeyConstraint(
-            ["to_id"], ["accounts.id"], ondelete="RESTRICT"
-        ),
-        sa.ForeignKeyConstraint(
-            ["verified_by_id"], ["users.id"], ondelete="RESTRICT"
-        ),
+        sa.CheckConstraint("from_id != to_id", name="ck_transaction_no_self_transfer"),
+        sa.ForeignKeyConstraint(["from_id"], ["accounts.id"], ondelete="RESTRICT"),
+        sa.ForeignKeyConstraint(["order_id"], ["orders.id"], ondelete="SET NULL"),
+        sa.ForeignKeyConstraint(["to_id"], ["accounts.id"], ondelete="RESTRICT"),
+        sa.ForeignKeyConstraint(["verified_by_id"], ["users.id"], ondelete="RESTRICT"),
         sa.PrimaryKeyConstraint("id"),
         comment="Финансовый леджер (Event Sourcing). Строго только добавление (Append-only)",
     )
@@ -796,16 +748,10 @@ def upgrade() -> None:
         unique=False,
     )
     op.create_index(
-        "idx_transaction_to_status",
-        "transactions",
-        ["to_id", "status"],
-        unique=False,
+        "idx_transaction_to_status", "transactions", ["to_id", "status"], unique=False
     )
     op.create_index(
-        op.f("ix_transactions_order_id"),
-        "transactions",
-        ["order_id"],
-        unique=False,
+        op.f("ix_transactions_order_id"), "transactions", ["order_id"], unique=False
     )
     op.create_index(
         op.f("ix_transactions_verified_by_id"),
@@ -820,10 +766,7 @@ def upgrade() -> None:
         sa.Column("from_id", sa.UUID(), nullable=False),
         sa.Column("to_id", sa.UUID(), nullable=False),
         sa.Column(
-            "quantity",
-            sa.Integer(),
-            nullable=False,
-            comment="Проведенное количество",
+            "quantity", sa.Integer(), nullable=False, comment="Проведенное количество"
         ),
         sa.Column("id", sa.UUID(), nullable=False, comment="ID (UUIDv7)"),
         sa.Column(
@@ -850,22 +793,12 @@ def upgrade() -> None:
         sa.CheckConstraint(
             "quantity > 0", name="ck_stock_transaction_quantity_positive"
         ),
-        sa.ForeignKeyConstraint(
-            ["from_id"], ["inventories.id"], ondelete="RESTRICT"
-        ),
-        sa.ForeignKeyConstraint(
-            ["product_id"], ["products.id"], ondelete="RESTRICT"
-        ),
-        sa.ForeignKeyConstraint(
-            ["to_id"], ["inventories.id"], ondelete="RESTRICT"
-        ),
+        sa.ForeignKeyConstraint(["from_id"], ["inventories.id"], ondelete="RESTRICT"),
+        sa.ForeignKeyConstraint(["product_id"], ["products.id"], ondelete="RESTRICT"),
+        sa.ForeignKeyConstraint(["to_id"], ["inventories.id"], ondelete="RESTRICT"),
         sa.ForeignKeyConstraint(
             ["transfer_id", "from_id", "to_id"],
-            [
-                "stock_transfers.id",
-                "stock_transfers.from_id",
-                "stock_transfers.to_id",
-            ],
+            ["stock_transfers.id", "stock_transfers.from_id", "stock_transfers.to_id"],
             name="fk_stock_transaction_strict_route",
             ondelete="CASCADE",
         ),
@@ -879,10 +812,7 @@ def upgrade() -> None:
         unique=False,
     )
     op.create_index(
-        "idx_st_product_to",
-        "stock_transactions",
-        ["product_id", "to_id"],
-        unique=False,
+        "idx_st_product_to", "stock_transactions", ["product_id", "to_id"], unique=False
     )
     op.create_index(
         op.f("ix_stock_transactions_from_id"),
@@ -913,10 +843,7 @@ def upgrade() -> None:
         sa.Column("transfer_id", sa.UUID(), nullable=False),
         sa.Column("product_id", sa.UUID(), nullable=False),
         sa.Column(
-            "quantity",
-            sa.Integer(),
-            nullable=False,
-            comment="Количество в документе",
+            "quantity", sa.Integer(), nullable=False, comment="Количество в документе"
         ),
         sa.Column("id", sa.UUID(), nullable=False, comment="ID (UUIDv7)"),
         sa.Column(
@@ -940,12 +867,8 @@ def upgrade() -> None:
             nullable=False,
             comment="Дата и время последнего обновления",
         ),
-        sa.CheckConstraint(
-            "quantity > 0", name="ck_stock_transfer_item_quantity_pos"
-        ),
-        sa.ForeignKeyConstraint(
-            ["product_id"], ["products.id"], ondelete="RESTRICT"
-        ),
+        sa.CheckConstraint("quantity > 0", name="ck_stock_transfer_item_quantity_pos"),
+        sa.ForeignKeyConstraint(["product_id"], ["products.id"], ondelete="RESTRICT"),
         sa.ForeignKeyConstraint(
             ["transfer_id"], ["stock_transfers.id"], ondelete="CASCADE"
         ),
@@ -971,24 +894,18 @@ def downgrade() -> None:
     """Downgrade schema."""
     # ### commands auto generated by Alembic - please adjust! ###
     op.drop_index(
-        op.f("ix_stock_transfer_items_transfer_id"),
-        table_name="stock_transfer_items",
+        op.f("ix_stock_transfer_items_transfer_id"), table_name="stock_transfer_items"
     )
     op.drop_index(
-        op.f("ix_stock_transfer_items_product_id"),
-        table_name="stock_transfer_items",
+        op.f("ix_stock_transfer_items_product_id"), table_name="stock_transfer_items"
     )
     op.drop_table("stock_transfer_items")
     op.drop_index(
-        op.f("ix_stock_transactions_transfer_id"),
-        table_name="stock_transactions",
+        op.f("ix_stock_transactions_transfer_id"), table_name="stock_transactions"
     )
+    op.drop_index(op.f("ix_stock_transactions_to_id"), table_name="stock_transactions")
     op.drop_index(
-        op.f("ix_stock_transactions_to_id"), table_name="stock_transactions"
-    )
-    op.drop_index(
-        op.f("ix_stock_transactions_product_id"),
-        table_name="stock_transactions",
+        op.f("ix_stock_transactions_product_id"), table_name="stock_transactions"
     )
     op.drop_index(
         op.f("ix_stock_transactions_from_id"), table_name="stock_transactions"
@@ -996,40 +913,32 @@ def downgrade() -> None:
     op.drop_index("idx_st_product_to", table_name="stock_transactions")
     op.drop_index("idx_st_product_from", table_name="stock_transactions")
     op.drop_table("stock_transactions")
-    op.drop_index(
-        op.f("ix_transactions_verified_by_id"), table_name="transactions"
-    )
+    op.drop_index(op.f("ix_transactions_verified_by_id"), table_name="transactions")
     op.drop_index(op.f("ix_transactions_order_id"), table_name="transactions")
     op.drop_index("idx_transaction_to_status", table_name="transactions")
     op.drop_index("idx_transaction_from_status", table_name="transactions")
     op.drop_table("transactions")
+    op.drop_index(op.f("ix_stock_transfers_type"), table_name="stock_transfers")
+    op.drop_index(op.f("ix_stock_transfers_to_id"), table_name="stock_transfers")
+    op.drop_index(op.f("ix_stock_transfers_status"), table_name="stock_transfers")
     op.drop_index(
-        op.f("ix_stock_transfers_type"), table_name="stock_transfers"
+        op.f("ix_stock_transfers_route_sheet_id"), table_name="stock_transfers"
     )
-    op.drop_index(
-        op.f("ix_stock_transfers_to_id"), table_name="stock_transfers"
-    )
-    op.drop_index(
-        op.f("ix_stock_transfers_status"), table_name="stock_transfers"
-    )
-    op.drop_index(
-        op.f("ix_stock_transfers_order_id"), table_name="stock_transfers"
-    )
-    op.drop_index(
-        op.f("ix_stock_transfers_from_id"), table_name="stock_transfers"
-    )
+    op.drop_index(op.f("ix_stock_transfers_order_id"), table_name="stock_transfers")
+    op.drop_index(op.f("ix_stock_transfers_from_id"), table_name="stock_transfers")
     op.drop_table("stock_transfers")
     op.drop_index(op.f("ix_order_items_product_id"), table_name="order_items")
     op.drop_index(op.f("ix_order_items_order_id"), table_name="order_items")
     op.drop_table("order_items")
+    op.drop_index(op.f("ix_orders_warehouse_id"), table_name="orders")
     op.drop_index(op.f("ix_orders_status"), table_name="orders")
+    op.drop_index(op.f("ix_orders_sale_type"), table_name="orders")
     op.drop_index(op.f("ix_orders_courier_id"), table_name="orders")
     op.drop_index(op.f("ix_orders_client_inventory_id"), table_name="orders")
     op.drop_index(op.f("ix_orders_client_id"), table_name="orders")
     op.drop_table("orders")
     op.drop_index(
-        op.f("ix_inventory_balances_product_id"),
-        table_name="inventory_balances",
+        op.f("ix_inventory_balances_product_id"), table_name="inventory_balances"
     )
     op.drop_table("inventory_balances")
     op.drop_index(
@@ -1048,13 +957,9 @@ def downgrade() -> None:
     op.drop_index(op.f("ix_users_role"), table_name="users")
     op.drop_table("users")
     op.drop_index(op.f("ix_products_type"), table_name="products")
+    op.drop_index(op.f("ix_products_returnable_item_id"), table_name="products")
     op.drop_index(
-        op.f("ix_products_returnable_item_id"), table_name="products"
-    )
-    op.drop_index(
-        "idx_product_attributes_gin",
-        table_name="products",
-        postgresql_using="gin",
+        "idx_product_attributes_gin", table_name="products", postgresql_using="gin"
     )
     op.drop_table("products")
     # ### end Alembic commands ###

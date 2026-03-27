@@ -727,7 +727,9 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
         for item in order.items:
             if item.product.returnable_item_id and item.quantity > 0:
                 tare_id = item.product.returnable_item_id
-                returnable_map[tare_id] = returnable_map.get(tare_id, 0) + item.quantity
+                returnable_map[tare_id] = (
+                    returnable_map.get(tare_id, 0) + item.quantity
+                )
         returnable_items = [
             {"product_id": pid, "quantity": qty}
             for pid, qty in returnable_map.items()

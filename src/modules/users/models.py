@@ -84,6 +84,7 @@ class User(BaseModel):
     inventories: Mapped[list["Inventory"]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
     )
+
     @property
     def phone(self) -> str | None:
         try:
