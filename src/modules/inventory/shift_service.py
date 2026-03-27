@@ -82,20 +82,27 @@ class ShiftService:
                     )
                 )
 
-                # Создаем накладную на возврат
+                # Создаем накладную на возврат (COURIER → WAREHOUSE)
                 transfer = await self.uow.transfers.add(
                     {
                         "from_id": inventory.id,
                         "to_id": main_warehouse.id,
-                        "type": TransferType.WAREHOUSE_TRANSFER,
+                        "type": TransferType.COURIER_RETURN,
                         "status": TransferStatus.COMPLETED,
                         "created_by_id": request.courier_id,
                         "accepted_by_id": settings.SYSTEM_USER_ID,
                     }
                 )
 
-                # Создаем транзакции в леджере
+                # Создаем строки накладной и проводки в леджере
                 for item in request.returned_inventory:
+                    await self.uow.transfer_items.add(
+                        {
+                            "transfer_id": transfer.id,
+                            "product_id": item.product_id,
+                            "quantity": item.quantity,
+                        }
+                    )
                     await self.uow.transactions.add(
                         {
                             "product_id": item.product_id,

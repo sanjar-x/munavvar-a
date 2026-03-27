@@ -506,9 +506,16 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
                 }
             )
 
-        # 3. Проводим транзакции для обеих накладных
-        # а) Доставка
+        # 3. Строки накладных и проводки в леджере
+        # а) Доставка: Курьер → Клиент
         for item in order.items:
+            await self.uow.transfer_items.add(
+                {
+                    "transfer_id": delivery_transfer.id,
+                    "product_id": item.product_id,
+                    "quantity": item.quantity,
+                }
+            )
             await self.uow.transactions.add(
                 {
                     "product_id": item.product_id,
@@ -519,9 +526,16 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
                 }
             )
 
-        # б) Возврат тары
+        # б) Возврат тары: Клиент → Курьер
         if return_transfer:
             for item_data in returnable_items:
+                await self.uow.transfer_items.add(
+                    {
+                        "transfer_id": return_transfer.id,
+                        "product_id": item_data["product_id"],
+                        "quantity": item_data["quantity"],
+                    }
+                )
                 await self.uow.transactions.add(
                     {
                         "product_id": item_data["product_id"],

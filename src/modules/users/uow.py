@@ -6,6 +6,7 @@ from src.modules.finances.repositories import AccountRepository
 from src.modules.inventory.repositories import (
     InventoryRepository,
     StockTransactionRepository,
+    StockTransferItemRepository,
     StockTransferRepository,
 )
 from src.modules.users.repositories import IdentityRepository, UserRepository
@@ -18,6 +19,7 @@ class IUserUnitOfWork(IUnitOfWork):
     accounts: AccountRepository
     inventories: InventoryRepository
     transfers: StockTransferRepository
+    transfer_items: StockTransferItemRepository
     transactions: StockTransactionRepository
 
 
@@ -31,6 +33,7 @@ class UserUnitOfWork(BaseSQLAlchemyUoW, IUserUnitOfWork):
         self.accounts = AccountRepository(session=self.session)
         self.inventories = InventoryRepository(session=self.session)
         self.transfers = StockTransferRepository(session=self.session)
+        self.transfer_items = StockTransferItemRepository(session=self.session)
         self.transactions = StockTransactionRepository(session=self.session)
 
         return self

@@ -133,6 +133,15 @@ class UserService(BaseService[User, UserAdminCreate, UserUnitOfWork]):
                     }
                 )
 
+                # Строка накладной
+                await self.uow.transfer_items.add(
+                    {
+                        "transfer_id": transfer.id,
+                        "product_id": schema.tare_product_id,
+                        "quantity": schema.initial_tare_quantity,
+                    }
+                )
+
                 # Фиксируем проводку в леджере
                 await self.uow.transactions.add(
                     {
