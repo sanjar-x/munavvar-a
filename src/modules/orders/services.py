@@ -110,19 +110,27 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
                     b.product_id: b.quantity for b in inventory.balances
                 }
 
+                # Тара, заказанная в этой же корзине (например, новый клиент
+                # заказывает воду + тару одновременно)
+                ordering_tare_now = {
+                    item.product_id: item.quantity for item in dto.items
+                }
+
                 shortages = []
                 for product, item in exchange_items:
                     required_tare_id = product.returnable_item_id
-                    available_tare = balances.get(required_tare_id, 0)
-                    if available_tare < item.quantity:
+                    available_in_inventory = balances.get(required_tare_id, 0)
+                    ordering_now = ordering_tare_now.get(required_tare_id, 0)
+                    effective_available = available_in_inventory + ordering_now
+                    if effective_available < item.quantity:
                         shortages.append(
                             {
                                 "product_id": str(product.id),
                                 "product_name": product.name,
                                 "returnable_item_id": str(required_tare_id),
                                 "required": item.quantity,
-                                "available": available_tare,
-                                "deficit": item.quantity - available_tare,
+                                "available": effective_available,
+                                "deficit": item.quantity - effective_available,
                             }
                         )
 
