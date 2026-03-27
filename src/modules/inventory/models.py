@@ -115,6 +115,17 @@ class StockTransfer(BaseModel):
         index=True,
         comment="Ссылка на клиентский заказ (если применимо)",
     )
+    reason: Mapped[str | None] = mapped_column(
+        sa.String(255),
+        nullable=True,
+        comment="Причина (для списания LOSS_WRITE_OFF)",
+    )
+    route_sheet_id: Mapped[uuid.UUID | None] = mapped_column(
+        sa.UUID,
+        nullable=True,
+        index=True,
+        comment="ID маршрутного листа (для COURIER_LOAD)",
+    )
 
     type: Mapped[TransferType] = mapped_column(
         Enum(
