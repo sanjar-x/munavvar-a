@@ -21,7 +21,9 @@ class InventoryUnitOfWork(BaseSQLAlchemyUoW, IInventoryUnitOfWork):
         await super().__aenter__()
 
         self.inventories = InventoryRepository(session=self.session)
-        self.stock_transactions = StockTransactionRepository(session=self.session)
+        self.stock_transactions = StockTransactionRepository(
+            session=self.session
+        )
         self.products = ProductRepository(session=self.session)
         self.users = UserRepository(session=self.session)
         return self

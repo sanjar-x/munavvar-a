@@ -28,7 +28,9 @@ async def get_transports(
     current_admin: Annotated[
         User, Security(get_current_user, scopes=[Scope.USERS_WRITE])
     ],
-    transport_service: Annotated[TransportService, Depends(get_transport_service)],
+    transport_service: Annotated[
+        TransportService, Depends(get_transport_service)
+    ],
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
     user_id: uuid.UUID | None = Query(None, description="Фильтр по курьеру"),
@@ -52,7 +54,9 @@ async def create_transport(
     current_admin: Annotated[
         User, Security(get_current_user, scopes=[Scope.USERS_WRITE])
     ],
-    transport_service: Annotated[TransportService, Depends(get_transport_service)],
+    transport_service: Annotated[
+        TransportService, Depends(get_transport_service)
+    ],
 ):
     return await transport_service.create_transport(schema)
 
@@ -67,9 +71,13 @@ async def get_transport_detail(
     current_admin: Annotated[
         User, Security(get_current_user, scopes=[Scope.USERS_WRITE])
     ],
-    transport_service: Annotated[TransportService, Depends(get_transport_service)],
+    transport_service: Annotated[
+        TransportService, Depends(get_transport_service)
+    ],
 ):
-    transport = await transport_service.get_transport_with_balances(transport_id)
+    transport = await transport_service.get_transport_with_balances(
+        transport_id
+    )
     if not transport:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Transport not found"
@@ -88,7 +96,9 @@ async def update_transport(
     current_admin: Annotated[
         User, Security(get_current_user, scopes=[Scope.USERS_WRITE])
     ],
-    transport_service: Annotated[TransportService, Depends(get_transport_service)],
+    transport_service: Annotated[
+        TransportService, Depends(get_transport_service)
+    ],
 ):
     transport = await transport_service.update_transport(transport_id, schema)
     if not transport:
@@ -108,7 +118,9 @@ async def delete_transport(
     current_admin: Annotated[
         User, Security(get_current_user, scopes=[Scope.USERS_WRITE])
     ],
-    transport_service: Annotated[TransportService, Depends(get_transport_service)],
+    transport_service: Annotated[
+        TransportService, Depends(get_transport_service)
+    ],
 ):
     success = await transport_service.delete_transport(transport_id)
     if not success:

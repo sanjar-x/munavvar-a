@@ -33,7 +33,9 @@ class CourierAlreadyExistsError(ConflictError):
 class CourierInactiveError(UnauthorizedError):
     """Выбрасывается, если курьер был уволен/отстранен в админке."""
 
-    def __init__(self, phone: str | None = None, courier_id: uuid.UUID | None = None):
+    def __init__(
+        self, phone: str | None = None, courier_id: uuid.UUID | None = None
+    ):
         details = {}
         if phone:
             details["phone"] = phone

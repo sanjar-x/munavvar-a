@@ -27,7 +27,9 @@ async def get_warehouses_with_balances(
     current_admin: Annotated[
         User, Security(get_current_user, scopes=[Scope.USERS_WRITE])
     ],
-    warehouse_service: Annotated[WarehouseService, Depends(get_warehouse_service)],
+    warehouse_service: Annotated[
+        WarehouseService, Depends(get_warehouse_service)
+    ],
 ):
     return await warehouse_service.get_warehouses_with_balances()
 
@@ -43,7 +45,9 @@ async def create_warehouse(
     current_admin: Annotated[
         User, Security(get_current_user, scopes=[Scope.USERS_WRITE])
     ],
-    warehouse_service: Annotated[WarehouseService, Depends(get_warehouse_service)],
+    warehouse_service: Annotated[
+        WarehouseService, Depends(get_warehouse_service)
+    ],
 ):
     return await warehouse_service.create_warehouse(schema)
 
@@ -58,9 +62,13 @@ async def get_warehouse_detail(
     current_admin: Annotated[
         User, Security(get_current_user, scopes=[Scope.USERS_WRITE])
     ],
-    warehouse_service: Annotated[WarehouseService, Depends(get_warehouse_service)],
+    warehouse_service: Annotated[
+        WarehouseService, Depends(get_warehouse_service)
+    ],
 ):
-    warehouse = await warehouse_service.get_warehouse_with_balances(warehouse_id)
+    warehouse = await warehouse_service.get_warehouse_with_balances(
+        warehouse_id
+    )
     if not warehouse:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Warehouse not found"

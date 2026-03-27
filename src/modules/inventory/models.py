@@ -118,7 +118,10 @@ class StockTransfer(BaseModel):
 
     type: Mapped[TransferType] = mapped_column(
         Enum(
-            TransferType, name="transfer_type_enum", native_enum=True, create_type=True
+            TransferType,
+            name="transfer_type_enum",
+            native_enum=True,
+            create_type=True,
         ),
         nullable=False,
         index=True,
@@ -139,8 +142,12 @@ class StockTransfer(BaseModel):
     from_inventory: Mapped["Inventory"] = relationship(foreign_keys=[from_id])
     to_inventory: Mapped["Inventory"] = relationship(foreign_keys=[to_id])
     created_by: Mapped["User"] = relationship(foreign_keys=[created_by_id])
-    accepted_by: Mapped["User | None"] = relationship(foreign_keys=[accepted_by_id])
-    order: Mapped["Order | None"] = relationship(back_populates="stock_transfers")
+    accepted_by: Mapped["User | None"] = relationship(
+        foreign_keys=[accepted_by_id]
+    )
+    order: Mapped["Order | None"] = relationship(
+        back_populates="stock_transfers"
+    )
 
     items: Mapped[list["StockTransferItem"]] = relationship(
         back_populates="transfer", cascade="all, delete-orphan"
@@ -150,8 +157,12 @@ class StockTransfer(BaseModel):
     )
 
     __table_args__ = (
-        CheckConstraint("from_id != to_id", name="ck_stock_transfer_no_circular"),
-        UniqueConstraint("id", "from_id", "to_id", name="uq_stock_transfer_route"),
+        CheckConstraint(
+            "from_id != to_id", name="ck_stock_transfer_no_circular"
+        ),
+        UniqueConstraint(
+            "id", "from_id", "to_id", name="uq_stock_transfer_route"
+        ),
         {
             "comment": "Документы (накладные) на перемещение товаров между складами/клиентами"
         },
@@ -181,7 +192,9 @@ class StockTransferItem(BaseModel):
     product: Mapped["Product"] = relationship()
 
     __table_args__ = (
-        CheckConstraint("quantity > 0", name="ck_stock_transfer_item_quantity_pos"),
+        CheckConstraint(
+            "quantity > 0", name="ck_stock_transfer_item_quantity_pos"
+        ),
         {
             "comment": "Черновик строк накладной (не влияет на остатки, пока статус DRAFT)"
         },
@@ -263,7 +276,9 @@ class StockTransaction(BaseModel):
     )
 
     __table_args__ = (
-        CheckConstraint("quantity > 0", name="ck_stock_transaction_quantity_positive"),
+        CheckConstraint(
+            "quantity > 0", name="ck_stock_transaction_quantity_positive"
+        ),
         ForeignKeyConstraint(
             ["transfer_id", "from_id", "to_id"],
             [

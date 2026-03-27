@@ -35,7 +35,9 @@ class ClientService:
 
     async def create_client(self, data: ClientCreate) -> ClientResponse:
         async with self.uow:
-            existing_identity = await self.uow.identities.get_local_by_id(data.phone)
+            existing_identity = await self.uow.identities.get_local_by_id(
+                data.phone
+            )
             if existing_identity:
                 raise ClientAlreadyExistsError(phone=data.phone)
 
@@ -72,11 +74,13 @@ class ClientService:
             if not client:
                 raise ClientNotFoundError(client_id)
 
-            await self.uow.inventories.add({
-                "name": data.name,
-                "type": InventoryType.CLIENT,
-                "user_id": client.id,
-            })
+            await self.uow.inventories.add(
+                {
+                    "name": data.name,
+                    "type": InventoryType.CLIENT,
+                    "user_id": client.id,
+                }
+            )
             await self.uow.commit()
 
         return await self.get_client(client_id)
@@ -108,15 +112,25 @@ class ClientService:
 
     async def get_client(self, client_id: uuid.UUID) -> ClientResponse:
         async with self.uow:
-            client = await self.uow.users.get_client_with_details(client_id=client_id)
+            client = await self.uow.users.get_client_with_details(
+                client_id=client_id
+            )
             if not client:
                 raise ClientNotFoundError(client_id=client_id)
-            identity = await self.uow.identities.get_local_by_user(user_id=client_id)
-            account = await self.uow.accounts.get_client_account(client_id=client_id)
+            identity = await self.uow.identities.get_local_by_user(
+                user_id=client_id
+            )
+            account = await self.uow.accounts.get_client_account(
+                client_id=client_id
+            )
 
             response = ClientResponse.model_validate(client)
-            response.account = Account.model_validate(account) if account else None
-            response.phone = identity.provider_identity_id if identity else None
+            response.account = (
+                Account.model_validate(account) if account else None
+            )
+            response.phone = (
+                identity.provider_identity_id if identity else None
+            )
             return response
 
     async def onboard_client_with_balance(
@@ -127,7 +141,9 @@ class ClientService:
         """
         async with self.uow:
             # 1. Проверка дубликата телефона (Identity)
-            existing_identity = await self.uow.identities.get_local_by_id(data.phone)
+            existing_identity = await self.uow.identities.get_local_by_id(
+                data.phone
+            )
             if existing_identity:
                 raise ClientAlreadyExistsError(phone=data.phone)
 
@@ -151,40 +167,51 @@ class ClientService:
             )
 
             # 5. Создание Склада (Inventory)
-            client_inventory = await self.uow.inventories.create_client_inventory(
-                user_id=client.id,
-                inventory_name=data.address_name,
+            client_inventory = (
+                await self.uow.inventories.create_client_inventory(
+                    user_id=client.id,
+                    inventory_name=data.address_name,
+                )
             )
 
             # 6. Оприходование начальных остатков (INITIAL_BALANCE)
-            if data.initial_balance_quantity > 0 and data.initial_balance_product_id:
+            if (
+                data.initial_balance_quantity > 0
+                and data.initial_balance_product_id
+            ):
                 vendor_inv = await self.uow.inventories.get_vendor_inventory()
 
                 # Создаем завершенную накладную
-                transfer = await self.uow.transfers.add({
-                    "from_id": vendor_inv.id,
-                    "to_id": client_inventory.id,
-                    "type": TransferType.INITIAL_BALANCE,
-                    "status": TransferStatus.COMPLETED,
-                    "created_by_id": creator_id,
-                    "accepted_by_id": creator_id,
-                })
+                transfer = await self.uow.transfers.add(
+                    {
+                        "from_id": vendor_inv.id,
+                        "to_id": client_inventory.id,
+                        "type": TransferType.INITIAL_BALANCE,
+                        "status": TransferStatus.COMPLETED,
+                        "created_by_id": creator_id,
+                        "accepted_by_id": creator_id,
+                    }
+                )
 
                 # Добавляем строку в накладную
-                await self.uow.transfer_items.add({
-                    "transfer_id": transfer.id,
-                    "product_id": data.initial_balance_product_id,
-                    "quantity": data.initial_balance_quantity,
-                })
+                await self.uow.transfer_items.add(
+                    {
+                        "transfer_id": transfer.id,
+                        "product_id": data.initial_balance_product_id,
+                        "quantity": data.initial_balance_quantity,
+                    }
+                )
 
                 # Генерируем транзакцию для леджера
-                await self.uow.stock_transactions.add({
-                    "product_id": data.initial_balance_product_id,
-                    "transfer_id": transfer.id,
-                    "from_id": vendor_inv.id,
-                    "to_id": client_inventory.id,
-                    "quantity": data.initial_balance_quantity,
-                })
+                await self.uow.stock_transactions.add(
+                    {
+                        "product_id": data.initial_balance_product_id,
+                        "transfer_id": transfer.id,
+                        "from_id": vendor_inv.id,
+                        "to_id": client_inventory.id,
+                        "quantity": data.initial_balance_quantity,
+                    }
+                )
 
             # 7. Создание опционального Первого заказа
             if data.order:
@@ -192,30 +219,38 @@ class ClientService:
                 products = await self.catalog_service.get_by_ids(product_ids)
                 price_map = {p.id: p.price for p in products}
 
-                missing_ids = [pid for pid in product_ids if pid not in price_map]
+                missing_ids = [
+                    pid for pid in product_ids if pid not in price_map
+                ]
                 if missing_ids:
-                    raise ProductsUnavailableError(missing_product_ids=missing_ids)
+                    raise ProductsUnavailableError(
+                        missing_product_ids=missing_ids
+                    )
 
                 total_amount = 0
                 for item in data.order.items:
                     price = price_map.get(item.product_id, 0)
                     total_amount += price * item.quantity
 
-                order = await self.uow.orders.add({
-                    "client_id": client.id,
-                    "client_inventory_id": client_inventory.id,
-                    "payment_method": data.order.payment_method,
-                    "status": OrderStatus.NEW,
-                    "total_amount": total_amount,
-                })
+                order = await self.uow.orders.add(
+                    {
+                        "client_id": client.id,
+                        "client_inventory_id": client_inventory.id,
+                        "payment_method": data.order.payment_method,
+                        "status": OrderStatus.NEW,
+                        "total_amount": total_amount,
+                    }
+                )
 
                 for item in data.order.items:
-                    await self.uow.order_items.add({
-                        "order_id": order.id,
-                        "product_id": item.product_id,
-                        "quantity": item.quantity,
-                        "unit_price": price_map.get(item.product_id, 0),
-                    })
+                    await self.uow.order_items.add(
+                        {
+                            "order_id": order.id,
+                            "product_id": item.product_id,
+                            "quantity": item.quantity,
+                            "unit_price": price_map.get(item.product_id, 0),
+                        }
+                    )
 
             await self.uow.commit()
 

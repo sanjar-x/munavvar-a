@@ -34,7 +34,9 @@ class CourierUnitOfWork(BaseSQLAlchemyUoW, ICourierUnitOfWork):
         self.accounts = AccountRepository(session=self.session)
         self.transactions = TransactionRepository(session=self.session)
         self.inventories = InventoryRepository(session=self.session)
-        self.stock_transactions = StockTransactionRepository(session=self.session)
+        self.stock_transactions = StockTransactionRepository(
+            session=self.session
+        )
         self.orders = OrderRepository(session=self.session)
 
         return self

@@ -23,7 +23,9 @@ class MissingTaraDTO(BaseModel):
 
     product_id: str = Field(..., description="ID возвратной тары")
     name: str = Field(..., description="Название тары")
-    missing_quantity: int = Field(..., description="Сколько штук не хватает на балансе")
+    missing_quantity: int = Field(
+        ..., description="Сколько штук не хватает на балансе"
+    )
 
 
 # --- ЗАПРОСЫ (REQUESTS) ---
@@ -32,7 +34,9 @@ class MissingTaraDTO(BaseModel):
 class CartValidateRequest(BaseModel):
     """Схема запроса для проверки корзины перед оформлением."""
 
-    inventory_id: uuid.UUID = Field(..., description="ID инвентаря (адреса) клиента")
+    inventory_id: uuid.UUID = Field(
+        ..., description="ID инвентаря (адреса) клиента"
+    )
     items: list[OrderItemCreate] = Field(
         ..., min_length=1, description="Товары в корзине"
     )
@@ -41,7 +45,9 @@ class CartValidateRequest(BaseModel):
 class OrderCreate(BaseModel):
     """Схема создания нового заказа клиентом или менеджером."""
 
-    inventory_id: uuid.UUID = Field(..., description="ID инвентаря (адреса) клиента")
+    inventory_id: uuid.UUID = Field(
+        ..., description="ID инвентаря (адреса) клиента"
+    )
     payment_method: PaymentMethod = Field(
         ..., description="Способ оплаты (наличные/карта/и т.д.)"
     )

@@ -47,7 +47,9 @@ class CatalogService(BaseService[Product, ProductCreate, CatalogUnitOfWork]):
                     active_only=True,  # На витрине только активные товары!
                 )
 
-    async def get_by_ids(self, product_ids: list[uuid.UUID]) -> Sequence[Product]:
+    async def get_by_ids(
+        self, product_ids: list[uuid.UUID]
+    ) -> Sequence[Product]:
         """
         PUBLIC API для соседних доменов (Orders).
         Используется корзиной для получения актуальных цен при чекауте.

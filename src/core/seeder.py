@@ -18,7 +18,11 @@ from src.infrastructure.database.models import (
 from src.infrastructure.database.session import async_session_maker
 from src.modules.catalog.enums import ProductType
 from src.modules.finances.enums import AccountType
-from src.modules.inventory.enums import InventoryType, TransferStatus, TransferType
+from src.modules.inventory.enums import (
+    InventoryType,
+    TransferStatus,
+    TransferType,
+)
 from src.modules.orders.enums import OrderStatus, PaymentMethod
 from src.modules.users.enums import AuthProvider, Role
 
@@ -64,7 +68,9 @@ class Seeder:
             await session.flush()
 
             # Map containers for water links
-            all_prods = (await session.execute(select(Product))).scalars().all()
+            all_prods = (
+                (await session.execute(select(Product))).scalars().all()
+            )
             prod_map = {p.name: p for p in all_prods}
 
             # 2. Water (linked to containers)
@@ -96,7 +102,9 @@ class Seeder:
                     session.add(product)
 
             # 3. Equipment
-            equipment_data = [{"name": "[MOCK] Помпа механическая", "price": 15000}]
+            equipment_data = [
+                {"name": "[MOCK] Помпа механическая", "price": 15000}
+            ]
             for e_data in equipment_data:
                 existing = await session.execute(
                     select(Product).where(Product.name == e_data["name"])
@@ -113,7 +121,9 @@ class Seeder:
             await session.commit()
 
             # Populate total mapping
-            all_final = (await session.execute(select(Product))).scalars().all()
+            all_final = (
+                (await session.execute(select(Product))).scalars().all()
+            )
             for p in all_final:
                 self.products[p.name] = p.id
 
@@ -124,7 +134,9 @@ class Seeder:
         async with self.session_factory() as session:
             # Get System User
             system_user = (
-                await session.execute(select(User).where(User.role == Role.SYSTEM))
+                await session.execute(
+                    select(User).where(User.role == Role.SYSTEM)
+                )
             ).scalar_one()
 
             # Ensure Virtual Warehouses exist
@@ -161,7 +173,9 @@ class Seeder:
             # Create Mock Main Warehouse
             main_warehouse = (
                 await session.execute(
-                    select(Inventory).where(Inventory.name == "[MOCK] Главный Склад")
+                    select(Inventory).where(
+                        Inventory.name == "[MOCK] Главный Склад"
+                    )
                 )
             ).scalar_one_or_none()
             if not main_warehouse:
@@ -175,7 +189,9 @@ class Seeder:
             await session.commit()
 
             # Refresh inventories mapping reliably
-            all_invs = (await session.execute(select(Inventory))).scalars().all()
+            all_invs = (
+                (await session.execute(select(Inventory))).scalars().all()
+            )
             for inv in all_invs:
                 if inv.type == InventoryType.VIRTUAL_VENDOR:
                     self.inventories["vendor"] = inv.id
@@ -207,7 +223,9 @@ class Seeder:
                 ).scalar_one_or_none()
 
                 if not user:
-                    user = User(username=name, role=Role.COURIER, is_active=True)
+                    user = User(
+                        username=name, role=Role.COURIER, is_active=True
+                    )
                     session.add(user)
                     await session.flush()
 
@@ -326,7 +344,9 @@ class Seeder:
             # Robust population of user/inventory mappings
             all_u = (
                 await session.execute(
-                    select(User, Identity.provider_identity_id).join(User.identities)
+                    select(User, Identity.provider_identity_id).join(
+                        User.identities
+                    )
                 )
             ).all()
             for u_rec, phone in all_u:
@@ -334,7 +354,9 @@ class Seeder:
 
             all_inv = (
                 await session.execute(
-                    select(Inventory, User.username, Identity.provider_identity_id)
+                    select(
+                        Inventory, User.username, Identity.provider_identity_id
+                    )
                     .join(Inventory.user)
                     .join(User.identities)
                 )
@@ -440,13 +462,19 @@ class Seeder:
             await self._create_transfer(
                 self.inventories["main"],
                 self.inventories["+998000000002"],
-                {"[MOCK] Вода Hayot 19Л": 50, "[MOCK] Вода MunavvarA 18.9Л": 20},
+                {
+                    "[MOCK] Вода Hayot 19Л": 50,
+                    "[MOCK] Вода MunavvarA 18.9Л": 20,
+                },
                 session,
             )
             await self._create_transfer(
                 self.inventories["main"],
                 self.inventories["+998000000003"],
-                {"[MOCK] Вода MunavvarA 18.9Л": 40, "[MOCK] Вода Hayot 19Л": 10},
+                {
+                    "[MOCK] Вода MunavvarA 18.9Л": 40,
+                    "[MOCK] Вода Hayot 19Л": 10,
+                },
                 session,
             )
 
@@ -476,7 +504,9 @@ class Seeder:
                     "client_phone": "+998000000013",
                     "status": OrderStatus.DELIVERED,
                     "courier_phone": "+998000000003",
-                    "items": [{"name": "[MOCK] Вода MunavvarA 18.9Л", "qty": 10}],
+                    "items": [
+                        {"name": "[MOCK] Вода MunavvarA 18.9Л", "qty": 10}
+                    ],
                 },
                 {
                     "client_phone": "+998000000014",
@@ -490,7 +520,9 @@ class Seeder:
                     "client_phone": "+998000000015",
                     "status": OrderStatus.IN_TRANSIT,
                     "courier_phone": "+998000000003",
-                    "items": [{"name": "[MOCK] Вода MunavvarA 18.9Л", "qty": 15}],
+                    "items": [
+                        {"name": "[MOCK] Вода MunavvarA 18.9Л", "qty": 15}
+                    ],
                 },
             ]
 
@@ -522,7 +554,9 @@ class Seeder:
                         continue
 
                     product = (
-                        await session.execute(select(Product).where(Product.id == p_id))
+                        await session.execute(
+                            select(Product).where(Product.id == p_id)
+                        )
                     ).scalar_one()
 
                     item = OrderItem(
@@ -537,7 +571,9 @@ class Seeder:
                 order.total_amount = total
 
                 if o_data["status"] == OrderStatus.DELIVERED and courier_id:
-                    await self._handle_delivered_order(session, o_data, items_main)
+                    await self._handle_delivered_order(
+                        session, o_data, items_main
+                    )
 
             await session.commit()
             logger.info("Orders seeded.")
@@ -554,7 +590,9 @@ class Seeder:
             return
 
         # 1. Courier -> Client (Filled)
-        filled = {cast(str, i["name"]): cast(int, i["qty"]) for i in items_main}
+        filled = {
+            cast(str, i["name"]): cast(int, i["qty"]) for i in items_main
+        }
         await self._create_transfer(c_inv_id, cl_inv_id, filled, session)
 
         # 2. Client -> Courier (Empty containers)
@@ -566,19 +604,25 @@ class Seeder:
                 continue
 
             p = (
-                await session.execute(select(Product).where(Product.id == p_id))
+                await session.execute(
+                    select(Product).where(Product.id == p_id)
+                )
             ).scalar_one()
 
             if p.type == ProductType.WATER and p.returnable_item_id:
                 ret_p = (
                     await session.execute(
-                        select(Product).where(Product.id == p.returnable_item_id)
+                        select(Product).where(
+                            Product.id == p.returnable_item_id
+                        )
                     )
                 ).scalar_one()
                 empty_items[ret_p.name] = cast(int, it["qty"])
 
         if empty_items:
-            await self._create_transfer(cl_inv_id, c_inv_id, empty_items, session)
+            await self._create_transfer(
+                cl_inv_id, c_inv_id, empty_items, session
+            )
 
 
 if __name__ == "__main__":

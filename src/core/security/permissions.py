@@ -9,36 +9,58 @@ class Scope:
     USERS_READ = "users:read"  # Просмотр чужих профилей и списка сотрудников
     USERS_WRITE = "users:write"  # Создание/блокировка сотрудников
     PROFILE_READ = "profile:read"  # Просмотр собственного профиля (Все)
-    PROFILE_WRITE = "profile:write"  # Редактирование собственного профиля (Все)
+    PROFILE_WRITE = (
+        "profile:write"  # Редактирование собственного профиля (Все)
+    )
 
     # --- КАТАЛОГ (Catalog) ---
     CATALOG_READ = "catalog:read"  # Просмотр товаров и цен (Клиенты, Кассиры)
     CATALOG_WRITE = "catalog:write"  # Добавление/изменение товаров (Админ)
 
     # --- ЗАКАЗЫ (Orders) ---
-    ORDERS_READ = "orders:read"  # Просмотр заказов (Своих или всех — решает сервис)
+    ORDERS_READ = (
+        "orders:read"  # Просмотр заказов (Своих или всех — решает сервис)
+    )
     ORDERS_CREATE = "orders:create"  # Оформление заказа (Клиенты, Кассир)
     ORDERS_EDIT = "orders:edit"  # Изменение состава чужого заказа (Админ)
-    ORDERS_DELIVER = "orders:deliver"  # Взятие в доставку и смена статусов (Курьер)
-    ORDERS_CANCEL = "orders:cancel"  # Отмена заказа (Клиент - своего, Админ - любого)
+    ORDERS_DELIVER = (
+        "orders:deliver"  # Взятие в доставку и смена статусов (Курьер)
+    )
+    ORDERS_CANCEL = (
+        "orders:cancel"  # Отмена заказа (Клиент - своего, Админ - любого)
+    )
 
     # --- СКЛАД И ЛОГИСТИКА (Logistics & Inventory) ---
-    INVENTORY_READ = "inventory:read"  # Просмотр остатков на складе (Кладовщик, Кассир)
-    INVENTORY_WRITE = "inventory:write"  # Инвентаризация, ручное списание (Кладовщик)
-    LOGISTICS_SUPPLY = "logistics:supply"  # Приемка товара от поставщика (Кладовщик)
-    LOGISTICS_TRANSFER = "logistics:transfer"  # Перемещение между складами (Кладовщик)
+    INVENTORY_READ = (
+        "inventory:read"  # Просмотр остатков на складе (Кладовщик, Кассир)
+    )
+    INVENTORY_WRITE = (
+        "inventory:write"  # Инвентаризация, ручное списание (Кладовщик)
+    )
+    LOGISTICS_SUPPLY = (
+        "logistics:supply"  # Приемка товара от поставщика (Кладовщик)
+    )
+    LOGISTICS_TRANSFER = (
+        "logistics:transfer"  # Перемещение между складами (Кладовщик)
+    )
     ROUTES_READ = "routes:read"  # Просмотр маршрутных листов (Курьер, Админ)
 
     # --- ФИНАНСЫ И КАССА (Finances) ---
     FINANCES_READ = "finances:read"
     FINANCES_WRITE = "finances:write"
-    PAYMENTS_CREATE = "payments:create"  # Прием оплаты, пробитие чека (Кассир, Курьер)
-    BILLS_READ = "bills:read"  # Просмотр счетов-фактур и актов (Клиент B2B, Бухгалтер)
+    PAYMENTS_CREATE = (
+        "payments:create"  # Прием оплаты, пробитие чека (Кассир, Курьер)
+    )
+    BILLS_READ = (
+        "bills:read"  # Просмотр счетов-фактур и актов (Клиент B2B, Бухгалтер)
+    )
 
     # --- СИСТЕМНЫЕ (System) ---
     SETTINGS_READ = "settings:read"  # Просмотр глобальных настроек системы
     SETTINGS_WRITE = "settings:write"  # Изменение системных настроек (Админ)
-    SYSTEM_EXEC = "system:exec"  # Технический scope для фоновых задач (Celery/Cron)
+    SYSTEM_EXEC = (
+        "system:exec"  # Технический scope для фоновых задач (Celery/Cron)
+    )
 
 
 BASE_SCOPES = [

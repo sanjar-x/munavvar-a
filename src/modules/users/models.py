@@ -27,7 +27,10 @@ class Identity(BaseModel):
     )
     provider: Mapped[AuthProvider] = mapped_column(
         Enum(
-            AuthProvider, name="auth_provider_enum", native_enum=True, create_type=True
+            AuthProvider,
+            name="auth_provider_enum",
+            native_enum=True,
+            create_type=True,
         ),
         nullable=False,
         comment="Провайдер авторизации (local, google, telegram и т.д.)",
@@ -50,7 +53,9 @@ class Identity(BaseModel):
             "provider_identity_id",
             name="uq_identities_provider_identity_id",
         ),
-        {"comment": "Учетные данные пользователей и привязки к соцсетям (OAuth)"},
+        {
+            "comment": "Учетные данные пользователей и привязки к соцсетям (OAuth)"
+        },
     )
 
 

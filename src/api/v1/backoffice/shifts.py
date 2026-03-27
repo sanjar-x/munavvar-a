@@ -12,15 +12,19 @@ from src.modules.inventory.uow import InventoryUnitOfWork
 
 shifts_router = APIRouter()
 
+
 def get_shift_service(
-    uow: Annotated[InventoryUnitOfWork, Depends()]
+    uow: Annotated[InventoryUnitOfWork, Depends()],
 ) -> ShiftService:
     return ShiftService(uow)
+
 
 @shifts_router.post("/close")
 async def close_shift(
     request: CloseShiftRequest,
-    admin: Annotated[User, Security(get_current_user, scopes=[Scope.INVENTORY_WRITE])],
+    admin: Annotated[
+        User, Security(get_current_user, scopes=[Scope.INVENTORY_WRITE])
+    ],
     shift_service: Annotated[ShiftService, Depends(get_shift_service)],
 ):
     """Закрытие смены курьера и инкассация (Backoffice/Кладовщик)."""

@@ -18,7 +18,9 @@ class ClientRole(enum.StrEnum):
 
 class ClientCreate(BaseModel):
     username: str = Field(..., description="ФИО или Название компании")
-    phone: str = Field(..., description="Номер телефона клиента (будет Identity)")
+    phone: str = Field(
+        ..., description="Номер телефона клиента (будет Identity)"
+    )
     role: ClientRole = Field(
         default=ClientRole.CLIENT_B2C,
         description=(
@@ -136,7 +138,9 @@ class ClientsResponse(BaseModel):
 
 
 class ClientUpdate(BaseModel):
-    username: str | None = Field(default=None, description="ФИО или Название компании")
+    username: str | None = Field(
+        default=None, description="ФИО или Название компании"
+    )
     phone: str | None = Field(default=None, description="Новый номер телефона")
     role: Literal[Role.CLIENT_B2C, Role.CLIENT_B2B] | None = Field(
         default=None,

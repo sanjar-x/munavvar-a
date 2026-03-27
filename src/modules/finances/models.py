@@ -66,7 +66,9 @@ class Account(BaseModel):
     # --- Meta ---
     __table_args__ = (
         Index("idx_account_user_type", "user_id", "type"),
-        {"comment": "Счета для хранения денег (наличные, безнал, долги клиентов)"},
+        {
+            "comment": "Счета для хранения денег (наличные, безнал, долги клиентов)"
+        },
     )
 
 
@@ -125,12 +127,16 @@ class Transaction(BaseModel):
         foreign_keys=[to_id], back_populates="incoming_transactions"
     )
     order: Mapped["Order | None"] = relationship(back_populates="transactions")
-    verified_by: Mapped["User | None"] = relationship(foreign_keys=[verified_by_id])
+    verified_by: Mapped["User | None"] = relationship(
+        foreign_keys=[verified_by_id]
+    )
 
     # --- Meta ---
     __table_args__ = (
         CheckConstraint("amount > 0", name="ck_transaction_amount_pos"),
-        CheckConstraint("from_id != to_id", name="ck_transaction_no_self_transfer"),
+        CheckConstraint(
+            "from_id != to_id", name="ck_transaction_no_self_transfer"
+        ),
         Index("idx_transaction_from_status", "from_id", "status"),
         Index("idx_transaction_to_status", "to_id", "status"),
         {

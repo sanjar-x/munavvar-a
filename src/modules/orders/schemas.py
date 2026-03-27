@@ -101,7 +101,9 @@ class TaraShortage(BaseModel):
 class TaraCheckResponse(BaseModel):
     """Результат проверки тары: можно ли оформить заказ."""
 
-    can_order: bool = Field(description="Можно ли оформить заказ с текущей тарой")
+    can_order: bool = Field(
+        description="Можно ли оформить заказ с текущей тарой"
+    )
     shortages: list[TaraShortage] = Field(
         default_factory=list,
         description="Список нехваток тары (пуст, если can_order=true)",
@@ -146,6 +148,7 @@ class OrderResponse(BaseModel):
     courier_id: uuid.UUID | None = None
     courier: UserResponse | None = None
     status: OrderStatus
+    payment_method: PaymentMethod
     total_amount: int
     capitalization_applied: bool = Field(
         default=False,

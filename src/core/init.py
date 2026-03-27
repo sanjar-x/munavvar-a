@@ -5,7 +5,12 @@ from sqlalchemy import select
 
 from src.core.config import settings
 from src.core.security.password import get_password_hash
-from src.infrastructure.database.models import Account, Identity, Inventory, User
+from src.infrastructure.database.models import (
+    Account,
+    Identity,
+    Inventory,
+    User,
+)
 from src.infrastructure.database.session import async_session_maker
 from src.modules.finances.enums import AccountType
 from src.modules.inventory.enums import InventoryType
@@ -21,7 +26,9 @@ async def init_data() -> None:
     async with async_session_maker() as session:
         # --- 1. СОЗДАНИЕ СИСТЕМНОГО ПОЛЬЗОВАТЕЛЯ ---
         query_system = select(User).where(User.role == Role.SYSTEM)
-        system_user = (await session.execute(query_system)).scalar_one_or_none()
+        system_user = (
+            await session.execute(query_system)
+        ).scalar_one_or_none()
 
         if not system_user:
             system_user = User(
@@ -49,7 +56,9 @@ async def init_data() -> None:
                 Account.user_id == system_user.id,
                 Account.type == acc_type,
             )
-            existing_acc = (await session.execute(query_acc)).scalar_one_or_none()
+            existing_acc = (
+                await session.execute(query_acc)
+            ).scalar_one_or_none()
 
             if not existing_acc:
                 new_acc = Account(
@@ -73,7 +82,9 @@ async def init_data() -> None:
                 Inventory.user_id == system_user.id,
                 Inventory.type == inv_type,
             )
-            existing_inv = (await session.execute(query_inv)).scalar_one_or_none()
+            existing_inv = (
+                await session.execute(query_inv)
+            ).scalar_one_or_none()
 
             if not existing_inv:
                 new_inv = Inventory(
@@ -82,7 +93,9 @@ async def init_data() -> None:
                     name=inv_name,
                 )
                 session.add(new_inv)
-                logger.info(f"Виртуальный склад '{inv_name}' ({inv_type.name}) создан.")
+                logger.info(
+                    f"Виртуальный склад '{inv_name}' ({inv_type.name}) создан."
+                )
             else:
                 logger.info(f"Виртуальный склад '{inv_name}' уже существует.")
 
@@ -125,9 +138,13 @@ async def init_data() -> None:
                     password_hash=hashed_password,
                 )
                 session.add(admin_identity)
-                logger.info(f"Администратор с номером {admin_phone} успешно создан.")
+                logger.info(
+                    f"Администратор с номером {admin_phone} успешно создан."
+                )
             else:
-                logger.info(f"Администратор с номером {admin_phone} уже существует.")
+                logger.info(
+                    f"Администратор с номером {admin_phone} уже существует."
+                )
 
         await session.commit()
         logger.info("Инициализация успешно завершена!")

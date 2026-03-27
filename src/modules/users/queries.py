@@ -31,15 +31,21 @@ class UsersDashboardQuery:
         self, skip: int = 0, limit: int = 50
     ) -> UsersDashboardResponse:
         # ЗАПРОС 1: Пагинация
-        users_stmt = select(User.id, User.username, User.role)  # username уже тут
-        users_stmt = users_stmt.where(User.role.in_([Role.CLIENT_B2B, Role.CLIENT_B2C]))
+        users_stmt = select(
+            User.id, User.username, User.role
+        )  # username уже тут
+        users_stmt = users_stmt.where(
+            User.role.in_([Role.CLIENT_B2B, Role.CLIENT_B2C])
+        )
         count_stmt = select(func.count()).select_from(users_stmt.subquery())
         total_count = await self.session.scalar(count_stmt) or 0
 
         if total_count == 0:
             return UsersDashboardResponse(total_count=0, users=[])
 
-        users_page = users_stmt.offset(skip).limit(limit).subquery("users_page")
+        users_page = (
+            users_stmt.offset(skip).limit(limit).subquery("users_page")
+        )
 
         phone_subq = (
             select(Identity.provider_identity_id)
@@ -146,7 +152,9 @@ class UsersDashboardQuery:
             for u in users_data
         ]
 
-        return UsersDashboardResponse(total_count=total_count, users=final_users)
+        return UsersDashboardResponse(
+            total_count=total_count, users=final_users
+        )
 
     async def get_couriers(
         self, skip: int = 0, limit: int = 50
@@ -161,7 +169,9 @@ class UsersDashboardQuery:
         if total_count == 0:
             return UsersDashboardResponse(total_count=0, users=[])
 
-        users_page = users_stmt.offset(skip).limit(limit).subquery("users_page")
+        users_page = (
+            users_stmt.offset(skip).limit(limit).subquery("users_page")
+        )
 
         phone_subq = (
             select(Identity.provider_identity_id)
@@ -293,4 +303,6 @@ class UsersDashboardQuery:
             for u in users_data
         ]
 
-        return UsersDashboardResponse(total_count=total_count, users=final_users)
+        return UsersDashboardResponse(
+            total_count=total_count, users=final_users
+        )

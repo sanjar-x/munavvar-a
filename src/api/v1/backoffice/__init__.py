@@ -22,7 +22,9 @@ backoffice.include_router(
 backoffice.include_router(
     clients_router, prefix="/clients", tags=["Backoffice | Clients"]
 )
-backoffice.include_router(users_router, prefix="/users", tags=["Backoffice | Users"])
+backoffice.include_router(
+    users_router, prefix="/users", tags=["Backoffice | Users"]
+)
 
 backoffice.include_router(
     catalog_router, prefix="/catalog", tags=["Backoffice | Catalog"]
@@ -36,7 +38,15 @@ backoffice.include_router(
 backoffice.include_router(
     transfers_router, prefix="/transfers", tags=["Backoffice | Transfers"]
 )
-backoffice.include_router(orders_router, prefix="/orders", tags=["Backoffice | Orders"])
-backoffice.include_router(shifts_router, prefix="/shifts", tags=["Backoffice | Shifts"])
-backoffice.include_router(system_router, prefix="/system", tags=["Backoffice | System"])
-backoffice.include_router(system_router, prefix="/system", tags=["Backoffice | System"])
+backoffice.include_router(
+    orders_router, prefix="/orders", tags=["Backoffice | Orders"]
+)
+backoffice.include_router(
+    shifts_router, prefix="/shifts", tags=["Backoffice | Shifts"]
+)
+backoffice.include_router(
+    system_router, prefix="/system", tags=["Backoffice | System"]
+)
+backoffice.include_router(
+    system_router, prefix="/system", tags=["Backoffice | System"]
+)

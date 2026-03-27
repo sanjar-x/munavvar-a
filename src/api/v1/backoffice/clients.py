@@ -16,7 +16,10 @@ from src.core.security.permissions import Scope
 from src.infrastructure.database.models import User
 from src.modules.auth.dependencies import get_current_user
 from src.modules.inventory.dependencies import get_capitalize_tara_service
-from src.modules.inventory.schemas import CapitalizeTaraRequest, CapitalizeTaraResponse
+from src.modules.inventory.schemas import (
+    CapitalizeTaraRequest,
+    CapitalizeTaraResponse,
+)
 from src.modules.inventory.services import CapitalizeTaraService
 from src.modules.users.dependencies import get_user_service
 from src.modules.users.schemas import UserAdminUpdate, UserResponse
@@ -78,7 +81,9 @@ async def create_client_inventory(
     ],
     client_service: Annotated[ClientService, Depends(get_client_service)],
 ):
-    return await client_service.create_client_inventory(client_id=client_id, data=data)
+    return await client_service.create_client_inventory(
+        client_id=client_id, data=data
+    )
 
 
 @clients_router.get(
@@ -93,10 +98,14 @@ async def get_clients(
     ],
     client_service: Annotated[ClientService, Depends(get_client_service)],
     skip: int = Query(0, ge=0, description="Сколько записей пропустить"),
-    limit: int = Query(50, ge=1, le=100, description="Сколько записей вернуть"),
+    limit: int = Query(
+        50, ge=1, le=100, description="Сколько записей вернуть"
+    ),
     search: str | None = Query(None, description="Поиск по ФИО или телефону"),
 ):
-    return await client_service.get_clients(skip=skip, limit=limit, search=search)
+    return await client_service.get_clients(
+        skip=skip, limit=limit, search=search
+    )
 
 
 @clients_router.get(

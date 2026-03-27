@@ -27,12 +27,16 @@ class IdentityRepository(BaseRepository[Identity]):
     def __init__(self, session: AsyncSession):
         super().__init__(model=Identity, session=session)
 
-    async def add_local(self, user_id: UUID, provider_identity_id: str) -> Identity:
-        return await self.add({
-            "user_id": user_id,
-            "provider": AuthProvider.LOCAL,
-            "provider_identity_id": provider_identity_id,
-        })
+    async def add_local(
+        self, user_id: UUID, provider_identity_id: str
+    ) -> Identity:
+        return await self.add(
+            {
+                "user_id": user_id,
+                "provider": AuthProvider.LOCAL,
+                "provider_identity_id": provider_identity_id,
+            }
+        )
 
     async def get_by_user_and_provider(
         self, user_id: UUID, provider: AuthProvider
@@ -55,7 +59,9 @@ class IdentityRepository(BaseRepository[Identity]):
         )
         return await self.session.scalar(query)
 
-    async def get_local_by_id(self, provider_identity_id: str) -> Identity | None:
+    async def get_local_by_id(
+        self, provider_identity_id: str
+    ) -> Identity | None:
         return await self.get_by_id_and_provider(
             provider_identity_id=provider_identity_id,
             provider=AuthProvider.LOCAL,
@@ -89,8 +95,12 @@ class UserRepository(BaseRepository[User]):
             cls._updatable_keys = frozenset(valid_columns - restricted_columns)
 
     async def add(self, obj_data: dict[str, Any]) -> User:
-        insert_data = {k: v for k, v in obj_data.items() if k in self._insertable_keys}
-        statement = insert(self.model).values(insert_data).returning(self.model)
+        insert_data = {
+            k: v for k, v in obj_data.items() if k in self._insertable_keys
+        }
+        statement = (
+            insert(self.model).values(insert_data).returning(self.model)
+        )
         result = await self.session.execute(statement)
         return result.scalar_one()
 
@@ -187,8 +197,7 @@ class UserRepository(BaseRepository[User]):
             return 0, []
 
         query = (
-            query
-            .options(
+            query.options(
                 selectinload(self.model.identities),
                 selectinload(self.model.accounts),
                 selectinload(self.model.inventories),
@@ -238,7 +247,9 @@ class UserRepository(BaseRepository[User]):
             )
             .options(
                 selectinload(self.model.inventories).options(
-                    selectinload(Inventory.balances).joinedload(Balance.product)
+                    selectinload(Inventory.balances).joinedload(
+                        Balance.product
+                    )
                 ),
                 selectinload(self.model.client_orders).options(
                     joinedload(Order.client_inventory),
@@ -274,8 +285,7 @@ class UserRepository(BaseRepository[User]):
             return 0, []
 
         query = (
-            query
-            .options(
+            query.options(
                 selectinload(self.model.identities),
                 selectinload(self.model.client_orders),
             )
@@ -288,7 +298,9 @@ class UserRepository(BaseRepository[User]):
         return total_count, result.all()
 
     async def update(self, id: uuid.UUID, obj_data: dict[str, Any]) -> User:
-        update_data = {k: v for k, v in obj_data.items() if k in self._updatable_keys}
+        update_data = {
+            k: v for k, v in obj_data.items() if k in self._updatable_keys
+        }
 
         if not update_data:
             query = select(self.model).where(
@@ -310,7 +322,8 @@ class UserRepository(BaseRepository[User]):
             return result.scalar_one()
         except IntegrityError as e:
             raise UserUpdateConflictError(
-                user_id=id, reason="Нарушение уникальности или ограничения базы данных"
+                user_id=id,
+                reason="Нарушение уникальности или ограничения базы данных",
             ) from e
 
     async def archive(self, id: uuid.UUID) -> bool:

@@ -48,14 +48,18 @@ class UserService(BaseService[User, UserAdminCreate, UserUnitOfWork]):
                 account = user.accounts[0] if user.accounts else None
                 inventory = user.inventories[0] if user.inventories else None
 
-                items.append({
-                    "id": user.id,
-                    "username": user.username,
-                    "phone": identity.provider_identity_id if identity else None,
-                    "is_active": user.is_active,
-                    "account": account,
-                    "inventory": inventory,
-                })
+                items.append(
+                    {
+                        "id": user.id,
+                        "username": user.username,
+                        "phone": identity.provider_identity_id
+                        if identity
+                        else None,
+                        "is_active": user.is_active,
+                        "account": account,
+                        "inventory": inventory,
+                    }
+                )
 
             return {"total_count": total, "couriers": items}
 
@@ -94,19 +98,23 @@ class UserService(BaseService[User, UserAdminCreate, UserUnitOfWork]):
             await self.uow.identities.add(identity_data)
 
             # 4. Создаем Счет клиента (Task 5 context)
-            await self.uow.accounts.add({
-                "user_id": user.id,
-                "type": AccountType.CLIENT,
-                "name": f"Лицевой счет: {user.username}",
-                "balance": 0,
-            })
+            await self.uow.accounts.add(
+                {
+                    "user_id": user.id,
+                    "type": AccountType.CLIENT,
+                    "name": f"Лицевой счет: {user.username}",
+                    "balance": 0,
+                }
+            )
 
             # 5. Создаем Инвентарь клиента (Адрес доставки)
-            inventory = await self.uow.inventories.add({
-                "user_id": user.id,
-                "type": InventoryType.CLIENT,
-                "name": f"Адрес: {user.username}",
-            })
+            inventory = await self.uow.inventories.add(
+                {
+                    "user_id": user.id,
+                    "type": InventoryType.CLIENT,
+                    "name": f"Адрес: {user.username}",
+                }
+            )
 
             # 6. Начисляем стартовую тару (Task 4)
             if schema.initial_tare_quantity and schema.tare_product_id:
@@ -114,23 +122,27 @@ class UserService(BaseService[User, UserAdminCreate, UserUnitOfWork]):
                 vendor_inv = await self.uow.inventories.get_vendor_inventory()
 
                 # Создаем и проводим StockTransfer
-                transfer = await self.uow.transfers.add({
-                    "from_id": vendor_inv.id,
-                    "to_id": inventory.id,
-                    "type": TransferType.FACTORY_RECEIPT,
-                    "status": TransferStatus.COMPLETED,
-                    "created_by_id": user.id,  # Условно
-                    "accepted_by_id": user.id,
-                })
+                transfer = await self.uow.transfers.add(
+                    {
+                        "from_id": vendor_inv.id,
+                        "to_id": inventory.id,
+                        "type": TransferType.FACTORY_RECEIPT,
+                        "status": TransferStatus.COMPLETED,
+                        "created_by_id": user.id,  # Условно
+                        "accepted_by_id": user.id,
+                    }
+                )
 
                 # Фиксируем проводку в леджере
-                await self.uow.transactions.add({
-                    "product_id": schema.tare_product_id,
-                    "transfer_id": transfer.id,
-                    "from_id": vendor_inv.id,
-                    "to_id": inventory.id,
-                    "quantity": schema.initial_tare_quantity,
-                })
+                await self.uow.transactions.add(
+                    {
+                        "product_id": schema.tare_product_id,
+                        "transfer_id": transfer.id,
+                        "from_id": vendor_inv.id,
+                        "to_id": inventory.id,
+                        "quantity": schema.initial_tare_quantity,
+                    }
+                )
 
             await self.uow.commit()
             return user

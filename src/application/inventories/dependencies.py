@@ -1,5 +1,8 @@
 # src/application/inventories/dependencies.py
-from src.application.inventories.uow import IInventoryUnitOfWork, InventoryUnitOfWork
+from src.application.inventories.uow import (
+    IInventoryUnitOfWork,
+    InventoryUnitOfWork,
+)
 from src.infrastructure.database.session import async_session_maker
 
 

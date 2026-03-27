@@ -77,7 +77,9 @@ class OrderAccessDeniedError(ForbiddenError):
 class EmptyCartError(ConflictError):
     """Выбрасывается при попытке оформить заказ без товаров."""
 
-    def __init__(self, message: str = "Невозможно оформить заказ: корзина пуста"):
+    def __init__(
+        self, message: str = "Невозможно оформить заказ: корзина пуста"
+    ):
         super().__init__(
             message=message,
             error_code="EMPTY_CART",
@@ -98,7 +100,11 @@ class ProductsUnavailableError(ConflictError):
         super().__init__(
             message=message,
             error_code="PRODUCTS_UNAVAILABLE",
-            details={"missing_product_ids": [str(pid) for pid in missing_product_ids]},
+            details={
+                "missing_product_ids": [
+                    str(pid) for pid in missing_product_ids
+                ]
+            },
         )
 
 

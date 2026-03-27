@@ -33,7 +33,9 @@ class AccountCreate(AccountBase):
     Все новые счета рождаются с балансом 0.
     """
 
-    user_id: uuid.UUID = Field(..., title="Владелец счета (Пользователь или Система)")
+    user_id: uuid.UUID = Field(
+        ..., title="Владелец счета (Пользователь или Система)"
+    )
 
 
 class AccountUpdate(BaseModel):

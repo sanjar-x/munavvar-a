@@ -47,11 +47,17 @@ async def get_couriers(
     ],
     courier_service: Annotated[CourierService, Depends(get_courier_service)],
     page: Annotated[int, Query(ge=1, description="Номер страницы")] = 1,
-    size: Annotated[int, Query(ge=1, le=100, description="Размер страницы")] = 50,
-    search: Annotated[str | None, Query(description="Поиск по ФИО курьера")] = None,
+    size: Annotated[
+        int, Query(ge=1, le=100, description="Размер страницы")
+    ] = 50,
+    search: Annotated[
+        str | None, Query(description="Поиск по ФИО курьера")
+    ] = None,
 ):
     skip = (page - 1) * size
-    return await courier_service.get_couriers(skip=skip, limit=size, search=search)
+    return await courier_service.get_couriers(
+        skip=skip, limit=size, search=search
+    )
 
 
 @couriers_router.get(

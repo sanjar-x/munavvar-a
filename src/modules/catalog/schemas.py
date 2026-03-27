@@ -39,7 +39,9 @@ class ProductBase(BaseModel):
 
 # --- СХЕМА ДЛЯ СОЗДАНИЯ (POST /products) ---
 class ProductCreate(ProductBase):
-    type: ProductType = Field(..., title="Тип товара", examples=[ProductType.WATER])
+    type: ProductType = Field(
+        ..., title="Тип товара", examples=[ProductType.WATER]
+    )
 
 
 # --- СХЕМА ДЛЯ ОБНОВЛЕНИЯ (PATCH /products/{id}) ---

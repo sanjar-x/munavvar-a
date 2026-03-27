@@ -25,12 +25,18 @@ from src.modules.orders.exceptions import (
     ProductsUnavailableError,
 )
 from src.modules.orders.repositories import OrderRepository
-from src.modules.orders.schemas import OrderCreate, OrderItemActual, TaraCheckRequest
+from src.modules.orders.schemas import (
+    OrderCreate,
+    OrderItemActual,
+    TaraCheckRequest,
+)
 from src.modules.orders.uow import BaseOrderUnitOfWork
 
 
 class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
-    def __init__(self, uow: BaseOrderUnitOfWork, catalog_service: CatalogService):
+    def __init__(
+        self, uow: BaseOrderUnitOfWork, catalog_service: CatalogService
+    ):
         super().__init__(uow=uow)
         self.catalog_service = catalog_service
 
@@ -40,7 +46,9 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
 
     # --- БИЗНЕС-ЛОГИКА ---
 
-    async def create_order(self, client_id: uuid.UUID, dto: OrderCreate) -> Order:
+    async def create_order(
+        self, client_id: uuid.UUID, dto: OrderCreate
+    ) -> Order:
         """
         Процесс Checkout'а.
         Формирует корзину заказа (OrderItem) и высчитывает (total_amount),
@@ -72,60 +80,78 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
         if exchange_items:
             async with self.uow:
                 # Получаем баланс пустой тары клиента (с блокировкой от Race Condition)
-                inventory = await self.uow.inventories.get_inventory_with_balances(
-                    dto.client_inventory_id,
-                    with_for_update=True,
+                inventory = (
+                    await self.uow.inventories.get_inventory_with_balances(
+                        dto.client_inventory_id,
+                        with_for_update=True,
+                    )
                 )
                 if not inventory:
                     raise ClientInventoryNotFoundError(
                         inventory_id=dto.client_inventory_id
                     )
 
-                balances = {b.product_id: b.quantity for b in inventory.balances}
+                balances = {
+                    b.product_id: b.quantity for b in inventory.balances
+                }
 
                 shortages = []
                 for product, item in exchange_items:
                     required_tare_id = product.returnable_item_id
                     available_tare = balances.get(required_tare_id, 0)
                     if available_tare < item.quantity:
-                        shortages.append({
-                            "product_id": str(product.id),
-                            "product_name": product.name,
-                            "returnable_item_id": str(required_tare_id),
-                            "required": item.quantity,
-                            "available": available_tare,
-                            "deficit": item.quantity - available_tare,
-                        })
+                        shortages.append(
+                            {
+                                "product_id": str(product.id),
+                                "product_name": product.name,
+                                "returnable_item_id": str(required_tare_id),
+                                "required": item.quantity,
+                                "available": available_tare,
+                                "deficit": item.quantity - available_tare,
+                            }
+                        )
 
                 if shortages and not dto.capitalize_missing_tara:
                     raise InsufficientTaraError(shortages=shortages)
 
                 # Автоматическое оприходование дефицита тары
                 if shortages and dto.capitalize_missing_tara:
-                    vendor_inv = await self.uow.inventories.get_vendor_inventory()
+                    vendor_inv = (
+                        await self.uow.inventories.get_vendor_inventory()
+                    )
 
-                    transfer = await self.uow.transfers.add({
-                        "from_id": vendor_inv.id,
-                        "to_id": inventory.id,
-                        "type": TransferType.INITIAL_BALANCE,
-                        "status": TransferStatus.COMPLETED,
-                        "created_by_id": client_id,
-                        "accepted_by_id": client_id,
-                    })
-
-                    for shortage in shortages:
-                        await self.uow.transfer_items.add({
-                            "transfer_id": transfer.id,
-                            "product_id": uuid.UUID(shortage["returnable_item_id"]),
-                            "quantity": shortage["deficit"],
-                        })
-                        await self.uow.transactions.add({
-                            "product_id": uuid.UUID(shortage["returnable_item_id"]),
-                            "transfer_id": transfer.id,
+                    transfer = await self.uow.transfers.add(
+                        {
                             "from_id": vendor_inv.id,
                             "to_id": inventory.id,
-                            "quantity": shortage["deficit"],
-                        })
+                            "type": TransferType.INITIAL_BALANCE,
+                            "status": TransferStatus.COMPLETED,
+                            "created_by_id": client_id,
+                            "accepted_by_id": client_id,
+                        }
+                    )
+
+                    for shortage in shortages:
+                        await self.uow.transfer_items.add(
+                            {
+                                "transfer_id": transfer.id,
+                                "product_id": uuid.UUID(
+                                    shortage["returnable_item_id"]
+                                ),
+                                "quantity": shortage["deficit"],
+                            }
+                        )
+                        await self.uow.transactions.add(
+                            {
+                                "product_id": uuid.UUID(
+                                    shortage["returnable_item_id"]
+                                ),
+                                "transfer_id": transfer.id,
+                                "from_id": vendor_inv.id,
+                                "to_id": inventory.id,
+                                "quantity": shortage["deficit"],
+                            }
+                        )
 
                     capitalization_applied = True
                     await self.uow.commit()
@@ -138,22 +164,26 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
             current_price = price_map[item.product_id]
             total_amount += current_price * item.quantity
 
-            order_items_data.append({
-                "product_id": item.product_id,
-                "quantity": item.quantity,
-                "unit_price": current_price,  # Snapshot Pattern
-            })
+            order_items_data.append(
+                {
+                    "product_id": item.product_id,
+                    "quantity": item.quantity,
+                    "unit_price": current_price,  # Snapshot Pattern
+                }
+            )
 
         async with self.uow:
             # 3. Сохраняем шапку Заказа с подсчитанной суммой
-            new_order = await self.uow.orders.add({
-                "client_id": client_id,
-                "client_inventory_id": dto.client_inventory_id,
-                "payment_method": dto.payment_method,
-                "status": OrderStatus.NEW,
-                "total_amount": total_amount,
-                "capitalization_applied": capitalization_applied,
-            })
+            new_order = await self.uow.orders.add(
+                {
+                    "client_id": client_id,
+                    "client_inventory_id": dto.client_inventory_id,
+                    "payment_method": dto.payment_method,
+                    "status": OrderStatus.NEW,
+                    "total_amount": total_amount,
+                    "capitalization_applied": capitalization_applied,
+                }
+            )
 
             # 4. Привязываем строки корзины к новому заказу
             for item_data in order_items_data:
@@ -215,11 +245,15 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
 
             # Бизнес-проверка: менять можно только новые заказы
             if order.status != OrderStatus.NEW:
-                raise ValueError("Нельзя менять состав заказа в текущем статусе")
+                raise ValueError(
+                    "Нельзя менять состав заказа в текущем статусе"
+                )
 
             # 3. Ищем, есть ли уже такой товар в заказе
-            existing_item = await self.uow.order_items.get_by_order_and_product(
-                order_id=order_id, product_id=product_id
+            existing_item = (
+                await self.uow.order_items.get_by_order_and_product(
+                    order_id=order_id, product_id=product_id
+                )
             )
 
             if existing_item:
@@ -228,12 +262,14 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
                     order_item_id=existing_item.id, new_quantity=new_quantity
                 )
             else:
-                await self.uow.order_items.add({
-                    "order_id": order_id,
-                    "product_id": product_id,
-                    "quantity": quantity,
-                    "unit_price": current_price,
-                })
+                await self.uow.order_items.add(
+                    {
+                        "order_id": order_id,
+                        "product_id": product_id,
+                        "quantity": quantity,
+                        "unit_price": current_price,
+                    }
+                )
 
             amount_to_add = current_price * quantity
             new_total = order.total_amount + amount_to_add
@@ -259,10 +295,14 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
                 raise OrderNotFoundError(order_id=order_id)
 
             if order.status != OrderStatus.NEW:
-                raise ValueError("Нельзя менять состав заказа в текущем статусе")
+                raise ValueError(
+                    "Нельзя менять состав заказа в текущем статусе"
+                )
 
-            existing_item = await self.uow.order_items.get_by_order_and_product(
-                order_id=order_id, product_id=product_id
+            existing_item = (
+                await self.uow.order_items.get_by_order_and_product(
+                    order_id=order_id, product_id=product_id
+                )
             )
 
             # Если товара и так нет, просто отдаем текущий заказ
@@ -274,7 +314,9 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
                 raise CannotRemoveLastItemError()
 
             # 3. Высчитываем сумму для вычета до удаления
-            amount_to_subtract = existing_item.unit_price * existing_item.quantity
+            amount_to_subtract = (
+                existing_item.unit_price * existing_item.quantity
+            )
 
             # 4. Удаляем строку
             await self.uow.order_items.delete_by_order_and_product(
@@ -290,7 +332,9 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
             await self.uow.commit()
             return updated_order
 
-    async def assign_courier(self, order_id: uuid.UUID, courier_id: uuid.UUID) -> Order:
+    async def assign_courier(
+        self, order_id: uuid.UUID, courier_id: uuid.UUID
+    ) -> Order:
         """
         Диспетчеризация: Логист назначает заказ конкретному курьеру.
         """
@@ -339,7 +383,9 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
                 raise OrderNotFoundError(order_id=order_id)
 
             old_status = order.status
-            updated_order = await self.uow.orders.update_status(order_id, new_status)
+            updated_order = await self.uow.orders.update_status(
+                order_id, new_status
+            )
             if not updated_order:
                 raise OrderNotFoundError(order_id=order_id)
 
@@ -356,7 +402,9 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
             return updated_order
 
     async def _handle_order_fulfillment(
-        self, order: Order, actual_items_dto: list[OrderItemActual] | None = None
+        self,
+        order: Order,
+        actual_items_dto: list[OrderItemActual] | None = None,
     ) -> None:
         """
         Автоматическое создание и проведение StockTransfer при доставке.
@@ -369,7 +417,9 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
 
         # 1. Корректировка заказа (Partial Delivery)
         if actual_items_dto:
-            actual_map = {item.product_id: item.quantity for item in actual_items_dto}
+            actual_map = {
+                item.product_id: item.quantity for item in actual_items_dto
+            }
             new_total = 0
 
             # Обновляем строки заказа (с защитой от превышения)
@@ -392,7 +442,9 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
                         )
 
                     item.quantity = requested_quantity
-                    await self.uow.order_items.update_quantity(item.id, item.quantity)
+                    await self.uow.order_items.update_quantity(
+                        item.id, item.quantity
+                    )
 
                 new_total += item.unit_price * item.quantity
 
@@ -408,59 +460,69 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
             raise ValueError("У курьера нет активного инвентаря (машины)")
 
         # 1. Создаем накладную на доставку (Full Water OUT)
-        delivery_transfer = await self.uow.transfers.add({
-            "from_id": courier_inventory.id,
-            "to_id": order.client_inventory_id,
-            "type": TransferType.CLIENT_DELIVERY,
-            "status": TransferStatus.COMPLETED,
-            "created_by_id": order.courier_id,
-            "accepted_by_id": order.client_id,
-            "order_id": order.id,
-        })
+        delivery_transfer = await self.uow.transfers.add(
+            {
+                "from_id": courier_inventory.id,
+                "to_id": order.client_inventory_id,
+                "type": TransferType.CLIENT_DELIVERY,
+                "status": TransferStatus.COMPLETED,
+                "created_by_id": order.courier_id,
+                "accepted_by_id": order.client_id,
+                "order_id": order.id,
+            }
+        )
 
         # 2. Создаем накладную на возврат тары (Empty Water IN)
         # Сначала проверим, какие товары в заказе имеют возвратную тару
         returnable_items = []
         for item in order.items:
             if item.product.returnable_item_id:
-                returnable_items.append({
-                    "product_id": item.product.returnable_item_id,
-                    "quantity": item.quantity,
-                })
+                returnable_items.append(
+                    {
+                        "product_id": item.product.returnable_item_id,
+                        "quantity": item.quantity,
+                    }
+                )
 
         return_transfer = None
         if returnable_items:
-            return_transfer = await self.uow.transfers.add({
-                "from_id": order.client_inventory_id,
-                "to_id": courier_inventory.id,
-                "type": TransferType.CLIENT_RETURN,
-                "status": TransferStatus.COMPLETED,
-                "created_by_id": order.courier_id,
-                "accepted_by_id": order.courier_id,
-                "order_id": order.id,
-            })
+            return_transfer = await self.uow.transfers.add(
+                {
+                    "from_id": order.client_inventory_id,
+                    "to_id": courier_inventory.id,
+                    "type": TransferType.CLIENT_RETURN,
+                    "status": TransferStatus.COMPLETED,
+                    "created_by_id": order.courier_id,
+                    "accepted_by_id": order.courier_id,
+                    "order_id": order.id,
+                }
+            )
 
         # 3. Проводим транзакции для обеих накладных
         # а) Доставка
         for item in order.items:
-            await self.uow.transactions.add({
-                "product_id": item.product_id,
-                "transfer_id": delivery_transfer.id,
-                "from_id": courier_inventory.id,
-                "to_id": order.client_inventory_id,
-                "quantity": item.quantity,
-            })
+            await self.uow.transactions.add(
+                {
+                    "product_id": item.product_id,
+                    "transfer_id": delivery_transfer.id,
+                    "from_id": courier_inventory.id,
+                    "to_id": order.client_inventory_id,
+                    "quantity": item.quantity,
+                }
+            )
 
         # б) Возврат тары
         if return_transfer:
             for item_data in returnable_items:
-                await self.uow.transactions.add({
-                    "product_id": item_data["product_id"],
-                    "transfer_id": return_transfer.id,
-                    "from_id": order.client_inventory_id,
-                    "to_id": courier_inventory.id,
-                    "quantity": item_data["quantity"],
-                })
+                await self.uow.transactions.add(
+                    {
+                        "product_id": item_data["product_id"],
+                        "transfer_id": return_transfer.id,
+                        "from_id": order.client_inventory_id,
+                        "to_id": courier_inventory.id,
+                        "quantity": item_data["quantity"],
+                    }
+                )
 
         # 4. Финансовое закрытие заказа
         await self._process_financial_settlement(order)
@@ -477,7 +539,9 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
         (update_account_balances), а не приложением. Приложение
         только вставляет записи в таблицу transactions.
         """
-        client_account = await self.uow.accounts.get_client_account(order.client_id)
+        client_account = await self.uow.accounts.get_client_account(
+            order.client_id
+        )
         if not client_account:
             return
         revenue_account = await self.uow.accounts.get_system_revenue_account()
@@ -499,25 +563,29 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
                 order.courier_id
             )
             if courier_account:
-                financial_txns.append({
-                    "from_id": client_account.id,
-                    "to_id": courier_account.id,
-                    "amount": order.total_amount,
-                    "order_id": order.id,
-                    "status": TransactionStatus.COMPLETED,
-                    "reason": "Оплата наличными курьеру",
-                })
+                financial_txns.append(
+                    {
+                        "from_id": client_account.id,
+                        "to_id": courier_account.id,
+                        "amount": order.total_amount,
+                        "order_id": order.id,
+                        "status": TransactionStatus.COMPLETED,
+                        "reason": "Оплата наличными курьеру",
+                    }
+                )
 
         elif order.payment_method == PaymentMethod.CARD:
             card_account = await self.uow.accounts.get_system_card_account()
-            financial_txns.append({
-                "from_id": client_account.id,
-                "to_id": card_account.id,
-                "amount": order.total_amount,
-                "order_id": order.id,
-                "status": TransactionStatus.PENDING,
-                "reason": "Перевод на карту",
-            })
+            financial_txns.append(
+                {
+                    "from_id": client_account.id,
+                    "to_id": card_account.id,
+                    "amount": order.total_amount,
+                    "order_id": order.id,
+                    "status": TransactionStatus.PENDING,
+                    "reason": "Перевод на карту",
+                }
+            )
 
         await self.uow.financial_transactions.add_many(financial_txns)
 
@@ -543,7 +611,9 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
                 dto.client_inventory_id
             )
             if not inventory:
-                raise ClientInventoryNotFoundError(inventory_id=dto.client_inventory_id)
+                raise ClientInventoryNotFoundError(
+                    inventory_id=dto.client_inventory_id
+                )
 
             balances = {b.product_id: b.quantity for b in inventory.balances}
 
@@ -552,14 +622,16 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
                 required_tare_id = product.returnable_item_id
                 available_tare = balances.get(required_tare_id, 0)
                 if available_tare < item.quantity:
-                    shortages.append({
-                        "product_id": product.id,
-                        "product_name": product.name,
-                        "returnable_item_id": required_tare_id,
-                        "required": item.quantity,
-                        "available": available_tare,
-                        "deficit": item.quantity - available_tare,
-                    })
+                    shortages.append(
+                        {
+                            "product_id": product.id,
+                            "product_name": product.name,
+                            "returnable_item_id": required_tare_id,
+                            "required": item.quantity,
+                            "available": available_tare,
+                            "deficit": item.quantity - available_tare,
+                        }
+                    )
 
             return {"can_order": len(shortages) == 0, "shortages": shortages}
 
@@ -574,7 +646,9 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
                 client_id=client_id, skip=skip, limit=limit
             )
 
-    async def get_courier_tasks(self, courier_id: uuid.UUID) -> Sequence[Order]:
+    async def get_courier_tasks(
+        self, courier_id: uuid.UUID
+    ) -> Sequence[Order]:
         """Активные заказы на сегодня для терминала курьера."""
         async with self.uow:
             return await self.uow.orders.get_active_courier_orders(

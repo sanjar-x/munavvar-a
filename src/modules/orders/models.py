@@ -50,7 +50,12 @@ class Order(BaseModel):
         comment="Намерение клиента по оплате: Наличные, Карта и т.д.",
     )
     status: Mapped[OrderStatus] = mapped_column(
-        Enum(OrderStatus, name="order_status_enum", native_enum=True, create_type=True),
+        Enum(
+            OrderStatus,
+            name="order_status_enum",
+            native_enum=True,
+            create_type=True,
+        ),
         nullable=False,
         default=OrderStatus.NEW,
         index=True,

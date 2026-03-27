@@ -30,19 +30,23 @@ class CourierService:
                 raise CourierAlreadyExistsError(phone=data.phone)
 
             try:
-                courier = await self.uow.users.add({
-                    "username": data.username,
-                    "role": Role.COURIER,
-                    "is_active": True,
-                })
+                courier = await self.uow.users.add(
+                    {
+                        "username": data.username,
+                        "role": Role.COURIER,
+                        "is_active": True,
+                    }
+                )
                 await self.uow.session.flush()
                 hashed_pwd = get_password_hash(data.password)
-                await self.uow.identities.add({
-                    "user_id": courier.id,
-                    "provider": AuthProvider.LOCAL,
-                    "provider_identity_id": data.phone,
-                    "password_hash": hashed_pwd,
-                })
+                await self.uow.identities.add(
+                    {
+                        "user_id": courier.id,
+                        "provider": AuthProvider.LOCAL,
+                        "provider_identity_id": data.phone,
+                        "password_hash": hashed_pwd,
+                    }
+                )
 
                 await self.uow.accounts.create_courier_account(
                     courier_id=courier.id,
@@ -67,11 +71,13 @@ class CourierService:
                 raise CourierNotFoundError(courier_id=courier_id)
 
             try:
-                await self.uow.inventories.add({
-                    "name": data.name,
-                    "type": InventoryType.COURIER,
-                    "user_id": courier_id,
-                })
+                await self.uow.inventories.add(
+                    {
+                        "name": data.name,
+                        "type": InventoryType.COURIER,
+                        "user_id": courier_id,
+                    }
+                )
                 await self.uow.commit()
             except IntegrityError as e:
                 await self.uow.rollback()
@@ -100,7 +106,9 @@ class CourierService:
                     "phone": courier.identities[0].provider_identity_id
                     if courier.identities
                     else None,
-                    "account": courier.accounts[0] if courier.accounts else None,
+                    "account": courier.accounts[0]
+                    if courier.accounts
+                    else None,
                     "inventory": courier.inventories[0]
                     if courier.inventories
                     else None,
@@ -125,7 +133,9 @@ class CourierService:
 
             identity = await self.uow.identities.get_local_by_user(courier.id)
             account = await self.uow.accounts.get_courier_account(courier.id)
-            inventory = await self.uow.inventories.get_courier_inventory(courier_id)
+            inventory = await self.uow.inventories.get_courier_inventory(
+                courier_id
+            )
 
             return {
                 "id": courier.id,

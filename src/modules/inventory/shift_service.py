@@ -8,6 +8,7 @@ from src.modules.inventory.enums import (
 from src.modules.inventory.schemas import CloseShiftRequest
 from src.modules.inventory.uow import InventoryUnitOfWork
 
+
 class ShiftService:
     def __init__(self, uow: InventoryUnitOfWork):
         self.uow = uow
@@ -22,19 +23,25 @@ class ShiftService:
         async with self.uow:
             # 1. Захватываем блокировку на инвентарь курьера
             inventory = await self.uow.inventories.get_inventory_with_balances(
-                request.courier_id, 
+                request.courier_id,
                 inv_type=InventoryType.COURIER,
-                with_for_update=True
+                with_for_update=True,
             )
             if not inventory:
                 # Попробуем найти по courier_id (так как это ID пользователя)
-                inventory = await self.uow.inventories.get_courier_inventory(request.courier_id)
+                inventory = await self.uow.inventories.get_courier_inventory(
+                    request.courier_id
+                )
                 if not inventory:
-                    raise ValueError(f"Активный инвентарь для курьера {request.courier_id} не найден")
-                
+                    raise ValueError(
+                        f"Активный инвентарь для курьера {request.courier_id} не найден"
+                    )
+
                 # Повторно запрашиваем с блокировкой
-                inventory = await self.uow.inventories.get_inventory_with_balances(
-                    inventory.id, with_for_update=True
+                inventory = (
+                    await self.uow.inventories.get_inventory_with_balances(
+                        inventory.id, with_for_update=True
+                    )
                 )
 
             if not inventory:
@@ -45,17 +52,20 @@ class ShiftService:
                 b.product_id: b.quantity for b in inventory.balances
             }
             returned_map = {
-                item.product_id: item.quantity for item in request.returned_inventory
+                item.product_id: item.quantity
+                for item in request.returned_inventory
             }
 
             # Проверяем, что курьер сдает ровно столько, сколько на нем числится
             # Важно: сверяем все товары, которые есть на балансе
-            all_product_ids = set(current_balances.keys()) | set(returned_map.keys())
-            
+            all_product_ids = set(current_balances.keys()) | set(
+                returned_map.keys()
+            )
+
             for pid in all_product_ids:
                 sys_qty = current_balances.get(pid, 0)
                 ret_qty = returned_map.get(pid, 0)
-                
+
                 if sys_qty != ret_qty:
                     raise ValueError(
                         f"Рассинхрон остатков по товару {pid}. "
@@ -66,34 +76,40 @@ class ShiftService:
             # 3. Если сверка прошла успешно — перемещаем всё на главный склад
             if request.returned_inventory:
                 # Получаем системный главный склад
-                main_warehouse = await self.uow.inventories.get_system_inventory(
-                    InventoryType.WAREHOUSE
+                main_warehouse = (
+                    await self.uow.inventories.get_system_inventory(
+                        InventoryType.WAREHOUSE
+                    )
                 )
-                
+
                 # Создаем накладную на возврат
-                transfer = await self.uow.transfers.add({
-                    "from_id": inventory.id,
-                    "to_id": main_warehouse.id,
-                    "type": TransferType.WAREHOUSE_TRANSFER,
-                    "status": TransferStatus.COMPLETED,
-                    "created_by_id": request.courier_id,
-                    "accepted_by_id": settings.SYSTEM_USER_ID,
-                })
+                transfer = await self.uow.transfers.add(
+                    {
+                        "from_id": inventory.id,
+                        "to_id": main_warehouse.id,
+                        "type": TransferType.WAREHOUSE_TRANSFER,
+                        "status": TransferStatus.COMPLETED,
+                        "created_by_id": request.courier_id,
+                        "accepted_by_id": settings.SYSTEM_USER_ID,
+                    }
+                )
 
                 # Создаем транзакции в леджере
                 for item in request.returned_inventory:
-                    await self.uow.transactions.add({
-                        "product_id": item.product_id,
-                        "transfer_id": transfer.id,
-                        "from_id": inventory.id,
-                        "to_id": main_warehouse.id,
-                        "quantity": item.quantity,
-                    })
+                    await self.uow.transactions.add(
+                        {
+                            "product_id": item.product_id,
+                            "transfer_id": transfer.id,
+                            "from_id": inventory.id,
+                            "to_id": main_warehouse.id,
+                            "quantity": item.quantity,
+                        }
+                    )
 
             # 4. Инкассация (Финансовый блок - placeholder)
             # if request.cash_collected > 0:
             #     await self.billing_service.collect_cash(request.courier_id, request.cash_collected)
-            
+
             # 5. Закрытие смены (бизнес-флаг)
             inventory.is_active = False
 

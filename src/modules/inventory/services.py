@@ -32,11 +32,13 @@ class TransportService:
     async def create_transport(self, schema: TransportCreate) -> Inventory:
         async with self.uow:
             # В реальной системе здесь должна быть проверка, user_id курьера
-            transport = await self.uow.inventories.add({
-                "user_id": schema.user_id,
-                "name": schema.name,
-                "type": InventoryType.COURIER,
-            })
+            transport = await self.uow.inventories.add(
+                {
+                    "user_id": schema.user_id,
+                    "name": schema.name,
+                    "type": InventoryType.COURIER,
+                }
+            )
             await self.uow.commit()
             return transport
 
@@ -75,7 +77,9 @@ class TransportService:
             if not update_data:
                 return await self.uow.inventories.get(transport_id)
 
-            transport = await self.uow.inventories.update(transport_id, update_data)
+            transport = await self.uow.inventories.update(
+                transport_id, update_data
+            )
             await self.uow.commit()
             return transport
 
@@ -102,11 +106,13 @@ class WarehouseService:
 
     async def create_warehouse(self, schema: WarehouseCreate) -> Inventory:
         async with self.uow:
-            warehouse = await self.uow.inventories.add({
-                "user_id": schema.user_id,
-                "name": schema.name,
-                "type": InventoryType.WAREHOUSE,
-            })
+            warehouse = await self.uow.inventories.add(
+                {
+                    "user_id": schema.user_id,
+                    "name": schema.name,
+                    "type": InventoryType.WAREHOUSE,
+                }
+            )
             await self.uow.commit()
             return warehouse
 
@@ -137,7 +143,9 @@ class WarehouseService:
         self,
     ) -> Sequence[Inventory]:
         async with self.uow:
-            return await self.uow.inventories.get_all_warehouses_with_balances()
+            return (
+                await self.uow.inventories.get_all_warehouses_with_balances()
+            )
 
 
 class StockTransferService:
@@ -172,13 +180,15 @@ class StockTransferService:
     ) -> StockTransfer:
         async with self.uow:
             # TODO: Validate inventories exist and types match the business logic
-            transfer = await self.uow.transfers.add({
-                "from_id": schema.from_id,
-                "to_id": schema.to_id,
-                "type": schema.type,
-                "status": TransferStatus.DRAFT,
-                "created_by_id": created_by_id,
-            })
+            transfer = await self.uow.transfers.add(
+                {
+                    "from_id": schema.from_id,
+                    "to_id": schema.to_id,
+                    "type": schema.type,
+                    "status": TransferStatus.DRAFT,
+                    "created_by_id": created_by_id,
+                }
+            )
             await self.uow.commit()
             return transfer
 
@@ -188,7 +198,9 @@ class StockTransferService:
         items_schema: list[TransferItemCreate],
     ) -> StockTransfer:
         async with self.uow:
-            transfer = await self.uow.transfers.get_with_items_for_update(transfer_id)
+            transfer = await self.uow.transfers.get_with_items_for_update(
+                transfer_id
+            )
             if not transfer:
                 raise ValueError("Transfer not found")
             if transfer.status != TransferStatus.DRAFT:
@@ -201,11 +213,13 @@ class StockTransferService:
                 await self.uow.transfer_items.delete(item.id)
 
             for item_data in items_schema:
-                await self.uow.transfer_items.add({
-                    "transfer_id": transfer_id,
-                    "product_id": item_data.product_id,
-                    "quantity": item_data.quantity,
-                })
+                await self.uow.transfer_items.add(
+                    {
+                        "transfer_id": transfer_id,
+                        "product_id": item_data.product_id,
+                        "quantity": item_data.quantity,
+                    }
+                )
 
             await self.uow.commit()
             transfer = await self.uow.transfers.get_transfer(transfer_id)
@@ -244,13 +258,15 @@ class StockTransferService:
 
             # 2. Create StockTransactions
             for item in transfer.items:
-                await self.uow.transactions.add({
-                    "product_id": item.product_id,
-                    "transfer_id": transfer_id,
-                    "from_id": transfer.from_id,
-                    "to_id": transfer.to_id,
-                    "quantity": item.quantity,
-                })
+                await self.uow.transactions.add(
+                    {
+                        "product_id": item.product_id,
+                        "transfer_id": transfer_id,
+                        "from_id": transfer.from_id,
+                        "to_id": transfer.to_id,
+                        "quantity": item.quantity,
+                    }
+                )
 
             # 3. Update status
             transfer.status = TransferStatus.COMPLETED
@@ -267,7 +283,9 @@ class CapitalizeTaraService:
     когда у клиента есть физическая тара, не учтенная в системе.
     """
 
-    def __init__(self, uow: InventoryUnitOfWork, catalog_service: CatalogService):
+    def __init__(
+        self, uow: InventoryUnitOfWork, catalog_service: CatalogService
+    ):
         self.uow = uow
         self.catalog_service = catalog_service
 
@@ -285,32 +303,40 @@ class CapitalizeTaraService:
                 dto.client_inventory_id, inv_type=InventoryType.CLIENT
             )
             if not inventory:
-                raise InventoryNotFoundError(inventory_id=dto.client_inventory_id)
+                raise InventoryNotFoundError(
+                    inventory_id=dto.client_inventory_id
+                )
 
             vendor_inv = await self.uow.inventories.get_vendor_inventory()
 
-            transfer = await self.uow.transfers.add({
-                "from_id": vendor_inv.id,
-                "to_id": inventory.id,
-                "type": TransferType.INITIAL_BALANCE,
-                "status": TransferStatus.COMPLETED,
-                "created_by_id": created_by_id,
-                "accepted_by_id": created_by_id,
-            })
-
-            for item in dto.items:
-                await self.uow.transfer_items.add({
-                    "transfer_id": transfer.id,
-                    "product_id": item.product_id,
-                    "quantity": item.quantity,
-                })
-                await self.uow.transactions.add({
-                    "product_id": item.product_id,
-                    "transfer_id": transfer.id,
+            transfer = await self.uow.transfers.add(
+                {
                     "from_id": vendor_inv.id,
                     "to_id": inventory.id,
-                    "quantity": item.quantity,
-                })
+                    "type": TransferType.INITIAL_BALANCE,
+                    "status": TransferStatus.COMPLETED,
+                    "created_by_id": created_by_id,
+                    "accepted_by_id": created_by_id,
+                }
+            )
+
+            for item in dto.items:
+                await self.uow.transfer_items.add(
+                    {
+                        "transfer_id": transfer.id,
+                        "product_id": item.product_id,
+                        "quantity": item.quantity,
+                    }
+                )
+                await self.uow.transactions.add(
+                    {
+                        "product_id": item.product_id,
+                        "transfer_id": transfer.id,
+                        "from_id": vendor_inv.id,
+                        "to_id": inventory.id,
+                        "quantity": item.quantity,
+                    }
+                )
 
             await self.uow.commit()
 
@@ -350,11 +376,15 @@ class CapitalizeTaraService:
                 dto.client_inventory_id, inv_type=InventoryType.CLIENT
             )
             if not inventory:
-                raise InventoryNotFoundError(inventory_id=dto.client_inventory_id)
+                raise InventoryNotFoundError(
+                    inventory_id=dto.client_inventory_id
+                )
 
             # Проверяем владельца инвентаря
             if inventory.user_id != client_id:
-                raise InventoryNotFoundError(inventory_id=dto.client_inventory_id)
+                raise InventoryNotFoundError(
+                    inventory_id=dto.client_inventory_id
+                )
 
             balances = {b.product_id: b.quantity for b in inventory.balances}
 
@@ -379,28 +409,34 @@ class CapitalizeTaraService:
 
             vendor_inv = await self.uow.inventories.get_vendor_inventory()
 
-            transfer = await self.uow.transfers.add({
-                "from_id": vendor_inv.id,
-                "to_id": inventory.id,
-                "type": TransferType.INITIAL_BALANCE,
-                "status": TransferStatus.COMPLETED,
-                "created_by_id": client_id,
-                "accepted_by_id": client_id,
-            })
-
-            for cap_item in items_to_capitalize:
-                await self.uow.transfer_items.add({
-                    "transfer_id": transfer.id,
-                    "product_id": cap_item.product_id,
-                    "quantity": cap_item.quantity,
-                })
-                await self.uow.transactions.add({
-                    "product_id": cap_item.product_id,
-                    "transfer_id": transfer.id,
+            transfer = await self.uow.transfers.add(
+                {
                     "from_id": vendor_inv.id,
                     "to_id": inventory.id,
-                    "quantity": cap_item.quantity,
-                })
+                    "type": TransferType.INITIAL_BALANCE,
+                    "status": TransferStatus.COMPLETED,
+                    "created_by_id": client_id,
+                    "accepted_by_id": client_id,
+                }
+            )
+
+            for cap_item in items_to_capitalize:
+                await self.uow.transfer_items.add(
+                    {
+                        "transfer_id": transfer.id,
+                        "product_id": cap_item.product_id,
+                        "quantity": cap_item.quantity,
+                    }
+                )
+                await self.uow.transactions.add(
+                    {
+                        "product_id": cap_item.product_id,
+                        "transfer_id": transfer.id,
+                        "from_id": vendor_inv.id,
+                        "to_id": inventory.id,
+                        "quantity": cap_item.quantity,
+                    }
+                )
 
             await self.uow.commit()
 

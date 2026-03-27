@@ -55,7 +55,9 @@ async def create_transfer(
         StockTransferService, Depends(get_stock_transfer_service)
     ],
 ):
-    return await transfer_service.create_draft_transfer(current_admin.id, schema)
+    return await transfer_service.create_draft_transfer(
+        current_admin.id, schema
+    )
 
 
 @transfers_router.put(
@@ -74,9 +76,13 @@ async def update_transfer_items(
     ],
 ):
     try:
-        return await transfer_service.update_draft_items(transfer_id, items_schema)
+        return await transfer_service.update_draft_items(
+            transfer_id, items_schema
+        )
     except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)
+        )
 
 
 @transfers_router.post(
@@ -99,4 +105,6 @@ async def complete_transfer(
             transfer_id, accepted_by_id=schema.accepted_by_id
         )
     except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)
+        )

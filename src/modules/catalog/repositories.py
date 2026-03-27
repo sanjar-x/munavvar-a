@@ -20,13 +20,17 @@ class ProductRepository(BaseRepository[Product]):
         product: Product | None = await self.get(product_id)
         return product
 
-    async def get_multi_by_ids(self, product_ids: list[uuid.UUID]) -> Sequence[Product]:
+    async def get_multi_by_ids(
+        self, product_ids: list[uuid.UUID]
+    ) -> Sequence[Product]:
         if not product_ids:
             return []
 
         query = (
             select(self.model)
-            .where(self.model.id.in_(product_ids), self.model.is_active.is_(True))
+            .where(
+                self.model.id.in_(product_ids), self.model.is_active.is_(True)
+            )
             .options(selectinload(self.model.returnable_item))
         )
         result: Result[Any] = await self.session.execute(query)
@@ -40,7 +44,9 @@ class ProductRepository(BaseRepository[Product]):
         """
         query = (
             select(self.model)
-            .where(self.model.type == product_type, self.model.is_active.is_(True))
+            .where(
+                self.model.type == product_type, self.model.is_active.is_(True)
+            )
             .options(selectinload(self.model.returnable_item))
             .order_by(self.model.created_at.desc())
             .offset(skip)

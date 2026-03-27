@@ -44,7 +44,9 @@ class ClientUnitOfWork(BaseSQLAlchemyUoW, IClientUnitOfWork):
         self.inventories = InventoryRepository(session=self.session)
         self.transfers = StockTransferRepository(session=self.session)
         self.transfer_items = StockTransferItemRepository(session=self.session)
-        self.stock_transactions = StockTransactionRepository(session=self.session)
+        self.stock_transactions = StockTransactionRepository(
+            session=self.session
+        )
         self.orders = OrderRepository(session=self.session)
         self.order_items = OrderItemRepository(session=self.session)
 

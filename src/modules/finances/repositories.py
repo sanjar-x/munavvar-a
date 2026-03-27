@@ -40,7 +40,9 @@ class AccountRepository(BaseRepository[Account]):
             name=f"Касса курьера: {courier_name}",
         )
 
-    async def create_system_accounts(self, system_user_id: uuid.UUID) -> list[Account]:
+    async def create_system_accounts(
+        self, system_user_id: uuid.UUID
+    ) -> list[Account]:
         accounts = []
         system_map = {
             AccountType.REVENUE: "Системный счет выручки",
@@ -100,7 +102,9 @@ class TransactionRepository(BaseRepository[Transaction]):
     def __init__(self, session: AsyncSession):
         super().__init__(model=Transaction, session=session)
 
-    async def get_for_update(self, transaction_id: uuid.UUID) -> Transaction | None:
+    async def get_for_update(
+        self, transaction_id: uuid.UUID
+    ) -> Transaction | None:
         query = (
             select(Transaction)
             .where(Transaction.id == transaction_id)

@@ -62,6 +62,8 @@ class Product(BaseModel):
 
     __table_args__ = (
         CheckConstraint("price >= 0", name="ck_product_price_pos"),
-        Index("idx_product_attributes_gin", "attributes", postgresql_using="gin"),
+        Index(
+            "idx_product_attributes_gin", "attributes", postgresql_using="gin"
+        ),
         {"comment": "Единый каталог товаров, услуг и оборотной тары"},
     )

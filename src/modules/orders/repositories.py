@@ -67,7 +67,9 @@ class OrderRepository(BaseRepository[Order]):
             .where(self.model.client_id == client_id)
             .options(
                 joinedload(self.model.courier),
-                joinedload(self.model.client_inventory).joinedload(Inventory.user),
+                joinedload(self.model.client_inventory).joinedload(
+                    Inventory.user
+                ),
             )
             .order_by(desc(self.model.created_at))
             .offset(skip)
@@ -76,7 +78,9 @@ class OrderRepository(BaseRepository[Order]):
         result: Result = await self.session.execute(query)
         return result.scalars().all()
 
-    async def get_active_courier_orders(self, courier_id: uuid.UUID) -> Sequence[Order]:
+    async def get_active_courier_orders(
+        self, courier_id: uuid.UUID
+    ) -> Sequence[Order]:
         """
         Для приложения курьера: Список заказов "На сегодня",
         которые еще не доставлены или не отменены.
@@ -85,15 +89,19 @@ class OrderRepository(BaseRepository[Order]):
             select(self.model)
             .where(
                 self.model.courier_id == courier_id,
-                self.model.status.in_([
-                    OrderStatus.ASSIGNED,
-                    OrderStatus.IN_TRANSIT,
-                    OrderStatus.ARRIVED,
-                ]),
+                self.model.status.in_(
+                    [
+                        OrderStatus.ASSIGNED,
+                        OrderStatus.IN_TRANSIT,
+                        OrderStatus.ARRIVED,
+                    ]
+                ),
             )
             .options(
                 joinedload(self.model.client),
-                joinedload(self.model.client_inventory).joinedload(Inventory.user),
+                joinedload(self.model.client_inventory).joinedload(
+                    Inventory.user
+                ),
                 selectinload(self.model.items).joinedload(OrderItem.product),
             )
             .order_by(self.model.created_at.asc())
@@ -109,7 +117,9 @@ class OrderRepository(BaseRepository[Order]):
             .where(self.model.id == order_id)
             .options(
                 joinedload(self.model.client),
-                joinedload(self.model.client_inventory).joinedload(Inventory.user),
+                joinedload(self.model.client_inventory).joinedload(
+                    Inventory.user
+                ),
                 joinedload(self.model.courier),
                 selectinload(self.model.items).joinedload(OrderItem.product),
                 selectinload(self.model.stock_transfers).selectinload(
@@ -154,7 +164,9 @@ class OrderRepository(BaseRepository[Order]):
         if client_id:
             query = query.where(self.model.client_id == client_id)
         if client_inventory_id:
-            query = query.where(self.model.client_inventory_id == client_inventory_id)
+            query = query.where(
+                self.model.client_inventory_id == client_inventory_id
+            )
 
         # Диапазоны дат (предполагается, что created_at есть в BaseModel)
         if date_from:
@@ -169,8 +181,7 @@ class OrderRepository(BaseRepository[Order]):
             query = query.where(self.model.total_amount <= max_amount)
 
         query = (
-            query
-            .options(
+            query.options(
                 joinedload(self.model.client),
                 joinedload(self.model.client_inventory),
                 joinedload(self.model.courier),

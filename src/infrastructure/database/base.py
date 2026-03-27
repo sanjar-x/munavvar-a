@@ -5,7 +5,12 @@ from datetime import datetime
 
 from sqlalchemy import BOOLEAN, TIMESTAMP, func, text
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import DeclarativeBase, Mapped, declared_attr, mapped_column
+from sqlalchemy.orm import (
+    DeclarativeBase,
+    Mapped,
+    declared_attr,
+    mapped_column,
+)
 
 
 class BaseModel(DeclarativeBase):
@@ -43,6 +48,8 @@ class BaseModel(DeclarativeBase):
 
     def __repr__(self) -> str:
         columns: str = ", ".join(
-            f"{k}={repr(v)}" for k, v in self.__dict__.items() if not k.startswith("_")
+            f"{k}={repr(v)}"
+            for k, v in self.__dict__.items()
+            if not k.startswith("_")
         )
         return f"<{self.__class__.__name__}({columns})>"

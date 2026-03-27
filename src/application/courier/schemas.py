@@ -10,7 +10,9 @@ from pydantic import BaseModel, ConfigDict, Field
 
 class CourierCreate(BaseModel):
     username: str = Field(..., description="ФИО курьера")
-    phone: str = Field(..., description="Номер телефона курьера (будет Identity)")
+    phone: str = Field(
+        ..., description="Номер телефона курьера (будет Identity)"
+    )
     password: str = Field(
         ..., description="Пароль курьера (в открытом виде, будет захэширован)"
     )
@@ -51,29 +53,6 @@ class CourierInventoryWithBalancesDTO(InventoryShortDTO):
     balances: list[Any]
 
 
-# --- ОТВЕТЫ (RESPONSES) ---
-class Courier(BaseModel):
-    """Схема одного курьера для выдачи в списке (без глубоких связей)"""
-
-    id: uuid.UUID
-    username: str
-    phone: str | None
-    account: AccountShortDTO | None  # УБРАЛИ Any, теперь Pydantic знает как парсить!
-    inventory: InventoryShortDTO | None  # УБРАЛИ Any!
-    is_active: bool
-    orders: int = Field(description="Количество выполненных заказов")
-    created_at: datetime
-
-    model_config = ConfigDict(from_attributes=True)
-
-
-class CouriersResponse(BaseModel):
-    """Схема ответа для эндпоинта списка курьеров с пагинацией"""
-
-    total_count: int
-    couriers: list[Courier]
-
-
 class CourierResponse(BaseModel):
     """Полная карточка курьера для детального просмотра"""
 
@@ -88,3 +67,28 @@ class CourierResponse(BaseModel):
     ]  # Если заказы тоже падают с такой же ошибкой, их тоже нужно описать через DTO!
 
     model_config = ConfigDict(from_attributes=True)
+
+
+# --- ОТВЕТЫ (RESPONSES) ---
+class Courier(BaseModel):
+    """Схема одного курьера для выдачи в списке (без глубоких связей)"""
+
+    id: uuid.UUID
+    username: str
+    phone: str | None
+    account: (
+        AccountShortDTO | None
+    )  # УБРАЛИ Any, теперь Pydantic знает как парсить!
+    inventory: InventoryShortDTO | None  # УБРАЛИ Any!
+    is_active: bool
+    orders: int = Field(description="Количество выполненных заказов")
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class CouriersResponse(BaseModel):
+    """Схема ответа для эндпоинта списка курьеров с пагинацией"""
+
+    total_count: int
+    couriers: list[Courier]
