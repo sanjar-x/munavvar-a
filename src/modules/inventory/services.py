@@ -321,13 +321,11 @@ class StockTransferService:
             if transfer.status != TransferStatus.DRAFT:
                 raise ValueError("Only draft transfers can be completed")
 
-            # 1. Захватываем блокировку на инвентарь-отправитель (Race Condition Protection)
             from_inventory = await self.uow.inventories.get_inventory_with_balances(
                 transfer.from_id, with_for_update=True
             )
 
             # 2. Validate balances in from_inventory
-            # VIRTUAL_VENDOR — бесконечный виртуальный источник, проверка остатков не применима
             if from_inventory and from_inventory.type != InventoryType.VIRTUAL_VENDOR:
                 product_ids = [item.product_id for item in transfer.items]
                 balances = await self.uow.transactions.get_balances_for_products(

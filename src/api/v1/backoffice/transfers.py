@@ -60,7 +60,7 @@ async def create_transfer(
 
 @transfers_router.put(
     "/{transfer_id}/items",
-    response_model=TransferResponse,  # Assuming StockTransferResponse is a typo and should be TransferResponse based on existing schemas
+    response_model=TransferResponse,
     summary="Добавление/обновление строк в черновик",
 )
 async def update_transfer_items(
@@ -81,7 +81,7 @@ async def update_transfer_items(
 
 @transfers_router.post(
     "/{transfer_id}/complete",
-    response_model=TransferResponse,  # Assuming StockTransferResponse is a typo and should be TransferResponse based on existing schemas
+    response_model=TransferResponse,
     summary="Проведение документа",
 )
 async def complete_transfer(
