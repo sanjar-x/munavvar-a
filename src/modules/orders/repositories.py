@@ -147,6 +147,7 @@ class OrderRepository(BaseRepository[Order]):
         courier_id: uuid.UUID | None = None,
         client_id: uuid.UUID | None = None,
         client_inventory_id: uuid.UUID | None = None,
+        sale_type: str | None = None,
         date_from: datetime | None = None,
         date_to: datetime | None = None,
         min_amount: int | None = None,
@@ -171,6 +172,8 @@ class OrderRepository(BaseRepository[Order]):
             query = query.where(
                 self.model.client_inventory_id == client_inventory_id
             )
+        if sale_type:
+            query = query.where(self.model.sale_type == sale_type)
 
         # Диапазоны дат (предполагается, что created_at есть в BaseModel)
         if date_from:
