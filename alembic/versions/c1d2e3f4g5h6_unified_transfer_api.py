@@ -5,11 +5,12 @@ Revises: 8e058e9a7678
 Create Date: 2026-03-27
 
 """
+
 from typing import Sequence, Union
 
-from alembic import op
 import sqlalchemy as sa
 
+from alembic import op
 
 revision: str = "c1d2e3f4g5h6"
 down_revision: Union[str, Sequence[str], None] = "8e058e9a7678"
@@ -18,7 +19,9 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.execute("ALTER TYPE transfer_type_enum ADD VALUE IF NOT EXISTS 'FACTORY_SHIPMENT'")
+    op.execute(
+        "ALTER TYPE transfer_type_enum ADD VALUE IF NOT EXISTS 'FACTORY_SHIPMENT'"
+    )
     op.execute("ALTER TYPE transfer_type_enum ADD VALUE IF NOT EXISTS 'FACTORY_RETURN'")
 
     op.add_column(
@@ -48,6 +51,8 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_index(op.f("ix_stock_transfers_route_sheet_id"), table_name="stock_transfers")
+    op.drop_index(
+        op.f("ix_stock_transfers_route_sheet_id"), table_name="stock_transfers"
+    )
     op.drop_column("stock_transfers", "route_sheet_id")
     op.drop_column("stock_transfers", "reason")

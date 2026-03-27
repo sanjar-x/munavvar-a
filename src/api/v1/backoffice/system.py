@@ -16,9 +16,7 @@ system_router = APIRouter()
     tags=["Backoffice | System"],
 )
 async def seed_database(
-    current_admin: User = Security(
-        get_current_user, scopes=[Scope.USERS_WRITE]
-    ),
+    current_admin: User = Security(get_current_user, scopes=[Scope.USERS_WRITE]),
 ):
     """
     Запускает генератор тестовых данных (Товары, Склады, Курьеры, Клиенты, Заказы).

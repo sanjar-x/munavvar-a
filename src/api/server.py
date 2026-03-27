@@ -27,7 +27,6 @@ async def lifespan(app: FastAPI):
         environment=settings.ENVIRONMENT,
     )
     # Инициализация БД и Redis...
-    # await init_data()
     yield
     logger.info("Остановка Enterprise API. Очистка ресурсов...")
     # Закрытие пулов...
