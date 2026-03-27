@@ -4,358 +4,343 @@
 
 ---
 
-## 1. Новый тип инвентаря: `FACTORY`
+## 1. Единый API накладных (Unified Transfer API)
 
-`InventoryType` теперь содержит:
+### Что изменилось
+
+Все операции с товародвижением теперь идут через **один эндпоинт**:
 
 ```
-FACTORY         — Завод (отдельный от склада)
-WAREHOUSE       — Склад
-COURIER         — Машина курьера
-CLIENT          — Клиент
-VIRTUAL_LOSS    — Системный (списание)
-VIRTUAL_VENDOR  — Системный (оприходование)
+POST /api/v1/backoffice/transfers/
 ```
 
-**Что поменять на фронте:**
-- В селектах инвентарей учитывать тип `FACTORY`
-- В таблице накладных `from_id` / `to_id` могут ссылаться на завод — нужно отображать имя
-- Если есть маппинг `InventoryType → иконка/цвет`, добавить `FACTORY`
+#### Удалённые эндпоинты (больше не работают!)
+
+| Старый эндпоинт | Замена |
+|---|---|
+| `POST /shifts/load-truck` | `POST /transfers/` с `type: "COURIER_LOAD"` |
+| `POST /shifts/loss` | `POST /transfers/` с `type: "LOSS_WRITE_OFF"` |
+| `PUT /transfers/{id}/items` | Удалён — items передаются сразу |
+| `POST /transfers/{id}/complete` | Удалён — накладная создаётся сразу COMPLETED |
+
+#### Оставшиеся без изменений
+
+| Эндпоинт | Назначение |
+|---|---|
+| `GET /transfers/` | Журнал накладных (без изменений) |
+| `POST /shifts/factory-exchange` | Обмен курьера на заводе (без изменений) |
+| `POST /shifts/close` | Закрытие смены (без изменений) |
+
+---
+
+### Единая схема запроса
+
+```javascript
+POST /api/v1/backoffice/transfers/
+
+{
+  "type": "COURIER_LOAD",           // Обязательно — тип накладной
+  "from_id": "uuid",                // Откуда (необязательно для виртуальных источников)
+  "to_id": "uuid",                  // Куда (необязательно для виртуальных получателей)
+  "items": [                        // Обязательно — минимум 1 позиция
+    { "product_id": "uuid", "quantity": 10 }
+  ],
+  "reason": "Broken during transport", // Только для LOSS_WRITE_OFF (обязательно)
+  "route_sheet_id": "uuid"            // Только для COURIER_LOAD (необязательно)
+}
+```
+
+#### Правила по полям `from_id` / `to_id`
+
+**Бэкенд сам подставляет виртуальные склады — фронтенд их НЕ передаёт:**
+
+| Тип | from_id | to_id | Что подставит бэкенд |
+|---|---|---|---|
+| `COURIER_LOAD` | ✅ передать (warehouse) | ✅ передать (courier) | — |
+| `COURIER_RETURN` | ✅ передать (courier) | ✅ передать (warehouse) | — |
+| `FACTORY_SHIPMENT` | ✅ передать (warehouse) | ✅ передать (factory) | — |
+| `FACTORY_RETURN` | ✅ передать (factory) | ✅ передать (warehouse) | — |
+| `LOSS_WRITE_OFF` | ✅ передать (warehouse/courier) | ❌ НЕ передавать | `to_id` = VIRTUAL_LOSS |
+| `INVENTORY_FINDING` | ❌ НЕ передавать | ✅ передать (warehouse) | `from_id` = VIRTUAL_VENDOR |
+| `FACTORY_RECEIPT` | ❌ НЕ передавать | ✅ передать (warehouse/factory) | `from_id` = VIRTUAL_VENDOR |
+| `INITIAL_BALANCE` | ❌ НЕ передавать | ✅ передать (warehouse) | `from_id` = VIRTUAL_VENDOR |
+
+> **Главное:** Больше не нужно знать UUID виртуальных складов (VIRTUAL_VENDOR / VIRTUAL_LOSS). Бэкенд сам разберётся.
+
+---
+
+### Новые типы накладных
+
+| Тип | Название (UZ) | Маршрут | Описание |
+|---|---|---|---|
+| `FACTORY_SHIPMENT` | Zavodga jo'natish | Ombor → Zavod | Отправка товара на завод (пустые бутыли на розлив) |
+| `FACTORY_RETURN` | Zavoddan qabul qilish | Zavod → Ombor | Приёмка товара с завода (полная вода) |
+
+---
+
+### Flow для каждой операции
+
+#### 1. Yuklash (Загрузка курьера)
+
+**Форма:** Ombor + Kuryer mashina + Mahsulotlar
+
+```javascript
+await createTransfer({
+  type: "COURIER_LOAD",
+  from_id: warehouseId,        // UUID выбранного склада
+  to_id: courierId,            // UUID машины курьера
+  items: [{ product_id: "...", quantity: 10 }],
+  route_sheet_id: crypto.randomUUID(),  // опционально
+}).unwrap();
+```
+
+---
+
+#### 2. Tushurib olish (Выгрузка курьера)
+
+**Без изменений.** Используется `POST /shifts/close` с `cash_collected: 0`.
+
+```javascript
+await closeShift({
+  courier_id: courierUserId,
+  returned_inventory: [{ product_id: "...", quantity: 5 }],
+  cash_collected: 0,
+}).unwrap();
+```
+
+---
+
+#### 3. Hisobga qo'shish (Оприходование / Топилма)
+
+**Форма:** Ombor + Mahsulotlar
+
+```javascript
+await createTransfer({
+  type: "INVENTORY_FINDING",
+  to_id: warehouseId,          // только to_id!
+  items: [{ product_id: "...", quantity: 3 }],
+}).unwrap();
+```
+
+> **Было:** 3 вызова (createTransfer → updateItems → complete). **Стало:** 1 вызов.
+> **Больше не нужен** `virtualVendorId` — бэкенд подставит сам.
+
+---
+
+#### 4. Hisobdan chiqarish (Списание)
+
+**Форма:** Ombor + Mahsulotlar + Sabab
+
+```javascript
+await createTransfer({
+  type: "LOSS_WRITE_OFF",
+  from_id: warehouseId,        // только from_id!
+  items: [{ product_id: "...", quantity: 2 }],
+  reason: "Transportda singan",  // обязательно, мин. 3 символа
+}).unwrap();
+```
+
+> **to_id не передаём** — бэкенд автоматически направит в VIRTUAL_LOSS.
+
+---
+
+#### 5. Boshlang'ich qoldiq (Начальные остатки)
+
+**Форма:** Ombor + Mahsulotlar
+
+```javascript
+await createTransfer({
+  type: "INITIAL_BALANCE",
+  to_id: warehouseId,          // только to_id!
+  items: [{ product_id: "...", quantity: 100 }],
+}).unwrap();
+```
+
+> **Было:** 3 вызова. **Стало:** 1 вызов. Без `virtualVendorId`.
+
+---
+
+#### 6. Zavodga jo'natish (Отправка на завод) — НОВЫЙ
+
+**Форма:** Ombor + Zavod + Mahsulotlar
+
+```javascript
+await createTransfer({
+  type: "FACTORY_SHIPMENT",
+  from_id: warehouseId,        // UUID склада
+  to_id: factoryId,            // UUID завода
+  items: [{ product_id: "...", quantity: 50 }],
+}).unwrap();
+```
+
+**Сценарий:** Складовщик грузит пустые бутыли в машину → фиксирует накладную. Машина едет на завод.
+
+---
+
+#### 7. Zavoddan qabul qilish (Приёмка с завода) — НОВЫЙ
+
+**Форма:** Zavod + Ombor + Mahsulotlar
+
+```javascript
+await createTransfer({
+  type: "FACTORY_RETURN",
+  from_id: factoryId,          // UUID завода
+  to_id: warehouseId,          // UUID склада
+  items: [{ product_id: "...", quantity: 50 }],
+}).unwrap();
+```
+
+**Сценарий:** Машина вернулась с завода с полной водой → складовщик принимает и фиксирует накладную.
+
+---
+
+#### 8. Zavoddan qabul (Обмен курьера на заводе) — БЕЗ ИЗМЕНЕНИЙ
+
+```javascript
+await factoryExchange({
+  courier_inventory_id: courierId,
+  factory_id: factoryId,
+  given_items: [{ product_id: "...", quantity: 10 }],
+  received_items: [{ product_id: "...", quantity: 10 }],
+}).unwrap();
+```
+
+---
+
+### Ответ API (TransferResponse)
+
+Новые поля в ответе:
+
+```json
+{
+  "id": "uuid",
+  "type": "COURIER_LOAD",
+  "status": "COMPLETED",
+  "from_id": "uuid",
+  "to_id": "uuid",
+  "created_by_id": "uuid",
+  "accepted_by_id": "uuid",
+  "items": [{ "product": { "id": "...", "name": "...", "type": "..." }, "quantity": 10 }],
+  "reason": null,              // ← НОВОЕ: причина списания (для LOSS_WRITE_OFF)
+  "route_sheet_id": null,      // ← НОВОЕ: ID маршрутного листа (для COURIER_LOAD)
+  "created_at": "2026-03-27T12:00:00Z"
+}
+```
+
+---
+
+### Полная таблица операций
+
+| # | Операция (UZ) | Тип | Форма | Endpoint |
+|---|---|---|---|---|
+| 1 | Yuklash | `COURIER_LOAD` | Ombor + Kuryer + Mahsulotlar | `POST /transfers/` |
+| 2 | Tushurib olish | — | Kuryer + Mahsulotlar + Naqd | `POST /shifts/close` |
+| 3 | Hisobga qo'shish | `INVENTORY_FINDING` | Ombor + Mahsulotlar | `POST /transfers/` |
+| 4 | Hisobdan chiqarish | `LOSS_WRITE_OFF` | Ombor + Mahsulotlar + Sabab | `POST /transfers/` |
+| 5 | Boshlang'ich qoldiq | `INITIAL_BALANCE` | Ombor + Mahsulotlar | `POST /transfers/` |
+| 6 | Zavodga jo'natish | `FACTORY_SHIPMENT` | Ombor + Zavod + Mahsulotlar | `POST /transfers/` |
+| 7 | Zavoddan qabul | `FACTORY_RETURN` | Zavod + Ombor + Mahsulotlar | `POST /transfers/` |
+| 8 | Zavod almashinuv | — | Kuryer + Zavod + 2 ro'yxat | `POST /shifts/factory-exchange` |
+
+---
+
+### Что нужно обновить в UI (Warehouse.jsx)
+
+#### Кнопки создания (CREATE_TYPES)
+
+Добавить 2 новые кнопки в массив `CREATE_TYPES`:
+
+```javascript
+const CREATE_TYPES = [
+  { key: "factory-receipt", label: "Zavoddan qabul", hint: "Zavod → Ombor (kuryer orqali)" },
+  { key: "load", label: "Yuklash", hint: "Ombor → Kuryer mashinasi" },
+  { key: "unload", label: "Tushurib olish", hint: "Kuryer mashinasi → Ombor" },
+  { key: "capitalize", label: "Hisobga qo'shish", hint: "Topilma — yangi tovar kiritish" },
+  { key: "loss", label: "Hisobdan chiqarish", hint: "Tovarni hisobdan chiqarish" },
+  { key: "initial-balance", label: "Boshlang'ich qoldiq", hint: "Dastlabki qoldiq kiritish" },
+  // ⬇ НОВЫЕ
+  { key: "factory-shipment", label: "Zavodga jo'natish", hint: "Ombor → Zavod (bo'sh idishlar)" },
+  { key: "factory-return", label: "Zavoddan qabul qilish", hint: "Zavod → Ombor (to'la suv)" },
+];
+```
+
+#### Новые case в handleSubmit
+
+```javascript
+case "factory-shipment": {
+  if (!warehouseId || !factoryId)
+    throw { local: "Ombor va zavodini tanlang" };
+  if (v.length === 0) throw { local: "Kamida bitta mahsulot qo'shing" };
+  await createTransfer({
+    type: "FACTORY_SHIPMENT",
+    from_id: warehouseId,
+    to_id: factoryId,
+    items: v,
+  }).unwrap();
+  break;
+}
+case "factory-return": {
+  if (!warehouseId || !factoryId)
+    throw { local: "Ombor va zavodini tanlang" };
+  if (v.length === 0) throw { local: "Kamida bitta mahsulot qo'shing" };
+  await createTransfer({
+    type: "FACTORY_RETURN",
+    from_id: factoryId,
+    to_id: warehouseId,
+    items: v,
+  }).unwrap();
+  break;
+}
+```
+
+#### Форма для factory-shipment / factory-return
+
+Показывать 2 select-а:
+- **Ombor** (select из warehousesApi)
+- **Zavod** (select из списка инвентарей с type=FACTORY)
+
+И стандартный список товаров (items).
+
+---
+
+### RTK Query — обновлённые хуки
+
+**transfersApi.js:**
+```javascript
+// Доступные хуки:
+useGetTransfersQuery()       // журнал
+useCreateTransferMutation()  // единый вызов для всех типов
+```
+
+**shiftsApi.js:**
+```javascript
+// Доступные хуки:
+useFactoryExchangeMutation() // обмен на заводе
+useCloseShiftMutation()      // закрытие смены
+```
+
+**Удалённые хуки (больше не экспортируются!):**
+- ~~`useLoadTruckMutation`~~ → использовать `useCreateTransferMutation`
+- ~~`useWriteOffLossMutation`~~ → использовать `useCreateTransferMutation`
+- ~~`useUpdateTransferItemsMutation`~~ → удалён (items передаются сразу)
+- ~~`useCompleteTransferMutation`~~ → удалён (накладная сразу COMPLETED)
+
+---
+
+### Журнал накладных (GET /transfers/)
+
+Ответ теперь включает `reason` и `route_sheet_id`. В таблице журнала можно:
+- Показывать `reason` для строк с `type === "LOSS_WRITE_OFF"`
+- Показывать новые типы `FACTORY_SHIPMENT` / `FACTORY_RETURN` с соответствующими лейблами
+
+---
+
+*При вопросах — смотри Swagger (`/docs`)*
 
 ---
 
 ## 2. Удалены TransferType
 
-Убраны из enum:
-- ~~`PURCHASE`~~
-- ~~`PRODUCTION`~~
-- ~~`WAREHOUSE_TRANSFER`~~
-
-**Что поменять на фронте:**
-- Убрать из select при создании накладной (wizard Step 1)
-- Убрать из фильтров, если есть
-- Убрать из маппинга `TransferType → label/цвет`
-
-Актуальные типы:
-
-| TransferType        | Отображение (UZ)        | Цвет    |
-| ------------------- | ----------------------- | ------- |
-| `FACTORY_RECEIPT`   | Qabul qilish (zavoddan) | Зелёный |
-| `COURIER_LOAD`      | Yuklanish               | Зелёный |
-| `COURIER_RETURN`    | Qaytarish               | Синий   |
-| `CLIENT_DELIVERY`   | Yetkazish               | Красный |
-| `CLIENT_RETURN`     | Tara olish              | Синий   |
-| `LOSS_WRITE_OFF`    | Hisobdan chiqarish      | Красный |
-| `INVENTORY_FINDING` | Topilma                 | Зелёный |
-| `INITIAL_BALANCE`   | Boshlang'ich qoldiq     | Серый   |
-
----
-
-## 3. Новый эндпоинт: `POST /api/v1/backoffice/shifts/factory-exchange`
-
-**Бизнес-сценарий:** Завсклад фиксирует обмен на заводе — курьер сдал пустые бутыли, забрал полные.
-
-### Запрос
-
-```json
-POST /api/v1/backoffice/shifts/factory-exchange
-
-{
-  "courier_inventory_id": "uuid — машина курьера",
-  "factory_id": "uuid — инвентарь завода (тип FACTORY)",
-  "given_items": [
-    { "product_id": "uuid — пустая тара", "quantity": 100 }
-  ],
-  "received_items": [
-    { "product_id": "uuid — полная вода", "quantity": 95 }
-  ]
-}
-```
-
-### Ответ
-
-```json
-// Успех: HTTP 200
-true
-
-// Ошибки:
-// 404 — INVENTORY_NOT_FOUND (курьер или завод не найден)
-// 409 — INSUFFICIENT_STOCK (у курьера нет столько товара для сдачи)
-//       { "error_code": "INSUFFICIENT_STOCK", "details": { "shortages": { "<product_id>": N } } }
-```
-
-### Что происходит на бэкенде
-
-Одна кнопка завсклада создаёт **3 накладные атомарно**:
-
-```
-① COURIER_RETURN:  Курьер → Завод    [given_items]      — пустые сданы
-② FACTORY_RECEIPT: V_VENDOR → Завод   [received_items]   — полные поступили
-③ COURIER_LOAD:   Завод → Курьер     [received_items]    — полные загружены
-```
-
-Все три видны в журнале накладных (`GET /transfers/`).
-
-### Требуется `INVENTORY_WRITE` scope (роль: Admin, Storekeeper)
-
----
-
-## 4. Поле `type` добавлено в баланс продуктов
-
-`ProductSimpleResponse` (используется в балансах складов, транспортов, накладных) теперь включает `type`:
-
-**Было:**
-```json
-{ "id": "uuid", "name": "Вода 19Л" }
-```
-
-**Стало:**
-```json
-{ "id": "uuid", "name": "Вода 19Л", "type": "water" }
-```
-
-Значения: `water`, `container`, `equipment`
-
-**Где используется:**
-- `GET /warehouses/{id}` → `balances[].product.type`
-- `GET /transports/{id}` → `balances[].product.type`
-- `GET /transfers/` → `items[].product.type`
-
-**Что поменять на фронте:**
-- В таблице остатков колонка "Turi" теперь берётся из `product.type` (раньше не было)
-- Маппинг: `water` → "Suv", `container` → "Idish", `equipment` → "Jihozlar"
-
----
-
-## 5. Полная карта API shifts
-
-| Метод | Эндпоинт                   | Описание                    | Когда                |
-| ----- | -------------------------- | --------------------------- | -------------------- |
-| POST  | `/shifts/load-truck`       | Загрузка курьера со склада  | Утро                 |
-| POST  | `/shifts/factory-exchange` | **НОВЫЙ** — Обмен на заводе | После рейса на завод |
-| POST  | `/shifts/loss`             | Списание потерь             | В любое время        |
-| POST  | `/shifts/close`            | Закрытие смены + инкассация | Вечер                |
-
----
-
-## 6. Полный цикл рейса на завод (UX)
-
-```
-Шаг 1: Завсклад → "Загрузить курьера"
-        POST /shifts/load-truck
-        { warehouse_id, courier_inventory_id, items: [пустые бутыли] }
-
-Шаг 2: Курьер едет на завод, обменивает пустые на полные
-
-Шаг 3: Завсклад → "Обмен на заводе"
-        POST /shifts/factory-exchange
-        { courier_inventory_id, factory_id, given_items: [пустые], received_items: [полные] }
-
-Шаг 4: Завсклад → "Закрыть смену"
-        POST /shifts/close
-        { courier_id, returned_inventory: [полные], cash_collected: 0 }
-```
-
----
-
-*При вопросах — смотри Swagger: `/docs#/shifts`*
-
----
-
-## 7. Продажа со склада (Warehouse Pickup Sales)
-
-**Дата:** 2026-03-27
-
-**Бизнес-сценарий:** Клиент приходит на склад, приносит пустую тару, покупает воду за наличку — без курьера.
-
----
-
-### 7.1 Новые поля в OrderResponse
-
-```json
-{
-  "id": "uuid",
-  "sale_type": "delivery",
-  "warehouse_id": null,
-  "status": "new",
-  ...
-}
-```
-
-| Поле | Тип | Описание |
-|------|-----|----------|
-| `sale_type` | `"delivery"` \| `"warehouse_pickup"` | Тип продажи. Для всех старых заказов — `"delivery"` |
-| `warehouse_id` | `uuid \| null` | ID склада (только для `warehouse_pickup`) |
-
-**Новый статус заказа:**
-
-| Код | Label (UZ) | Цвет |
-|-----|-----------|------|
-| `pickup_completed` | Skladdan berildi | Зелёный |
-
-**Новые типы накладных:**
-
-| TransferType | Отображение (UZ) | Цвет |
-|---|---|---|
-| `WAREHOUSE_SALE` | Skladdan sotish | Зелёный |
-| `WAREHOUSE_TARA_RETURN` | Tara qabul qilish | Синий |
-
----
-
-### 7.2 Новые API эндпоинты
-
-#### 7.2.1 Оприходование тары покупателя
-
-```
-POST /api/v1/backoffice/orders/warehouse-sale/capitalize-tara?clientId={uuid}
-```
-
-Если `clientId` не передан — используется системный Walk-in клиент (анонимная продажа).
-
-**Запрос:**
-```json
-{
-  "warehouse_id": "uuid — ID склада",
-  "items": [
-    { "product_id": "uuid — ID тары (пустая бутыль)", "quantity": 5 }
-  ]
-}
-```
-
-**Ответ (201):**
-```json
-{
-  "transfer_id": "uuid",
-  "capitalized_items": [
-    { "product_id": "uuid", "quantity": 5 }
-  ]
-}
-```
-
-**Ошибки:**
-- `404` — `INVENTORY_NOT_FOUND` (инвентарь клиента не найден)
-
----
-
-#### 7.2.2 Создание заказа на самовывоз
-
-```
-POST /api/v1/backoffice/orders/warehouse-sale?clientId={uuid}
-```
-
-Если `clientId` не передан — анонимная продажа (Walk-in).
-
-**Запрос:**
-```json
-{
-  "warehouse_id": "uuid",
-  "items": [
-    { "product_id": "uuid — вода", "quantity": 5 }
-  ],
-  "capitalize_missing_tara": false
-}
-```
-
-**Ответ (201):** Стандартный `OrderResponse` с:
-- `sale_type: "warehouse_pickup"`
-- `warehouse_id: "uuid"`
-- `status: "new"`
-- `payment_method: "cash"` (всегда)
-- `courier_id: null` (всегда)
-
-**Ошибки:**
-- `409` — `INSUFFICIENT_TARA` (недостаточно тары, если `capitalize_missing_tara=false`)
-- `409` — `PRODUCTS_UNAVAILABLE`
-- `409` — `EMPTY_CART`
-
----
-
-#### 7.2.3 Подтверждение выдачи (завершение продажи)
-
-```
-PATCH /api/v1/backoffice/orders/{orderId}/complete-pickup
-```
-
-**Запрос:** Без тела (пустой)
-
-**Ответ:** `OrderResponse` с `status: "pickup_completed"`
-
-**Что происходит на бэкенде:**
-1. Проверка остатков на складе
-2. `WAREHOUSE_SALE`: Склад → Клиент (товар)
-3. `WAREHOUSE_TARA_RETURN`: Клиент → Склад (пустая тара)
-4. Финансовая проводка: Revenue → Client → Cash (обе COMPLETED)
-
-**Ошибки:**
-- `404` — `ORDER_NOT_FOUND`
-- `409` — `INVALID_PICKUP_OPERATION` (заказ не самовывоз или не в статусе `new`)
-- `409` — `INSUFFICIENT_STOCK` (на складе нет товара)
-
----
-
-#### 7.2.4 Фильтрация заказов по типу продажи
-
-```
-GET /api/v1/backoffice/orders/?saleType=warehouse_pickup
-```
-
-Новый query-параметр `saleType`: `"delivery"` | `"warehouse_pickup"` | пусто (все)
-
----
-
-### 7.3 RTK Query — новые эндпоинты для ordersApi.js
-
-```javascript
-// В ordersApi.js добавить:
-
-// Оприходование тары покупателя
-capitalizeTaraForSale: builder.mutation({
-  query: ({ clientId, body }) => ({
-    url: `/api/v1/backoffice/orders/warehouse-sale/capitalize-tara${
-      clientId ? `?clientId=${clientId}` : ''
-    }`,
-    method: 'POST',
-    body,
-  }),
-}),
-
-// Создание заказа на самовывоз
-createWarehouseSale: builder.mutation({
-  query: ({ clientId, body }) => ({
-    url: `/api/v1/backoffice/orders/warehouse-sale${
-      clientId ? `?clientId=${clientId}` : ''
-    }`,
-    method: 'POST',
-    body,
-  }),
-  invalidatesTags: [{ type: 'Orders', id: 'LIST' }],
-}),
-
-// Подтверждение выдачи
-completePickup: builder.mutation({
-  query: (orderId) => ({
-    url: `/api/v1/backoffice/orders/${orderId}/complete-pickup`,
-    method: 'PATCH',
-  }),
-  invalidatesTags: (result, error, orderId) => [
-    { type: 'Orders', id: orderId },
-    { type: 'Orders', id: 'LIST' },
-  ],
-}),
-```
-
-Также обновить `searchOrders` — добавить `saleType` в params:
-```javascript
-searchOrders: builder.query({
-  query: ({ ..., saleType }) => ({
-    url: '/api/v1/backoffice/orders/',
-    params: { ..., saleType },
-  }),
-  ...
-}),
-```
-
----
 
 ### 7.4 Изменения в UI — Модалка создания заказа (Orders.jsx)
 
@@ -365,19 +350,13 @@ searchOrders: builder.query({
 
 ```
 ┌─────────────────────────────────┐
-│  [🚗 Yetkazish]  [🏢 Skladdan] │   ← сегментированный контрол
+│  [🚗 Yetkazish]  [🏢 Skladdan]  │   ← сегментированный контрол
 └─────────────────────────────────┘
 ```
 
 - `"Yetkazish"` (Доставка) — текущий flow, по умолчанию
 - `"Skladdan sotish"` (Со склада) — новый flow
 
-**State:**
-```javascript
-const [saleMode, setSaleMode] = useState('delivery') // 'delivery' | 'warehouse_pickup'
-```
-
-При переключении — сбрасывать форму (очищать выбранные товары, клиента, склад).
 
 ---
 
@@ -387,81 +366,14 @@ const [saleMode, setSaleMode] = useState('delivery') // 'delivery' | 'warehouse_
 
 **Правая панель — меняется:**
 
-| Поле | Режим "Yetkazish" | Режим "Skladdan" |
-|------|---|---|
-| Mijoz (Клиент) | Обязательный combobox | **Опциональный** combobox + чекбокс "Anonim sotish" |
-| Manzil (Адрес) | Select из inventories клиента | **Скрыт** |
-| Ombor (Склад) | Скрыт | **Новый select** — выбор склада |
-| To'lov turi | cash/card/contract | **Скрыт** (всегда cash) |
-| Tara checkbox | "Mijoz taralarini hisobga kiritish" | **"Tara qabul qilish"** (оприходовать тару покупателя) |
+| Поле           | Режим "Yetkazish"                   | Режим "Skladdan"                                       |
+| -------------- | ----------------------------------- | ------------------------------------------------------ |
+| Mijoz (Клиент) | Обязательный combobox               | **Опциональный** combobox + чекбокс "Anonim sotish"    |
+| Manzil (Адрес) | Select из inventories клиента       | **Скрыт**                                              |
+| Ombor (Склад)  | Скрыт                               | **Новый select** — выбор склада                        |
+| To'lov turi    | cash/card/contract                  | **Скрыт** (всегда cash)                                |
+| Tara checkbox  | "Mijoz taralarini hisobga kiritish" | **"Tara qabul qilish"** (оприходовать тару покупателя) |
 
-**Новый flow правой панели для "Skladdan":**
-
-```
-┌──────────────────────────────────┐
-│  ☐ Anonim sotish                 │  ← чекбокс, по умолчанию ВКЛ
-│                                  │
-│  Mijoz: [поиск клиента ▾]       │  ← скрыт, если "Anonim" включен
-│                                  │
-│  Ombor: [Основной склад    ▾]   │  ← новый select (useGetWarehousesQuery)
-│                                  │
-│  ─── Tara ───────────────────    │
-│  ☑ Tara qabul qilish            │  ← чекбокс (оприходовать тару)
-│    Suv idishi 19L: [5] [-][+]   │  ← ввод количества тары (если включен)
-│                                  │
-│  ─── Jami ───────────────────    │
-│  💰 125 000 so'm                 │
-│                                  │
-│  [ Sotish ]                      │  ← кнопка "Продать"
-└──────────────────────────────────┘
-```
-
----
-
-#### Шаг 3: Логика кнопки "Sotish" (Продать)
-
-```javascript
-async function handleWarehouseSale() {
-  try {
-    // 1. Если тара включена — сначала оприходуем
-    if (acceptTara && taraItems.length > 0) {
-      await capitalizeTaraForSale({
-        clientId: isAnonymous ? null : selectedClientId,
-        body: {
-          warehouse_id: selectedWarehouseId,
-          items: taraItems, // [{product_id, quantity}]
-        },
-      }).unwrap()
-    }
-
-    // 2. Создаём заказ
-    const order = await createWarehouseSale({
-      clientId: isAnonymous ? null : selectedClientId,
-      body: {
-        warehouse_id: selectedWarehouseId,
-        items: selectedItems,
-        capitalize_missing_tara: false, // тару уже оприходовали выше
-      },
-    }).unwrap()
-
-    // 3. Сразу подтверждаем выдачу
-    await completePickup(order.id).unwrap()
-
-    toast.success('Sotildi!') // "Продано!"
-    setCreateOpen(false)
-    resetForm()
-
-  } catch (err) {
-    if (err?.data?.error_code === 'INSUFFICIENT_TARA') {
-      toast.error('Mijozda yetarli tara yo\'q')
-    } else if (err?.data?.error_code === 'INSUFFICIENT_STOCK') {
-      toast.error('Omborda yetarli tovar yo\'q')
-    } else {
-      toast.error('Xatolik yuz berdi')
-    }
-  }
-}
-```
 
 **Важно:** Все 3 вызова последовательны. Если шаг 1 или 2 упал — не продолжать.
 
@@ -471,9 +383,6 @@ async function handleWarehouseSale() {
 
 Когда чекбокс "Tara qabul qilish" включен, показать отдельный мини-список **только тарных позиций** из каталога (фильтр `product.type === 'container'`):
 
-```javascript
-const taraProducts = catalog?.filter(p => p.type === 'container' && p.is_active)
-```
 
 Для каждой тары — степпер количества (как в основном каталоге). Эти `taraItems` передаются в `capitalize-tara`, а **не** в основной заказ.
 
@@ -485,24 +394,17 @@ const taraProducts = catalog?.filter(p => p.type === 'container' && p.is_active)
 
 Добавить dropdown-фильтр рядом с фильтром оплаты:
 
-| Значение | Label (UZ) |
-|----------|-----------|
-| *пусто* | Hammasi (все) |
-| `delivery` | Yetkazish (доставка) |
+| Значение           | Label (UZ)           |
+| ------------------ | -------------------- |
+| *пусто*            | Hammasi (все)        |
+| `delivery`         | Yetkazish (доставка) |
 | `warehouse_pickup` | Skladdan (со склада) |
 
-Передавать `saleType` в `useSearchOrdersQuery`.
 
 #### 7.5.2 Новый статус в таблице
 
 В маппинг статусов добавить:
 
-```javascript
-const STATUS_MAP = {
-  ...existing,
-  pickup_completed: { label: 'Skladdan berildi', color: '#22c55e' },
-}
-```
 
 #### 7.5.3 Колонка "Курьер" для pickup-заказов
 
@@ -559,16 +461,7 @@ const STATUS_MAP = {
 └────────────────────────────────────────────────────────────────┘
 ```
 
----
-
-### 7.8 Файлы для изменения
-
-| Файл | Что сделать |
-|------|------------|
-| `frontend/src/services/ordersApi.js` | Добавить 3 mutation + saleType в searchOrders |
-| `frontend/src/pages/Orders.jsx` | Переключатель режима, форма склада, логика продажи |
-| `frontend/src/pages/Orders.module.css` | Стили для переключателя, формы склада |
 
 ---
 
-*При вопросах — смотри Swagger: `/docs#/Backoffice%20%7C%20Orders`*
+*При вопросах — смотри Swagger
