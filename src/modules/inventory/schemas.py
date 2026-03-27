@@ -5,6 +5,7 @@ from typing import Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from src.modules.catalog.enums import ProductType
 from src.modules.catalog.schemas import ProductResponse
 from src.modules.inventory.enums import (
     InventoryType,
@@ -59,9 +60,7 @@ class Item(BaseModel):
     """Стандартная единица измерения передачи товара."""
 
     product_id: uuid.UUID
-    quantity: int = Field(
-        gt=0, description="Количество товара (строго больше нуля)"
-    )
+    quantity: int = Field(gt=0, description="Количество товара (строго больше нуля)")
 
 
 class AdjustmentItem(BaseModel):
@@ -111,9 +110,7 @@ class FactoryRefillRequest(BaseModel):
     warehouse_id: uuid.UUID
     factory_id: uuid.UUID = Field(description="ID Завода (Скважины)")
     water_id: uuid.UUID = Field(description="ID продукта 'Вода' (сырье)")
-    bottle_id: uuid.UUID = Field(
-        description="ID продукта 'Пустая бутыль' (тара)"
-    )
+    bottle_id: uuid.UUID = Field(description="ID продукта 'Пустая бутыль' (тара)")
     quantity: int = Field(gt=0, description="Сколько бутылей воды разлито")
 
 
@@ -234,6 +231,7 @@ class StockTransferItemResponse(BaseModel):
 class ProductSimpleResponse(BaseModel):
     id: uuid.UUID
     name: str
+    type: ProductType
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -264,9 +262,7 @@ class UpdateItemQuantityDto(BaseModel):
 class CapitalizeTaraItem(BaseModel):
     """Позиция оприходования: ID тары и количество."""
 
-    product_id: uuid.UUID = Field(
-        description="ID возвратной тары (пустая бутыль)"
-    )
+    product_id: uuid.UUID = Field(description="ID возвратной тары (пустая бутыль)")
     quantity: int = Field(gt=0, description="Количество единиц тары")
 
 
@@ -321,12 +317,8 @@ class TransportCreate(BaseModel):
 
 
 class TransportUpdate(BaseModel):
-    user_id: uuid.UUID | None = Field(
-        None, description="Новый ответственный курьер"
-    )
-    name: str | None = Field(
-        None, max_length=255, description="Новое название"
-    )
+    user_id: uuid.UUID | None = Field(None, description="Новый ответственный курьер")
+    name: str | None = Field(None, max_length=255, description="Новое название")
 
 
 class TransportResponse(BaseModel):
@@ -346,9 +338,7 @@ class TransportDetailResponse(TransportResponse):
 
 
 class WarehouseCreate(BaseModel):
-    user_id: uuid.UUID = Field(
-        ..., description="ID материально ответственного"
-    )
+    user_id: uuid.UUID = Field(..., description="ID материально ответственного")
     name: str = Field(..., max_length=255)
 
 
@@ -383,9 +373,7 @@ class TransferItemCreate(BaseModel):
 
 
 class TransferCompleteRequest(BaseModel):
-    accepted_by_id: uuid.UUID = Field(
-        ..., description="Кто физически принял товар"
-    )
+    accepted_by_id: uuid.UUID = Field(..., description="Кто физически принял товар")
 
 
 class TransferItemResponse(BaseModel):
@@ -404,5 +392,6 @@ class TransferResponse(BaseModel):
     status: TransferStatus
     type: TransferType
     items: list[TransferItemResponse] = []
+    created_at: datetime | None = None
 
     model_config = ConfigDict(from_attributes=True)

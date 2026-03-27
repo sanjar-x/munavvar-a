@@ -31,24 +31,20 @@ class InventoryRepository(BaseRepository[Inventory]):
     async def create_courier_inventory(
         self, user_id: uuid.UUID, inventory_name: str
     ) -> Inventory:
-        return await self.add(
-            {
-                "user_id": user_id,
-                "type": InventoryType.COURIER,
-                "name": inventory_name,
-            }
-        )
+        return await self.add({
+            "user_id": user_id,
+            "type": InventoryType.COURIER,
+            "name": inventory_name,
+        })
 
     async def create_client_inventory(
         self, user_id: uuid.UUID, inventory_name: str
     ) -> Inventory:
-        return await self.add(
-            {
-                "user_id": user_id,
-                "type": InventoryType.CLIENT,
-                "name": inventory_name,
-            }
-        )
+        return await self.add({
+            "user_id": user_id,
+            "type": InventoryType.CLIENT,
+            "name": inventory_name,
+        })
 
     async def get_system_inventory(
         self, inv_type: InventoryType, with_for_update: bool = False
@@ -79,11 +75,7 @@ class InventoryRepository(BaseRepository[Inventory]):
                 self.model.type == InventoryType.COURIER,
                 self.model.is_active.is_(True),
             )
-            .options(
-                selectinload(self.model.balances).joinedload(
-                    attr=Balance.product
-                )
-            )
+            .options(selectinload(self.model.balances).joinedload(attr=Balance.product))
         )
         result = await self.session.execute(query)
         return result.unique().scalar_one_or_none()
@@ -169,9 +161,7 @@ class InventoryRepository(BaseRepository[Inventory]):
                 self.model.type == InventoryType.WAREHOUSE,
                 self.model.is_active.is_(True),
             )
-            .options(
-                selectinload(self.model.balances).joinedload(Balance.product)
-            )
+            .options(selectinload(self.model.balances).joinedload(Balance.product))
         )
         result = await self.session.execute(query)
         return result.unique().scalars().all()
@@ -186,9 +176,7 @@ class StockTransferRepository(BaseRepository[StockTransfer]):
     def __init__(self, session: AsyncSession):
         super().__init__(model=StockTransfer, session=session)
 
-    async def get_with_items(
-        self, transfer_id: uuid.UUID
-    ) -> StockTransfer | None:
+    async def get_with_items(self, transfer_id: uuid.UUID) -> StockTransfer | None:
         query = (
             select(StockTransfer)
             .where(StockTransfer.id == transfer_id)
@@ -209,18 +197,14 @@ class StockTransferRepository(BaseRepository[StockTransfer]):
         result = await self.session.execute(query)
         return result.scalar_one_or_none()
 
-    async def get_transfer(
-        self, transfer_id: uuid.UUID
-    ) -> StockTransfer | None:
+    async def get_transfer(self, transfer_id: uuid.UUID) -> StockTransfer | None:
         query = (
             select(StockTransfer)
             .where(StockTransfer.id == transfer_id)
             .options(
                 joinedload(StockTransfer.from_inventory),
                 joinedload(StockTransfer.to_inventory),
-                selectinload(StockTransfer.items).joinedload(
-                    StockTransferItem.product
-                ),
+                selectinload(StockTransfer.items).joinedload(StockTransferItem.product),
             )
         )
 
@@ -267,12 +251,11 @@ class StockTransferRepository(BaseRepository[StockTransfer]):
             query = query.where(self.model.created_at <= date_to)
 
         query = (
-            query.options(
+            query
+            .options(
                 joinedload(self.model.from_inventory),
                 joinedload(self.model.to_inventory),
-                selectinload(StockTransfer.items).joinedload(
-                    StockTransferItem.product
-                ),
+                selectinload(StockTransfer.items).joinedload(StockTransferItem.product),
             )
             .order_by(self.model.created_at.desc())
             .offset(skip)
@@ -380,9 +363,7 @@ class StockTransactionRepository(BaseRepository[StockTransaction]):
         result = await self.session.execute(query)
         return result.scalar() or 0
 
-    async def get_balances(
-        self, inventory_id: uuid.UUID
-    ) -> list[dict[str, Any]]:
+    async def get_balances(self, inventory_id: uuid.UUID) -> list[dict[str, Any]]:
         balance_expr = func.sum(
             case(
                 (self.model.to_id == inventory_id, self.model.quantity),
