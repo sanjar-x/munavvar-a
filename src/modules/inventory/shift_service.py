@@ -11,13 +11,10 @@ from src.modules.inventory.enums import (
 from src.modules.inventory.exceptions import (
     InsufficientStockError,
     InventoryNotFoundError,
-    InventoryTypeMismatchError,
 )
 from src.modules.inventory.schemas import (
     CloseShiftRequest,
     FactoryExchangeRequest,
-    LoadCourierTruckRequest,
-    LossWriteOffRequest,
 )
 from src.modules.inventory.uow import InventoryUnitOfWork
 
@@ -25,145 +22,6 @@ from src.modules.inventory.uow import InventoryUnitOfWork
 class ShiftService:
     def __init__(self, uow: InventoryUnitOfWork):
         self.uow = uow
-
-    async def load_courier_truck(
-        self,
-        request: LoadCourierTruckRequest,
-        loaded_by_id: uuid.UUID,
-    ) -> bool:
-        """
-        Утренняя загрузка машины курьера:
-        1. Проверка остатков на складе
-        2. Перемещение товаров: Склад → Машина курьера (COURIER_LOAD)
-        """
-        async with self.uow:
-            # 1. Захватываем блокировку на склад и получаем остатки
-            warehouse = await self.uow.inventories.get_inventory_with_balances(
-                request.warehouse_id,
-                inv_type=InventoryType.WAREHOUSE,
-                with_for_update=True,
-            )
-            if not warehouse:
-                raise InventoryNotFoundError(inventory_id=request.warehouse_id)
-
-            # 2. Проверяем достаточность остатков на складе
-            warehouse_balances = {b.product_id: b.quantity for b in warehouse.balances}
-            shortages: dict[uuid.UUID, int] = {}
-            for item in request.items:
-                available = warehouse_balances.get(item.product_id, 0)
-                if available < item.quantity:
-                    shortages[item.product_id] = item.quantity - available
-            if shortages:
-                raise InsufficientStockError(shortages=shortages)
-
-            # 3. Получаем инвентарь (машину) курьера
-            courier_inventory = await self.uow.inventories.get_inventory_with_balances(
-                request.courier_inventory_id,
-                inv_type=InventoryType.COURIER,
-            )
-            if not courier_inventory:
-                raise InventoryNotFoundError(inventory_id=request.courier_inventory_id)
-
-            # 4. Создаем накладную на загрузку (WAREHOUSE → COURIER)
-            transfer = await self.uow.transfers.add({
-                "from_id": warehouse.id,
-                "to_id": courier_inventory.id,
-                "type": TransferType.COURIER_LOAD,
-                "status": TransferStatus.COMPLETED,
-                "created_by_id": loaded_by_id,
-                "accepted_by_id": loaded_by_id,
-            })
-
-            # 5. Строки накладной и проводки в леджере
-            for item in request.items:
-                await self.uow.transfer_items.add({
-                    "transfer_id": transfer.id,
-                    "product_id": item.product_id,
-                    "quantity": item.quantity,
-                })
-                await self.uow.transactions.add({
-                    "product_id": item.product_id,
-                    "transfer_id": transfer.id,
-                    "from_id": warehouse.id,
-                    "to_id": courier_inventory.id,
-                    "quantity": item.quantity,
-                })
-
-            await self.uow.commit()
-            return True
-
-    async def write_off_loss(
-        self,
-        request: LossWriteOffRequest,
-        created_by_id: uuid.UUID,
-    ) -> bool:
-        """
-        Списание потерянного/разбитого товара (LOSS_WRITE_OFF):
-        1. Проверка остатков на инвентаре-отправителе
-        2. Перемещение в виртуальный склад потерь: Source → VIRTUAL_LOSS
-        """
-        async with self.uow:
-            # 1. Захватываем блокировку на инвентарь-отправитель
-            from_inventory = await self.uow.inventories.get_inventory_with_balances(
-                request.from_inventory_id,
-                with_for_update=True,
-            )
-            if not from_inventory:
-                raise InventoryNotFoundError(inventory_id=request.from_inventory_id)
-
-            # Только WAREHOUSE или COURIER могут списывать потери
-            if from_inventory.type not in (
-                InventoryType.WAREHOUSE,
-                InventoryType.COURIER,
-            ):
-                raise InventoryTypeMismatchError(
-                    inventory_id=from_inventory.id,
-                    expected_type="WAREHOUSE or COURIER",
-                    actual_type=from_inventory.type,
-                )
-
-            # 2. Проверяем достаточность остатков
-            balances = {b.product_id: b.quantity for b in from_inventory.balances}
-            shortages: dict[uuid.UUID, int] = {}
-            for item in request.items:
-                available = balances.get(item.product_id, 0)
-                if available < item.quantity:
-                    shortages[item.product_id] = item.quantity - available
-            if shortages:
-                raise InsufficientStockError(shortages=shortages)
-
-            # 3. Получаем виртуальный склад потерь
-            loss_inventory = await self.uow.inventories.get_system_inventory(
-                InventoryType.VIRTUAL_LOSS
-            )
-
-            # 4. Создаем накладную на списание
-            transfer = await self.uow.transfers.add({
-                "from_id": from_inventory.id,
-                "to_id": loss_inventory.id,
-                "type": TransferType.LOSS_WRITE_OFF,
-                "status": TransferStatus.COMPLETED,
-                "created_by_id": created_by_id,
-                "accepted_by_id": created_by_id,
-            })
-
-            # 5. Строки накладной и проводки в леджере
-            for item in request.items:
-                await self.uow.transfer_items.add({
-                    "transfer_id": transfer.id,
-                    "product_id": item.product_id,
-                    "quantity": item.quantity,
-                })
-                await self.uow.transactions.add({
-                    "product_id": item.product_id,
-                    "transfer_id": transfer.id,
-                    "from_id": from_inventory.id,
-                    "to_id": loss_inventory.id,
-                    "quantity": item.quantity,
-                })
-
-            await self.uow.commit()
-            return True
 
     async def factory_exchange(
         self,
