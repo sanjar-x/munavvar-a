@@ -12,6 +12,8 @@ from src.modules.inventory.enums import (
 from src.modules.inventory.exceptions import (
     CourierAlreadyAssignedError,
     InventoryNotFoundError,
+    InventoryTypeMismatchError,
+    RouteLoopError,
 )
 from src.modules.inventory.schemas import (
     CapitalizeDeficitRequest,
@@ -24,6 +26,59 @@ from src.modules.inventory.schemas import (
     WarehouseCreate,
 )
 from src.modules.inventory.uow import InventoryUnitOfWork
+
+# Допустимые маршруты для каждого типа накладной:
+# (множество разрешённых типов отправителя, множество разрешённых типов получателя)
+_VALID_ROUTES: dict[
+    TransferType, tuple[frozenset[InventoryType], frozenset[InventoryType]]
+] = {
+    TransferType.FACTORY_RECEIPT: (
+        frozenset({InventoryType.VIRTUAL_VENDOR}),
+        frozenset({InventoryType.WAREHOUSE}),
+    ),
+    TransferType.PURCHASE: (
+        frozenset({InventoryType.VIRTUAL_VENDOR}),
+        frozenset({InventoryType.WAREHOUSE}),
+    ),
+    TransferType.PRODUCTION: (
+        frozenset({InventoryType.WAREHOUSE}),
+        frozenset({InventoryType.WAREHOUSE}),
+    ),
+    TransferType.COURIER_LOAD: (
+        frozenset({InventoryType.WAREHOUSE}),
+        frozenset({InventoryType.COURIER}),
+    ),
+    TransferType.COURIER_RETURN: (
+        frozenset({InventoryType.COURIER}),
+        frozenset({InventoryType.WAREHOUSE}),
+    ),
+    TransferType.CLIENT_DELIVERY: (
+        frozenset({InventoryType.COURIER}),
+        frozenset({InventoryType.CLIENT}),
+    ),
+    TransferType.CLIENT_RETURN: (
+        frozenset({InventoryType.CLIENT}),
+        frozenset({InventoryType.COURIER}),
+    ),
+    TransferType.WAREHOUSE_TRANSFER: (
+        frozenset({InventoryType.WAREHOUSE}),
+        frozenset({InventoryType.WAREHOUSE}),
+    ),
+    TransferType.LOSS_WRITE_OFF: (
+        frozenset({InventoryType.WAREHOUSE, InventoryType.COURIER}),
+        frozenset({InventoryType.VIRTUAL_LOSS}),
+    ),
+    TransferType.INVENTORY_FINDING: (
+        frozenset({InventoryType.VIRTUAL_VENDOR}),
+        frozenset({InventoryType.WAREHOUSE, InventoryType.COURIER}),
+    ),
+    TransferType.INITIAL_BALANCE: (
+        frozenset({InventoryType.VIRTUAL_VENDOR}),
+        frozenset(
+            {InventoryType.CLIENT, InventoryType.WAREHOUSE, InventoryType.COURIER}
+        ),
+    ),
+}
 
 
 class TransportService:
@@ -193,7 +248,34 @@ class StockTransferService:
         self, created_by_id: uuid.UUID, schema: TransferCreate
     ) -> StockTransfer:
         async with self.uow:
-            # TODO: Validate inventories exist and types match the business logic
+            # Защита от «петли» (отправка самому себе)
+            if schema.from_id == schema.to_id:
+                raise RouteLoopError(inventory_id=schema.from_id)
+
+            # Проверяем существование складов и соответствие маршрута типу накладной
+            from_inventory = await self.uow.inventories.get(schema.from_id)
+            if not from_inventory:
+                raise InventoryNotFoundError(inventory_id=schema.from_id)
+            to_inventory = await self.uow.inventories.get(schema.to_id)
+            if not to_inventory:
+                raise InventoryNotFoundError(inventory_id=schema.to_id)
+
+            route = _VALID_ROUTES.get(schema.type)
+            if route:
+                allowed_from, allowed_to = route
+                if from_inventory.type not in allowed_from:
+                    raise InventoryTypeMismatchError(
+                        inventory_id=from_inventory.id,
+                        expected_type=str(allowed_from),
+                        actual_type=from_inventory.type,
+                    )
+                if to_inventory.type not in allowed_to:
+                    raise InventoryTypeMismatchError(
+                        inventory_id=to_inventory.id,
+                        expected_type=str(allowed_to),
+                        actual_type=to_inventory.type,
+                    )
+
             transfer = await self.uow.transfers.add(
                 {
                     "from_id": schema.from_id,
@@ -254,21 +336,23 @@ class StockTransferService:
                 raise ValueError("Only draft transfers can be completed")
 
             # 1. Захватываем блокировку на инвентарь-отправитель (Race Condition Protection)
-            await self.uow.inventories.get_inventory_with_balances(
+            from_inventory = await self.uow.inventories.get_inventory_with_balances(
                 transfer.from_id, with_for_update=True
             )
 
             # 2. Validate balances in from_inventory
-            product_ids = [item.product_id for item in transfer.items]
-            balances = await self.uow.transactions.get_balances_for_products(
-                transfer.from_id, product_ids
-            )
+            # VIRTUAL_VENDOR — бесконечный виртуальный источник, проверка остатков не применима
+            if from_inventory and from_inventory.type != InventoryType.VIRTUAL_VENDOR:
+                product_ids = [item.product_id for item in transfer.items]
+                balances = await self.uow.transactions.get_balances_for_products(
+                    transfer.from_id, product_ids
+                )
 
-            for item in transfer.items:
-                if balances.get(item.product_id, 0) < item.quantity:
-                    raise ValueError(
-                        f"Insufficient balance for product {item.product.name}"
-                    )
+                for item in transfer.items:
+                    if balances.get(item.product_id, 0) < item.quantity:
+                        raise ValueError(
+                            f"Insufficient balance for product {item.product.name}"
+                        )
 
             # 2. Create StockTransactions
             for item in transfer.items:

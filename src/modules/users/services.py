@@ -126,9 +126,9 @@ class UserService(BaseService[User, UserAdminCreate, UserUnitOfWork]):
                     {
                         "from_id": vendor_inv.id,
                         "to_id": inventory.id,
-                        "type": TransferType.FACTORY_RECEIPT,
+                        "type": TransferType.INITIAL_BALANCE,
                         "status": TransferStatus.COMPLETED,
-                        "created_by_id": user.id,  # Условно
+                        "created_by_id": user.id,
                         "accepted_by_id": user.id,
                     }
                 )

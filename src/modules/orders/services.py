@@ -13,6 +13,7 @@ from src.modules.inventory.enums import (
     TransferType,
 )
 from src.modules.orders.enums import OrderStatus, PaymentMethod
+from src.modules.inventory.exceptions import InsufficientStockError
 from src.modules.orders.exceptions import (
     CannotRemoveLastItemError,
     ClientInventoryNotFoundError,
@@ -454,18 +455,40 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
                         item.id, item.quantity
                     )
 
+                # Только фактически доставленные позиции входят в сумму
                 new_total += item.unit_price * item.quantity
 
             # Обновляем итоговую сумму заказа
             order.total_amount = new_total
             await self.uow.orders.update(order.id, {"total_amount": new_total})
 
-        # Получаем активный инвентарь (машину) курьера
-        courier_inventory = await self.uow.inventories.get_courier_inventory(
+        # Получаем активный инвентарь (машину) курьера (поиск по user_id)
+        courier_inv_row = await self.uow.inventories.get_courier_inventory(
             order.courier_id
+        )
+        if not courier_inv_row:
+            raise ValueError("У курьера нет активного инвентаря (машины)")
+
+        # Повторно получаем с блокировкой и актуальными остатками
+        courier_inventory = (
+            await self.uow.inventories.get_inventory_with_balances(
+                courier_inv_row.id, with_for_update=True
+            )
         )
         if not courier_inventory:
             raise ValueError("У курьера нет активного инвентаря (машины)")
+
+        # Проверяем наличие товаров у курьера перед доставкой
+        courier_balances = {
+            b.product_id: b.quantity for b in courier_inventory.balances
+        }
+        stock_shortages: dict[uuid.UUID, int] = {}
+        for item in order.items:
+            available = courier_balances.get(item.product_id, 0)
+            if available < item.quantity:
+                stock_shortages[item.product_id] = item.quantity - available
+        if stock_shortages:
+            raise InsufficientStockError(shortages=stock_shortages)
 
         # 1. Создаем накладную на доставку (Full Water OUT)
         delivery_transfer = await self.uow.transfers.add(
@@ -481,16 +504,17 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
         )
 
         # 2. Создаем накладную на возврат тары (Empty Water IN)
-        # Сначала проверим, какие товары в заказе имеют возвратную тару
-        returnable_items = []
+        # Агрегируем тару по product_id (несколько позиций могут требовать одну тару)
+        # Пропускаем позиции с quantity=0 (товар не был доставлен)
+        returnable_map: dict[uuid.UUID, int] = {}
         for item in order.items:
-            if item.product.returnable_item_id:
-                returnable_items.append(
-                    {
-                        "product_id": item.product.returnable_item_id,
-                        "quantity": item.quantity,
-                    }
-                )
+            if item.product.returnable_item_id and item.quantity > 0:
+                tare_id = item.product.returnable_item_id
+                returnable_map[tare_id] = returnable_map.get(tare_id, 0) + item.quantity
+        returnable_items = [
+            {"product_id": pid, "quantity": qty}
+            for pid, qty in returnable_map.items()
+        ]
 
         return_transfer = None
         if returnable_items:
@@ -507,8 +531,10 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
             )
 
         # 3. Строки накладных и проводки в леджере
-        # а) Доставка: Курьер → Клиент
+        # а) Доставка: Курьер → Клиент (пропускаем позиции с quantity=0)
         for item in order.items:
+            if item.quantity == 0:
+                continue
             await self.uow.transfer_items.add(
                 {
                     "transfer_id": delivery_transfer.id,
@@ -565,7 +591,10 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
             order.client_id
         )
         if not client_account:
-            return
+            raise ValueError(
+                f"Финансовый счет клиента {order.client_id} не найден. "
+                "Создайте счет перед обработкой заказа."
+            )
         revenue_account = await self.uow.accounts.get_system_revenue_account()
 
         # Долг клиенту (balance обновит триггер при INSERT)

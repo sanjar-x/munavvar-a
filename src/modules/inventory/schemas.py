@@ -148,6 +148,20 @@ class CloseShiftRequest(BaseModel):
     cash_collected: float = Field(ge=0, description="Сумма собранных наличных")
 
 
+class LossWriteOffRequest(BaseModel):
+    """Списание потерянного или разбитого товара (LOSS_WRITE_OFF)."""
+
+    from_inventory_id: uuid.UUID = Field(
+        description="ID склада или машины, откуда производится списание"
+    )
+    items: list[Item] = Field(min_length=1)
+    reason: str = Field(
+        min_length=3,
+        max_length=255,
+        description="Причина списания (напр. 'Разбито при транспортировке')",
+    )
+
+
 # ==========================================
 # 4. ОТВЕТЫ API (RESPONSES)
 # ==========================================
