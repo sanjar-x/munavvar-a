@@ -551,6 +551,12 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
             if not order:
                 raise OrderNotFoundError(order_id=order_id)
 
+            if order.sale_type == SaleType.WAREHOUSE_PICKUP:
+                raise InvalidPickupOperationError(
+                    order_id=order_id,
+                    reason="Заказ самовывоза не может быть назначен курьеру",
+                )
+
             if order.status in (OrderStatus.DELIVERED, OrderStatus.CANCELLED):
                 raise CourierAssignmentError(
                     order_id=order_id,
