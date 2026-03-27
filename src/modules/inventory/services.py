@@ -34,23 +34,15 @@ _VALID_ROUTES: dict[
 ] = {
     TransferType.FACTORY_RECEIPT: (
         frozenset({InventoryType.VIRTUAL_VENDOR}),
-        frozenset({InventoryType.WAREHOUSE}),
-    ),
-    TransferType.PURCHASE: (
-        frozenset({InventoryType.VIRTUAL_VENDOR}),
-        frozenset({InventoryType.WAREHOUSE}),
-    ),
-    TransferType.PRODUCTION: (
-        frozenset({InventoryType.WAREHOUSE}),
-        frozenset({InventoryType.WAREHOUSE}),
+        frozenset({InventoryType.WAREHOUSE, InventoryType.FACTORY}),
     ),
     TransferType.COURIER_LOAD: (
-        frozenset({InventoryType.WAREHOUSE}),
+        frozenset({InventoryType.WAREHOUSE, InventoryType.FACTORY}),
         frozenset({InventoryType.COURIER}),
     ),
     TransferType.COURIER_RETURN: (
         frozenset({InventoryType.COURIER}),
-        frozenset({InventoryType.WAREHOUSE}),
+        frozenset({InventoryType.WAREHOUSE, InventoryType.FACTORY}),
     ),
     TransferType.CLIENT_DELIVERY: (
         frozenset({InventoryType.COURIER}),
@@ -60,17 +52,13 @@ _VALID_ROUTES: dict[
         frozenset({InventoryType.CLIENT}),
         frozenset({InventoryType.COURIER}),
     ),
-    TransferType.WAREHOUSE_TRANSFER: (
-        frozenset({InventoryType.WAREHOUSE}),
-        frozenset({InventoryType.WAREHOUSE}),
-    ),
     TransferType.LOSS_WRITE_OFF: (
-        frozenset({InventoryType.WAREHOUSE, InventoryType.COURIER}),
+        frozenset({InventoryType.WAREHOUSE, InventoryType.COURIER, InventoryType.FACTORY}),
         frozenset({InventoryType.VIRTUAL_LOSS}),
     ),
     TransferType.INVENTORY_FINDING: (
         frozenset({InventoryType.VIRTUAL_VENDOR}),
-        frozenset({InventoryType.WAREHOUSE, InventoryType.COURIER}),
+        frozenset({InventoryType.WAREHOUSE, InventoryType.COURIER, InventoryType.FACTORY}),
     ),
     TransferType.INITIAL_BALANCE: (
         frozenset({InventoryType.VIRTUAL_VENDOR}),
@@ -78,6 +66,7 @@ _VALID_ROUTES: dict[
             InventoryType.CLIENT,
             InventoryType.WAREHOUSE,
             InventoryType.COURIER,
+            InventoryType.FACTORY,
         }),
     ),
 }

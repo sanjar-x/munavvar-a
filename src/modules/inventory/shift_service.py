@@ -15,6 +15,7 @@ from src.modules.inventory.exceptions import (
 )
 from src.modules.inventory.schemas import (
     CloseShiftRequest,
+    FactoryExchangeRequest,
     LoadCourierTruckRequest,
     LossWriteOffRequest,
 )
@@ -160,6 +161,150 @@ class ShiftService:
                     "to_id": loss_inventory.id,
                     "quantity": item.quantity,
                 })
+
+            await self.uow.commit()
+            return True
+
+    async def factory_exchange(
+        self,
+        request: FactoryExchangeRequest,
+        created_by_id: uuid.UUID,
+    ) -> bool:
+        """
+        Обмен на заводе (anti-fraud: товар всегда на курьере).
+
+        Курьер сдаёт пустые бутыли заводу, забирает полные.
+        Завсклад фиксирует факт обмена — система создаёт 3 накладные атомарно:
+          ① COURIER_RETURN:  Курьер → Завод   [given_items]
+          ② FACTORY_RECEIPT: V_VENDOR → Завод  [received_items]
+          ③ COURIER_LOAD:   Завод → Курьер    [received_items]
+        """
+        async with self.uow:
+            # 1. Блокируем курьерский инвентарь и проверяем остатки
+            courier_inv = (
+                await self.uow.inventories.get_inventory_with_balances(
+                    request.courier_inventory_id,
+                    inv_type=InventoryType.COURIER,
+                    with_for_update=True,
+                )
+            )
+            if not courier_inv:
+                raise InventoryNotFoundError(
+                    inventory_id=request.courier_inventory_id
+                )
+
+            courier_balances = {
+                b.product_id: b.quantity for b in courier_inv.balances
+            }
+            shortages: dict[uuid.UUID, int] = {}
+            for item in request.given_items:
+                available = courier_balances.get(item.product_id, 0)
+                if available < item.quantity:
+                    shortages[item.product_id] = item.quantity - available
+            if shortages:
+                raise InsufficientStockError(shortages=shortages)
+
+            # 2. Получаем завод (должен быть FACTORY)
+            factory = (
+                await self.uow.inventories.get_inventory_with_balances(
+                    request.factory_id,
+                    inv_type=InventoryType.FACTORY,
+                )
+            )
+            if not factory:
+                raise InventoryNotFoundError(inventory_id=request.factory_id)
+
+            # 3. Получаем виртуальный склад-поставщик
+            vendor_inv = await self.uow.inventories.get_system_inventory(
+                InventoryType.VIRTUAL_VENDOR
+            )
+
+            # ① COURIER_RETURN: Курьер → Завод [given_items]
+            tr_return = await self.uow.transfers.add(
+                {
+                    "from_id": courier_inv.id,
+                    "to_id": factory.id,
+                    "type": TransferType.COURIER_RETURN,
+                    "status": TransferStatus.COMPLETED,
+                    "created_by_id": created_by_id,
+                    "accepted_by_id": created_by_id,
+                }
+            )
+            for item in request.given_items:
+                await self.uow.transfer_items.add(
+                    {
+                        "transfer_id": tr_return.id,
+                        "product_id": item.product_id,
+                        "quantity": item.quantity,
+                    }
+                )
+                await self.uow.transactions.add(
+                    {
+                        "product_id": item.product_id,
+                        "transfer_id": tr_return.id,
+                        "from_id": courier_inv.id,
+                        "to_id": factory.id,
+                        "quantity": item.quantity,
+                    }
+                )
+
+            # ② FACTORY_RECEIPT: VIRTUAL_VENDOR → Завод [received_items]
+            tr_receipt = await self.uow.transfers.add(
+                {
+                    "from_id": vendor_inv.id,
+                    "to_id": factory.id,
+                    "type": TransferType.FACTORY_RECEIPT,
+                    "status": TransferStatus.COMPLETED,
+                    "created_by_id": created_by_id,
+                    "accepted_by_id": created_by_id,
+                }
+            )
+            for item in request.received_items:
+                await self.uow.transfer_items.add(
+                    {
+                        "transfer_id": tr_receipt.id,
+                        "product_id": item.product_id,
+                        "quantity": item.quantity,
+                    }
+                )
+                await self.uow.transactions.add(
+                    {
+                        "product_id": item.product_id,
+                        "transfer_id": tr_receipt.id,
+                        "from_id": vendor_inv.id,
+                        "to_id": factory.id,
+                        "quantity": item.quantity,
+                    }
+                )
+
+            # ③ COURIER_LOAD: Завод → Курьер [received_items]
+            tr_load = await self.uow.transfers.add(
+                {
+                    "from_id": factory.id,
+                    "to_id": courier_inv.id,
+                    "type": TransferType.COURIER_LOAD,
+                    "status": TransferStatus.COMPLETED,
+                    "created_by_id": created_by_id,
+                    "accepted_by_id": created_by_id,
+                }
+            )
+            for item in request.received_items:
+                await self.uow.transfer_items.add(
+                    {
+                        "transfer_id": tr_load.id,
+                        "product_id": item.product_id,
+                        "quantity": item.quantity,
+                    }
+                )
+                await self.uow.transactions.add(
+                    {
+                        "product_id": item.product_id,
+                        "transfer_id": tr_load.id,
+                        "from_id": factory.id,
+                        "to_id": courier_inv.id,
+                        "quantity": item.quantity,
+                    }
+                )
 
             await self.uow.commit()
             return True

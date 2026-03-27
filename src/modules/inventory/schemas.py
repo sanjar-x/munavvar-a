@@ -145,6 +145,31 @@ class CloseShiftRequest(BaseModel):
     cash_collected: float = Field(ge=0, description="Сумма собранных наличных")
 
 
+class FactoryExchangeRequest(BaseModel):
+    """Обмен на заводе: курьер сдаёт пустые, забирает полные.
+
+    Создаёт 3 накладные атомарно:
+      ① COURIER_RETURN  Курьер → Завод   [given_items]
+      ② FACTORY_RECEIPT  V_VENDOR → Завод [received_items]
+      ③ COURIER_LOAD    Завод → Курьер   [received_items]
+    """
+
+    courier_inventory_id: uuid.UUID = Field(
+        description="ID инвентаря (машины) курьера"
+    )
+    factory_id: uuid.UUID = Field(
+        description="ID инвентаря завода (тип FACTORY)"
+    )
+    given_items: list[Item] = Field(
+        min_length=1,
+        description="Товары, отданные заводу (обычно пустая тара)",
+    )
+    received_items: list[Item] = Field(
+        min_length=1,
+        description="Товары, полученные от завода (обычно полная вода)",
+    )
+
+
 class LossWriteOffRequest(BaseModel):
     """Списание потерянного или разбитого товара (LOSS_WRITE_OFF)."""
 
