@@ -5,16 +5,22 @@ from typing import Annotated
 
 from fastapi import APIRouter, Body, Depends, Path, Query, Security
 
+from src.core.constants import WALKIN_USER_ID
 from src.core.security.permissions import Scope
 from src.infrastructure.database.models import User
 from src.modules.auth.dependencies import get_current_user
+from src.modules.inventory.dependencies import get_capitalize_tara_service
+from src.modules.inventory.schemas import CapitalizeTaraItem, CapitalizeTaraRequest
+from src.modules.inventory.services import CapitalizeTaraService
 from src.modules.orders.dependencies import get_base_order_service
-from src.modules.orders.enums import OrderStatus, PaymentMethod
+from src.modules.orders.enums import OrderStatus, PaymentMethod, SaleType
 from src.modules.orders.schemas import (
     OrderCreate,
     OrderResponse,
     TaraCheckRequest,
     TaraCheckResponse,
+    WarehouseSaleCapitalizeTaraRequest,
+    WarehouseSaleCreate,
 )
 from src.modules.orders.services import BaseOrderService
 
@@ -55,6 +61,10 @@ async def search_orders(
             alias="maxAmount", ge=0, description="Максимальная сумма заказа"
         ),
     ] = None,
+    sale_type: Annotated[
+        SaleType | None,
+        Query(alias="saleType", description="Фильтр по типу продажи"),
+    ] = None,
 ):
     """Глобальный поиск заказов по фильтрам."""
     return await base_order_service.search_orders(
@@ -69,6 +79,7 @@ async def search_orders(
         date_to=date_to,
         min_amount=min_amount,
         max_amount=max_amount,
+        sale_type=sale_type,
     )
 
 
@@ -101,6 +112,79 @@ async def create_order(
 ):
     """Создание заказа администратором от лица клиента."""
     return await order_service.create_order(client_id=client_id, dto=dto)
+
+
+@orders_router.post("/warehouse-sale", status_code=201, response_model=OrderResponse)
+async def create_warehouse_sale(
+    dto: WarehouseSaleCreate,
+    admin: Annotated[
+        User, Security(get_current_user, scopes=[Scope.ORDERS_EDIT])
+    ],
+    order_service: Annotated[
+        BaseOrderService, Depends(get_base_order_service)
+    ],
+    client_id: Annotated[
+        uuid.UUID | None,
+        Query(alias="clientId", description="ID клиента (если не передан — анонимная продажа)"),
+    ] = None,
+):
+    """Создание заказа на самовывоз со склада."""
+    return await order_service.create_warehouse_sale(
+        dto=dto, client_id=client_id, created_by_id=admin.id
+    )
+
+
+@orders_router.post("/warehouse-sale/capitalize-tara", status_code=201)
+async def capitalize_tara_for_sale(
+    dto: WarehouseSaleCapitalizeTaraRequest,
+    admin: Annotated[
+        User, Security(get_current_user, scopes=[Scope.ORDERS_EDIT])
+    ],
+    capitalize_service: Annotated[
+        CapitalizeTaraService, Depends(get_capitalize_tara_service)
+    ],
+    client_id: Annotated[
+        uuid.UUID | None,
+        Query(alias="clientId", description="ID клиента (если не передан — walk-in)"),
+    ] = None,
+):
+    """Оприходование тары, принесённой покупателем на склад перед самовывозом."""
+    effective_client_id = client_id or WALKIN_USER_ID
+
+    async with capitalize_service.uow:
+        client_inv = await capitalize_service.uow.inventories.get_client_inventory(
+            effective_client_id
+        )
+        if not client_inv:
+            raise ValueError(f"Инвентарь клиента {effective_client_id} не найден")
+        client_inventory_id = client_inv.id
+
+    return await capitalize_service.capitalize_tara(
+        dto=CapitalizeTaraRequest(
+            client_inventory_id=client_inventory_id,
+            items=[
+                CapitalizeTaraItem(product_id=item.product_id, quantity=item.quantity)
+                for item in dto.items
+            ],
+        ),
+        created_by_id=admin.id,
+    )
+
+
+@orders_router.patch("/{orderId}/complete-pickup", response_model=OrderResponse)
+async def complete_pickup(
+    order_id: Annotated[uuid.UUID, Path(alias="orderId")],
+    admin: Annotated[
+        User, Security(get_current_user, scopes=[Scope.ORDERS_EDIT])
+    ],
+    order_service: Annotated[
+        BaseOrderService, Depends(get_base_order_service)
+    ],
+):
+    """Подтверждение выдачи товара со склада (NEW → PICKUP_COMPLETED)."""
+    return await order_service.complete_pickup(
+        order_id=order_id, completed_by_id=admin.id
+    )
 
 
 @orders_router.get("/{orderId}", response_model=OrderResponse)
