@@ -75,10 +75,25 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
             if p.returnable_item_id is not None
         ]
 
-        capitalization_applied = False
+        # 2. Высчитываем стоимость строк и итоговую сумму
+        total_amount = 0
+        order_items_data = []
+        for item in dto.items:
+            current_price = price_map[item.product_id]
+            total_amount += current_price * item.quantity
+            order_items_data.append(
+                {
+                    "product_id": item.product_id,
+                    "quantity": item.quantity,
+                    "unit_price": current_price,  # Snapshot Pattern
+                }
+            )
 
-        if exchange_items:
-            async with self.uow:
+        # 3. Всё — оприходование тары И создание заказа — в одной транзакции
+        async with self.uow:
+            capitalization_applied = False
+
+            if exchange_items:
                 # Получаем баланс пустой тары клиента (с блокировкой от Race Condition)
                 inventory = (
                     await self.uow.inventories.get_inventory_with_balances(
@@ -154,26 +169,8 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
                         )
 
                     capitalization_applied = True
-                    await self.uow.commit()
 
-        total_amount = 0
-        order_items_data = []
-
-        # 2. Высчитываем стоимость строк и итоговую сумму
-        for item in dto.items:
-            current_price = price_map[item.product_id]
-            total_amount += current_price * item.quantity
-
-            order_items_data.append(
-                {
-                    "product_id": item.product_id,
-                    "quantity": item.quantity,
-                    "unit_price": current_price,  # Snapshot Pattern
-                }
-            )
-
-        async with self.uow:
-            # 3. Сохраняем шапку Заказа с подсчитанной суммой
+            # 4. Сохраняем шапку Заказа с подсчитанной суммой
             new_order = await self.uow.orders.add(
                 {
                     "client_id": client_id,
@@ -185,15 +182,18 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
                 }
             )
 
-            # 4. Привязываем строки корзины к новому заказу
+            # 5. Привязываем строки корзины к новому заказу
             for item_data in order_items_data:
                 item_data["order_id"] = new_order.id
 
-            # 5. Сохраняем строки (Bulk Insert)
+            # 6. Сохраняем строки (Bulk Insert)
             await self.uow.order_items.add_many(order_items_data)
 
+            # 7. Единый коммит: оприходование + заказ атомарно
             await self.uow.commit()
-            return new_order
+
+            # 8. Перечитываем с eager-loaded relationships для корректной сериализации
+            return await self.uow.orders.get_with_details(new_order.id)
 
     async def get_order_with_details(
         self, order_id: uuid.UUID, requesting_user_id: uuid.UUID | None = None
