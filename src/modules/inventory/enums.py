@@ -2,8 +2,7 @@ import enum
 
 
 class InventoryType(enum.StrEnum):
-    FACTORY = "FACTORY"
-    WAREHOUSE = "WAREHOUSE"  # Главный склад / Завод
+    WAREHOUSE = "WAREHOUSE"  # Главный склад
     COURIER = "COURIER"  # Машина курьера
     CLIENT = "CLIENT"  # Клиент (у него копятся пустые бутыли!)
     VIRTUAL_LOSS = "VIRTUAL_LOSS"  # Виртуальная яма для потерянных/разбитых бутылей
@@ -11,9 +10,6 @@ class InventoryType(enum.StrEnum):
 
 
 class TransferType(enum.StrEnum):
-    FACTORY_RECEIPT = "FACTORY_RECEIPT"
-    FACTORY_SHIPMENT = "FACTORY_SHIPMENT"  # Отправка на завод (Склад → Завод)
-    FACTORY_RETURN = "FACTORY_RETURN"  # Приёмка с завода (Завод → Склад)
     COURIER_LOAD = "COURIER_LOAD"  # Загрузка
     COURIER_RETURN = "COURIER_RETURN"  # Выгрузка
     CLIENT_DELIVERY = "CLIENT_DELIVERY"  # Передача полной бутыли клиенту

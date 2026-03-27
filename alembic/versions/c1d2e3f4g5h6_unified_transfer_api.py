@@ -19,11 +19,6 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.execute(
-        "ALTER TYPE transfer_type_enum ADD VALUE IF NOT EXISTS 'FACTORY_SHIPMENT'"
-    )
-    op.execute("ALTER TYPE transfer_type_enum ADD VALUE IF NOT EXISTS 'FACTORY_RETURN'")
-
     op.add_column(
         "stock_transfers",
         sa.Column(

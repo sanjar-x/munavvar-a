@@ -38,7 +38,7 @@ class InventoriesResponse(BaseModel):
 class CreateLocation(BaseModel):
     name: str = Field(
         ...,
-        description="'Газель 01A123BC', 'Завод №1'",
+        description="'Газель 01A123BC', 'Склад №1'",
     )
     type: InventoryType
     user_id: uuid.UUID = Field(description="Владелец (Клиент или Курьер)")
@@ -90,16 +90,6 @@ class VendorReceiptRequest(BaseModel):
     items: list[Item] = Field(min_length=1)
 
 
-class FactoryRefillRequest(BaseModel):
-    """Специальный запрос для магии HOD: Розлив воды в пустую тару."""
-
-    warehouse_id: uuid.UUID
-    factory_id: uuid.UUID = Field(description="ID Завода (Скважины)")
-    water_id: uuid.UUID = Field(description="ID продукта 'Вода' (сырье)")
-    bottle_id: uuid.UUID = Field(description="ID продукта 'Пустая бутыль' (тара)")
-    quantity: int = Field(gt=0, description="Сколько бутылей воды разлито")
-
-
 class InventoryAdjustmentRequest(BaseModel):
     """Внесение результатов инвентаризации (излишки и недостачи)."""
 
@@ -123,7 +113,6 @@ class CloseShiftRequest(BaseModel):
 # Типы, для которых from_id вычисляется автоматически (VIRTUAL_VENDOR)
 _VIRTUAL_SOURCE_TYPES = {
     TransferType.INVENTORY_FINDING,
-    TransferType.FACTORY_RECEIPT,
     TransferType.INITIAL_BALANCE,
 }
 # Типы, для которых to_id вычисляется автоматически (VIRTUAL_LOSS)
@@ -137,7 +126,7 @@ class CreateTransferRequest(BaseModel):
 
     type: TransferType
     from_id: uuid.UUID | None = Field(
-        None, description="ID склада-отправителя (авто для INVENTORY_FINDING, FACTORY_RECEIPT, INITIAL_BALANCE)"
+        None, description="ID склада-отправителя (авто для INVENTORY_FINDING, INITIAL_BALANCE)"
     )
     to_id: uuid.UUID | None = Field(
         None, description="ID склада-получателя (авто для LOSS_WRITE_OFF)"
@@ -160,31 +149,6 @@ class CreateTransferRequest(BaseModel):
         if self.type == TransferType.LOSS_WRITE_OFF and not self.reason:
             raise ValueError("reason обязателен для LOSS_WRITE_OFF")
         return self
-
-
-class FactoryExchangeRequest(BaseModel):
-    """Обмен на заводе: курьер сдаёт пустые, забирает полные.
-
-    Создаёт 3 накладные атомарно:
-      ① COURIER_RETURN  Курьер → Завод   [given_items]
-      ② FACTORY_RECEIPT  V_VENDOR → Завод [received_items]
-      ③ COURIER_LOAD    Завод → Курьер   [received_items]
-    """
-
-    courier_inventory_id: uuid.UUID = Field(
-        description="ID инвентаря (машины) курьера"
-    )
-    factory_id: uuid.UUID = Field(
-        description="ID инвентаря завода (тип FACTORY)"
-    )
-    given_items: list[Item] = Field(
-        min_length=1,
-        description="Товары, отданные заводу (обычно пустая тара)",
-    )
-    received_items: list[Item] = Field(
-        min_length=1,
-        description="Товары, полученные от завода (обычно полная вода)",
-    )
 
 
 # ==========================================

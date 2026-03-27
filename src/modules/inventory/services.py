@@ -33,17 +33,13 @@ from src.modules.inventory.uow import InventoryUnitOfWork
 _VALID_ROUTES: dict[
     TransferType, tuple[frozenset[InventoryType], frozenset[InventoryType]]
 ] = {
-    TransferType.FACTORY_RECEIPT: (
-        frozenset({InventoryType.VIRTUAL_VENDOR}),
-        frozenset({InventoryType.WAREHOUSE, InventoryType.FACTORY}),
-    ),
     TransferType.COURIER_LOAD: (
-        frozenset({InventoryType.WAREHOUSE, InventoryType.FACTORY}),
+        frozenset({InventoryType.WAREHOUSE}),
         frozenset({InventoryType.COURIER}),
     ),
     TransferType.COURIER_RETURN: (
         frozenset({InventoryType.COURIER}),
-        frozenset({InventoryType.WAREHOUSE, InventoryType.FACTORY}),
+        frozenset({InventoryType.WAREHOUSE}),
     ),
     TransferType.CLIENT_DELIVERY: (
         frozenset({InventoryType.COURIER}),
@@ -54,12 +50,12 @@ _VALID_ROUTES: dict[
         frozenset({InventoryType.COURIER}),
     ),
     TransferType.LOSS_WRITE_OFF: (
-        frozenset({InventoryType.WAREHOUSE, InventoryType.COURIER, InventoryType.FACTORY, InventoryType.CLIENT}),
+        frozenset({InventoryType.WAREHOUSE, InventoryType.COURIER, InventoryType.CLIENT}),
         frozenset({InventoryType.VIRTUAL_LOSS}),
     ),
     TransferType.INVENTORY_FINDING: (
         frozenset({InventoryType.VIRTUAL_VENDOR}),
-        frozenset({InventoryType.WAREHOUSE, InventoryType.COURIER, InventoryType.FACTORY}),
+        frozenset({InventoryType.WAREHOUSE, InventoryType.COURIER}),
     ),
     TransferType.INITIAL_BALANCE: (
         frozenset({InventoryType.VIRTUAL_VENDOR}),
@@ -67,20 +63,11 @@ _VALID_ROUTES: dict[
             InventoryType.CLIENT,
             InventoryType.WAREHOUSE,
             InventoryType.COURIER,
-            InventoryType.FACTORY,
         }),
     ),
     TransferType.WAREHOUSE_SALE: (
         frozenset({InventoryType.WAREHOUSE}),
         frozenset({InventoryType.CLIENT}),
-    ),
-    TransferType.FACTORY_SHIPMENT: (
-        frozenset({InventoryType.WAREHOUSE}),
-        frozenset({InventoryType.FACTORY}),
-    ),
-    TransferType.FACTORY_RETURN: (
-        frozenset({InventoryType.FACTORY}),
-        frozenset({InventoryType.WAREHOUSE}),
     ),
     TransferType.WAREHOUSE_TARA_RETURN: (
         frozenset({InventoryType.CLIENT}),
@@ -269,7 +256,6 @@ class StockTransferService:
 
             if schema.type in (
                 TransferType.INVENTORY_FINDING,
-                TransferType.FACTORY_RECEIPT,
                 TransferType.INITIAL_BALANCE,
             ):
                 vendor_inv = await self.uow.inventories.get_system_inventory(

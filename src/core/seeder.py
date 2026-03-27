@@ -368,7 +368,7 @@ class Seeder:
         transfer = StockTransfer(
             from_id=from_inv_id,
             to_id=to_inv_id,
-            type=TransferType.FACTORY_RECEIPT,
+            type=TransferType.INITIAL_BALANCE,
             status=status,
             created_by_id=system_user.id,
         )
