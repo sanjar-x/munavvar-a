@@ -83,20 +83,6 @@ class AdjustmentItem(BaseModel):
 # ==========================================
 
 
-class DraftTransferRequest(BaseModel):
-    """Запрос на создание или пополнение черновика накладной."""
-
-    from_id: uuid.UUID = Field(description="ID склада отправителя")
-    to_id: uuid.UUID = Field(description="ID склада/машины получателя")
-    items: list[Item] = Field(min_length=1, description="Список товаров")
-
-
-class CompleteTransferRequest(BaseModel):
-    """Запрос на проведение существующего черновика."""
-
-    transfer_id: uuid.UUID
-
-
 class VendorReceiptRequest(BaseModel):
     """Оприходование новой тары от поставщика пластика."""
 
@@ -126,23 +112,54 @@ class InventoryAdjustmentRequest(BaseModel):
 # ==========================================
 
 
-class LoadCourierTruckRequest(BaseModel):
-    """Утренняя загрузка машины курьера."""
-
-    route_sheet_id: uuid.UUID = Field(
-        description="Связь с маршрутным листом из модуля Логистики"
-    )
-    warehouse_id: uuid.UUID
-    courier_inventory_id: uuid.UUID
-    items: list[Item] = Field(min_length=1)
-
-
 class CloseShiftRequest(BaseModel):
     """Вечерняя сдача смены курьером (Инкассация и возврат остатков)."""
 
     courier_id: uuid.UUID
     returned_inventory: list[Item]
     cash_collected: float = Field(ge=0, description="Сумма собранных наличных")
+
+
+# Типы, для которых from_id вычисляется автоматически (VIRTUAL_VENDOR)
+_VIRTUAL_SOURCE_TYPES = {
+    TransferType.INVENTORY_FINDING,
+    TransferType.FACTORY_RECEIPT,
+    TransferType.INITIAL_BALANCE,
+}
+# Типы, для которых to_id вычисляется автоматически (VIRTUAL_LOSS)
+_VIRTUAL_DEST_TYPES = {
+    TransferType.LOSS_WRITE_OFF,
+}
+
+
+class CreateTransferRequest(BaseModel):
+    """Единый запрос на создание и проведение накладной (single-step)."""
+
+    type: TransferType
+    from_id: uuid.UUID | None = Field(
+        None, description="ID склада-отправителя (авто для INVENTORY_FINDING, FACTORY_RECEIPT, INITIAL_BALANCE)"
+    )
+    to_id: uuid.UUID | None = Field(
+        None, description="ID склада-получателя (авто для LOSS_WRITE_OFF)"
+    )
+    items: list[Item] = Field(min_length=1, description="Список товаров")
+    reason: str | None = Field(
+        None, min_length=3, max_length=255,
+        description="Причина списания (обязательно для LOSS_WRITE_OFF)",
+    )
+    route_sheet_id: uuid.UUID | None = Field(
+        None, description="ID маршрутного листа (для COURIER_LOAD)"
+    )
+
+    @model_validator(mode="after")
+    def validate_ids_and_reason(self) -> Self:
+        if self.type not in _VIRTUAL_SOURCE_TYPES and self.from_id is None:
+            raise ValueError(f"from_id обязателен для типа {self.type}")
+        if self.type not in _VIRTUAL_DEST_TYPES and self.to_id is None:
+            raise ValueError(f"to_id обязателен для типа {self.type}")
+        if self.type == TransferType.LOSS_WRITE_OFF and not self.reason:
+            raise ValueError("reason обязателен для LOSS_WRITE_OFF")
+        return self
 
 
 class FactoryExchangeRequest(BaseModel):
@@ -167,20 +184,6 @@ class FactoryExchangeRequest(BaseModel):
     received_items: list[Item] = Field(
         min_length=1,
         description="Товары, полученные от завода (обычно полная вода)",
-    )
-
-
-class LossWriteOffRequest(BaseModel):
-    """Списание потерянного или разбитого товара (LOSS_WRITE_OFF)."""
-
-    from_inventory_id: uuid.UUID = Field(
-        description="ID склада или машины, откуда производится списание"
-    )
-    items: list[Item] = Field(min_length=1)
-    reason: str = Field(
-        min_length=3,
-        max_length=255,
-        description="Причина списания (напр. 'Разбито при транспортировке')",
     )
 
 
@@ -386,21 +389,6 @@ class WarehouseDetailResponse(BaseModel):
 # --- НАКЛАДНЫЕ (TRANSFERS) ---
 
 
-class TransferCreate(BaseModel):
-    from_id: uuid.UUID
-    to_id: uuid.UUID
-    type: TransferType
-
-
-class TransferItemCreate(BaseModel):
-    product_id: uuid.UUID
-    quantity: int = Field(..., gt=0)
-
-
-class TransferCompleteRequest(BaseModel):
-    accepted_by_id: uuid.UUID = Field(..., description="Кто физически принял товар")
-
-
 class TransferItemResponse(BaseModel):
     product: ProductSimpleResponse
     quantity: int
@@ -417,6 +405,8 @@ class TransferResponse(BaseModel):
     status: TransferStatus
     type: TransferType
     items: list[TransferItemResponse] = []
+    reason: str | None = None
+    route_sheet_id: uuid.UUID | None = None
     created_at: datetime | None = None
 
     model_config = ConfigDict(from_attributes=True)
