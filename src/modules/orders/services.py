@@ -364,6 +364,43 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
             await self.uow.commit()
             return await self.uow.orders.get_with_details(new_order.id)
 
+    async def complete_pickup(
+        self,
+        order_id: uuid.UUID,
+        completed_by_id: uuid.UUID,
+    ) -> Order:
+        """
+        Подтверждение выдачи товара со склада.
+        NEW → PICKUP_COMPLETED с созданием складских и финансовых проводок.
+        """
+        async with self.uow:
+            order = await self.uow.orders.get_with_details(
+                order_id, with_for_update=True
+            )
+            if not order:
+                raise OrderNotFoundError(order_id=order_id)
+
+            if order.sale_type != SaleType.WAREHOUSE_PICKUP:
+                raise InvalidPickupOperationError(
+                    order_id=order_id,
+                    reason="Заказ не является самовывозом",
+                )
+
+            if order.status != OrderStatus.NEW:
+                raise InvalidPickupOperationError(
+                    order_id=order_id,
+                    reason=f"Ожидался статус NEW, текущий: {order.status}",
+                )
+
+            await self.uow.orders.update_status(
+                order_id, OrderStatus.PICKUP_COMPLETED
+            )
+
+            await self._handle_warehouse_pickup(order, completed_by_id)
+
+            await self.uow.commit()
+            return await self.uow.orders.get_with_details(order_id)
+
     async def get_order_with_details(
         self, order_id: uuid.UUID, requesting_user_id: uuid.UUID | None = None
     ) -> Order:
@@ -552,6 +589,20 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
                 raise OrderNotFoundError(order_id=order_id)
 
             old_status = order.status
+
+            # Guard: pickup orders cannot use delivery statuses
+            if order.sale_type == SaleType.WAREHOUSE_PICKUP and new_status in (
+                OrderStatus.ASSIGNED,
+                OrderStatus.IN_TRANSIT,
+                OrderStatus.ARRIVED,
+                OrderStatus.DELIVERED,
+            ):
+                raise InvalidPickupOperationError(
+                    order_id=order_id,
+                    reason=f"Заказ самовывоза не может перейти в статус {new_status}. "
+                    "Используйте complete-pickup.",
+                )
+
             updated_order = await self.uow.orders.update_status(
                 order_id, new_status
             )
@@ -735,6 +786,124 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
         # 4. Финансовое закрытие заказа
         await self._process_financial_settlement(order)
 
+    async def _handle_warehouse_pickup(
+        self,
+        order: Order,
+        completed_by_id: uuid.UUID,
+    ) -> None:
+        """
+        Складские перемещения при самовывозе:
+        1. Проверка остатков на складе
+        2. WAREHOUSE_SALE: Warehouse → Client (товар)
+        3. WAREHOUSE_TARA_RETURN: Client → Warehouse (тара)
+        4. Финансовая проводка
+        """
+        if not order.warehouse_id:
+            raise ValueError("Заказ самовывоза без warehouse_id")
+
+        warehouse = await self.uow.inventories.get_inventory_with_balances(
+            order.warehouse_id,
+            inv_type=InventoryType.WAREHOUSE,
+            with_for_update=True,
+        )
+        if not warehouse:
+            raise ValueError(f"Склад {order.warehouse_id} не найден")
+
+        # Проверка остатков на складе
+        warehouse_balances = {
+            b.product_id: b.quantity for b in warehouse.balances
+        }
+        stock_shortages: dict[uuid.UUID, int] = {}
+        for item in order.items:
+            available = warehouse_balances.get(item.product_id, 0)
+            if available < item.quantity:
+                stock_shortages[item.product_id] = item.quantity - available
+        if stock_shortages:
+            raise InsufficientStockError(shortages=stock_shortages)
+
+        # 1. WAREHOUSE_SALE: Warehouse → Client
+        sale_transfer = await self.uow.transfers.add(
+            {
+                "from_id": warehouse.id,
+                "to_id": order.client_inventory_id,
+                "type": TransferType.WAREHOUSE_SALE,
+                "status": TransferStatus.COMPLETED,
+                "created_by_id": completed_by_id,
+                "accepted_by_id": order.client_id,
+                "order_id": order.id,
+            }
+        )
+
+        # 2. WAREHOUSE_TARA_RETURN: Client → Warehouse
+        returnable_map: dict[uuid.UUID, int] = {}
+        for item in order.items:
+            if item.product.returnable_item_id and item.quantity > 0:
+                tare_id = item.product.returnable_item_id
+                returnable_map[tare_id] = (
+                    returnable_map.get(tare_id, 0) + item.quantity
+                )
+        returnable_items = [
+            {"product_id": pid, "quantity": qty}
+            for pid, qty in returnable_map.items()
+        ]
+
+        tara_transfer = None
+        if returnable_items:
+            tara_transfer = await self.uow.transfers.add(
+                {
+                    "from_id": order.client_inventory_id,
+                    "to_id": warehouse.id,
+                    "type": TransferType.WAREHOUSE_TARA_RETURN,
+                    "status": TransferStatus.COMPLETED,
+                    "created_by_id": completed_by_id,
+                    "accepted_by_id": completed_by_id,
+                    "order_id": order.id,
+                }
+            )
+
+        # 3. Строки накладных и проводки в леджере
+        for item in order.items:
+            if item.quantity == 0:
+                continue
+            await self.uow.transfer_items.add(
+                {
+                    "transfer_id": sale_transfer.id,
+                    "product_id": item.product_id,
+                    "quantity": item.quantity,
+                }
+            )
+            await self.uow.transactions.add(
+                {
+                    "product_id": item.product_id,
+                    "transfer_id": sale_transfer.id,
+                    "from_id": warehouse.id,
+                    "to_id": order.client_inventory_id,
+                    "quantity": item.quantity,
+                }
+            )
+
+        if tara_transfer:
+            for item_data in returnable_items:
+                await self.uow.transfer_items.add(
+                    {
+                        "transfer_id": tara_transfer.id,
+                        "product_id": item_data["product_id"],
+                        "quantity": item_data["quantity"],
+                    }
+                )
+                await self.uow.transactions.add(
+                    {
+                        "product_id": item_data["product_id"],
+                        "transfer_id": tara_transfer.id,
+                        "from_id": order.client_inventory_id,
+                        "to_id": warehouse.id,
+                        "quantity": item_data["quantity"],
+                    }
+                )
+
+        # 4. Финансовое закрытие
+        await self._process_pickup_settlement(order)
+
     async def _process_financial_settlement(self, order: Order) -> None:
         """
         Финансовое закрытие заказа при доставке.
@@ -799,6 +968,44 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
             )
 
         await self.uow.financial_transactions.add_many(financial_txns)
+
+    async def _process_pickup_settlement(self, order: Order) -> None:
+        """
+        Финансовое закрытие самовывоза:
+        1. Revenue → Client (долг)
+        2. Client → Cash (оплата наличными на складе)
+        Обе транзакции COMPLETED — деньги сразу в кассе.
+        """
+        client_account = await self.uow.accounts.get_client_account(
+            order.client_id
+        )
+        if not client_account:
+            raise ValueError(
+                f"Финансовый счет клиента {order.client_id} не найден"
+            )
+        revenue_account = await self.uow.accounts.get_system_revenue_account()
+        cash_account = await self.uow.accounts.get_system_cash_account()
+
+        await self.uow.financial_transactions.add_many(
+            [
+                {
+                    "from_id": revenue_account.id,
+                    "to_id": client_account.id,
+                    "amount": order.total_amount,
+                    "order_id": order.id,
+                    "status": TransactionStatus.COMPLETED,
+                    "reason": "Задолженность за заказ (самовывоз)",
+                },
+                {
+                    "from_id": client_account.id,
+                    "to_id": cash_account.id,
+                    "amount": order.total_amount,
+                    "order_id": order.id,
+                    "status": TransactionStatus.COMPLETED,
+                    "reason": "Оплата наличными на складе",
+                },
+            ]
+        )
 
     async def check_tara_availability(self, dto: TaraCheckRequest) -> dict:
         """
