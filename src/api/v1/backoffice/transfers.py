@@ -1,19 +1,14 @@
 # src/api/v1/backoffice/transfers.py
-import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Security, status
+from fastapi import APIRouter, Depends, Query, Security
 
 from src.core.security.permissions import Scope
 from src.infrastructure.database.models import User
 from src.modules.auth.dependencies import get_current_user
-from src.modules.inventory.dependencies import (
-    get_stock_transfer_service,
-)
+from src.modules.inventory.dependencies import get_stock_transfer_service
 from src.modules.inventory.schemas import (
-    TransferCompleteRequest,
-    TransferCreate,
-    TransferItemCreate,
+    CreateTransferRequest,
     TransferResponse,
 )
 from src.modules.inventory.services import StockTransferService
@@ -43,60 +38,15 @@ async def get_transfers(
 @transfers_router.post(
     "/",
     response_model=TransferResponse,
-    status_code=status.HTTP_201_CREATED,
-    summary="Создание черновика перемещения",
+    summary="Создание и проведение накладной",
 )
 async def create_transfer(
-    schema: TransferCreate,
+    schema: CreateTransferRequest,
     current_admin: Annotated[
-        User, Security(get_current_user, scopes=[Scope.USERS_WRITE])
+        User, Security(get_current_user, scopes=[Scope.INVENTORY_WRITE])
     ],
     transfer_service: Annotated[
         StockTransferService, Depends(get_stock_transfer_service)
     ],
 ):
-    return await transfer_service.create_draft_transfer(current_admin.id, schema)
-
-
-@transfers_router.put(
-    "/{transfer_id}/items",
-    response_model=TransferResponse,
-    summary="Добавление/обновление строк в черновик",
-)
-async def update_transfer_items(
-    transfer_id: uuid.UUID,
-    items_schema: list[TransferItemCreate],
-    current_admin: Annotated[
-        User, Security(get_current_user, scopes=[Scope.USERS_WRITE])
-    ],
-    transfer_service: Annotated[
-        StockTransferService, Depends(get_stock_transfer_service)
-    ],
-):
-    try:
-        return await transfer_service.update_draft_items(transfer_id, items_schema)
-    except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
-
-
-@transfers_router.post(
-    "/{transfer_id}/complete",
-    response_model=TransferResponse,
-    summary="Проведение документа",
-)
-async def complete_transfer(
-    transfer_id: uuid.UUID,
-    schema: TransferCompleteRequest,
-    current_admin: Annotated[
-        User, Security(get_current_user, scopes=[Scope.USERS_WRITE])
-    ],
-    transfer_service: Annotated[
-        StockTransferService, Depends(get_stock_transfer_service)
-    ],
-):
-    try:
-        return await transfer_service.complete_transfer(
-            transfer_id, accepted_by_id=schema.accepted_by_id
-        )
-    except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    return await transfer_service.create_transfer(current_admin.id, schema)

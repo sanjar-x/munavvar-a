@@ -9,8 +9,6 @@ from src.modules.auth.dependencies import get_current_user
 from src.modules.inventory.schemas import (
     CloseShiftRequest,
     FactoryExchangeRequest,
-    LoadCourierTruckRequest,
-    LossWriteOffRequest,
 )
 from src.modules.inventory.shift_service import ShiftService
 from src.modules.inventory.uow import InventoryUnitOfWork
@@ -22,30 +20,6 @@ def get_shift_service(
     uow: Annotated[InventoryUnitOfWork, Depends()],
 ) -> ShiftService:
     return ShiftService(uow)
-
-
-@shifts_router.post("/load-truck")
-async def load_courier_truck(
-    request: LoadCourierTruckRequest,
-    admin: Annotated[
-        User, Security(get_current_user, scopes=[Scope.INVENTORY_WRITE])
-    ],
-    shift_service: Annotated[ShiftService, Depends(get_shift_service)],
-):
-    """Утренняя загрузка машины курьера со склада (WAREHOUSE → COURIER)."""
-    return await shift_service.load_courier_truck(request, loaded_by_id=admin.id)
-
-
-@shifts_router.post("/loss")
-async def write_off_loss(
-    request: LossWriteOffRequest,
-    admin: Annotated[
-        User, Security(get_current_user, scopes=[Scope.INVENTORY_WRITE])
-    ],
-    shift_service: Annotated[ShiftService, Depends(get_shift_service)],
-):
-    """Списание потерянного или разбитого товара (ANY → VIRTUAL_LOSS)."""
-    return await shift_service.write_off_loss(request, created_by_id=admin.id)
 
 
 @shifts_router.post("/factory-exchange")
