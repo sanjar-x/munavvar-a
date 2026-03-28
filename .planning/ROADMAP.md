@@ -50,11 +50,12 @@ Plans:
   2. At least one module demonstrates the Repository -> Service -> frozen DTO return chain end-to-end
   3. Alembic migrations are rebuilt from scratch and produce a working schema with `alembic upgrade head`
   4. PG triggers for stock balance and financial balance enforcement exist in the fresh migration set
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 02-01: TBD
-- [ ] 02-02: TBD
+- [ ] 02-01-PLAN.md -- Catalog DTO + facade + BaseService generic (ARCH-02, ARCH-03)
+- [ ] 02-02-PLAN.md -- Enum fixes + Alembic migration rebuild (DB-01, DB-02)
+- [ ] 02-03-PLAN.md -- Consumer import updates + integration verification (ARCH-02)
 
 ### Phase 3: STAFF & CATALOG Extraction
 **Goal**: STAFF and CATALOG exist as independent bounded contexts following the established convention
@@ -196,7 +197,7 @@ Note: Phases 8 and 9 can execute in parallel (both depend on Phase 7, not on eac
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Characterization Tests | 0/3 | Not started | - |
-| 2. Module Convention & Database Foundation | 0/2 | Not started | - |
+| 2. Module Convention & Database Foundation | 0/3 | Not started | - |
 | 3. STAFF & CATALOG Extraction | 0/2 | Not started | - |
 | 4. Ledger Separation | 0/2 | Not started | - |
 | 5. LOGISTICS & CRM Extraction | 0/2 | Not started | - |
