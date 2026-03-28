@@ -5,6 +5,7 @@ from typing import Any
 
 from src.common.service import BaseService
 from src.infrastructure.database.models import Product
+from src.modules.catalog.dtos import ProductDTO, product_to_dto
 from src.modules.catalog.enums import ProductType
 from src.modules.catalog.exceptions import (
     InvalidReturnableItemError,
@@ -15,7 +16,14 @@ from src.modules.catalog.schemas import ProductCreate
 from src.modules.catalog.uow import CatalogUnitOfWork
 
 
-class CatalogService(BaseService[Product, ProductCreate, CatalogUnitOfWork]):
+class CatalogService(
+    BaseService[
+        Product,
+        ProductCreate,
+        CatalogUnitOfWork,
+        ProductDTO,
+    ]
+):
     def __init__(self, uow: CatalogUnitOfWork):
         super().__init__(uow=uow)
 
@@ -28,28 +36,29 @@ class CatalogService(BaseService[Product, ProductCreate, CatalogUnitOfWork]):
         skip: int = 0,
         limit: int = 100,
         product_type: ProductType | None = None,
-    ) -> Sequence[Product]:
+    ) -> Sequence[ProductDTO]:
         """
         Выдача витрины для клиентского приложения (B2C/B2B).
         Если передан product_type, фильтруем по нему (например, только WATER).
         """
         async with self.uow:
             if product_type:
-                return await self._repo.get_catalog_by_type(
+                products = await self._repo.get_catalog_by_type(
                     product_type=product_type,
                     skip=skip,
                     limit=limit,
                 )
             else:
-                return await self._repo.get_multi(
+                products = await self._repo.get_multi(
                     skip=skip,
                     limit=limit,
-                    active_only=True,  # На витрине только активные товары!
+                    active_only=True,
                 )
+            return [product_to_dto(p) for p in products]
 
     async def get_by_ids(
         self, product_ids: list[uuid.UUID]
-    ) -> Sequence[Product]:
+    ) -> Sequence[ProductDTO]:
         """
         PUBLIC API для соседних доменов (Orders).
         Используется корзиной для получения актуальных цен при чекауте.
@@ -57,25 +66,40 @@ class CatalogService(BaseService[Product, ProductCreate, CatalogUnitOfWork]):
         if not product_ids:
             return []
         async with self.uow:
-            return await self._repo.get_multi_by_ids(product_ids)
+            products = await self._repo.get_multi_by_ids(
+                product_ids
+            )
+            return [product_to_dto(p) for p in products]
 
     async def search_by_attribute(
-        self, key: str, value: Any, skip: int = 0, limit: int = 100
-    ) -> Sequence[Product]:
+        self,
+        key: str,
+        value: Any,
+        skip: int = 0,
+        limit: int = 100,
+    ) -> Sequence[ProductDTO]:
         """
         Продвинутый поиск для UI.
         Позволяет найти все кулеры цвета "white" или компрессорного типа охлаждения.
         """
         async with self.uow:
-            return await self._repo.get_by_json_attribute(
-                key=key, value=value, skip=skip, limit=limit
+            products = (
+                await self._repo.get_by_json_attribute(
+                    key=key,
+                    value=value,
+                    skip=skip,
+                    limit=limit,
+                )
             )
+            return [product_to_dto(p) for p in products]
 
     # ==========================================
     # COMMANDS (МУТАЦИИ ДЛЯ АДМИНКИ)
     # ==========================================
 
-    async def add_product(self, dto: ProductCreate) -> Product:
+    async def add_product(
+        self, dto: ProductCreate
+    ) -> ProductDTO:
         """
         Создание нового товара с жесткой бизнес-валидацией.
         """
@@ -107,7 +131,7 @@ class CatalogService(BaseService[Product, ProductCreate, CatalogUnitOfWork]):
             data = dto.model_dump(exclude_unset=True)
             new_product = await self._repo.add(data)
             await self.uow.commit()
-            return new_product
+            return product_to_dto(new_product)
 
     # Примечание: методы get(), get_multi(), update(), archive() и delete()
     # уже доступны благодаря наследованию от BaseService.
