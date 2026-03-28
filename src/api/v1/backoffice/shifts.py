@@ -6,6 +6,9 @@ from fastapi import APIRouter, Depends, Security
 from src.core.security.permissions import Scope
 from src.infrastructure.database.models import User
 from src.modules.auth.dependencies import get_current_user
+from src.modules.inventory.dependencies import (
+    get_inventory_uow,
+)
 from src.modules.inventory.schemas import CloseShiftRequest
 from src.modules.inventory.shift_service import ShiftService
 from src.modules.inventory.uow import InventoryUnitOfWork
@@ -14,7 +17,10 @@ shifts_router = APIRouter()
 
 
 def get_shift_service(
-    uow: Annotated[InventoryUnitOfWork, Depends()],
+    uow: Annotated[
+        InventoryUnitOfWork,
+        Depends(get_inventory_uow),
+    ],
 ) -> ShiftService:
     return ShiftService(uow)
 
@@ -23,9 +29,15 @@ def get_shift_service(
 async def close_shift(
     request: CloseShiftRequest,
     admin: Annotated[
-        User, Security(get_current_user, scopes=[Scope.INVENTORY_WRITE])
+        User,
+        Security(
+            get_current_user,
+            scopes=[Scope.INVENTORY_WRITE],
+        ),
     ],
-    shift_service: Annotated[ShiftService, Depends(get_shift_service)],
+    shift_service: Annotated[
+        ShiftService, Depends(get_shift_service)
+    ],
 ):
-    """Закрытие смены курьера и инкассация (Backoffice/Кладовщик)."""
+    """Закрытие смены курьера и инкассация."""
     return await shift_service.close_shift(request)
