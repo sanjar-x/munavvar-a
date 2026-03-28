@@ -14,6 +14,7 @@ product_type_enum = Enum(
     name="product_type_enum",
     native_enum=True,
     create_type=True,
+    values_callable=lambda e: [m.value for m in e],
 )
 
 

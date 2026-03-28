@@ -31,6 +31,7 @@ class Identity(BaseModel):
             name="auth_provider_enum",
             native_enum=True,
             create_type=True,
+            values_callable=lambda e: [m.value for m in e],
         ),
         nullable=False,
         comment="Провайдер авторизации (local, google, telegram и т.д.)",
@@ -68,7 +69,13 @@ class User(BaseModel):
         comment="ФИО (для физлиц) или Название компании (для B2B)",
     )
     role: Mapped[Role] = mapped_column(
-        Enum(Role, name="user_role_enum", native_enum=True, create_type=True),
+        Enum(
+            Role,
+            name="user_role_enum",
+            native_enum=True,
+            create_type=True,
+            values_callable=lambda e: [m.value for m in e],
+        ),
         nullable=False,
         default=Role.CLIENT_B2C,
         index=True,
