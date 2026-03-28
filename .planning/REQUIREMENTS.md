@@ -25,7 +25,7 @@ Requirements for this milestone. Each maps to roadmap phases.
 - [x] **TEST-01**: Characterization tests for order delivery fulfillment flow (stock + financial atomicity)
 - [x] **TEST-02**: Characterization tests for warehouse pickup flow
 - [x] **TEST-03**: Characterization tests for walk-in sale flow
-- [ ] **TEST-04**: Characterization tests for courier shift close flow
+- [x] **TEST-04**: Characterization tests for courier shift close flow
 - [ ] **TEST-05**: Architecture boundary tests (pytest-archon) enforcing module import rules
 
 ### Database
@@ -142,7 +142,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | TEST-01 | Phase 1 | Complete |
 | TEST-02 | Phase 1 | Complete |
 | TEST-03 | Phase 1 | Complete |
-| TEST-04 | Phase 1 | Pending |
+| TEST-04 | Phase 1 | Complete |
 | TEST-05 | Phase 6 | Pending |
 | DB-01 | Phase 2 | Pending |
 | DB-02 | Phase 2 | Pending |
