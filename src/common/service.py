@@ -14,6 +14,7 @@ class BaseService[
     ModelType: BaseModel,
     CreateSchemaType: PydanticSchema,
     UoWType: BaseSQLAlchemyUoW,
+    DTOType = object,
 ](ABC):
     def __init__(self, uow: UoWType):
         self.uow = uow
