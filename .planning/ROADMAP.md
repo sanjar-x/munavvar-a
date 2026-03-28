@@ -53,7 +53,7 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 02-01-PLAN.md -- Catalog DTO + facade + BaseService generic (ARCH-02, ARCH-03)
+- [x] 02-01-PLAN.md -- Catalog DTO + facade + BaseService generic (ARCH-02, ARCH-03)
 - [ ] 02-02-PLAN.md -- Enum fixes + Alembic migration rebuild (DB-01, DB-02)
 - [ ] 02-03-PLAN.md -- Consumer import updates + integration verification (ARCH-02)
 

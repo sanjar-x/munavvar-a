@@ -10,8 +10,8 @@ Requirements for this milestone. Each maps to roadmap phases.
 ### Architecture
 
 - [ ] **ARCH-01**: All 6 bounded contexts cleanly separated with own models, repositories, services, schemas
-- [ ] **ARCH-02**: Each module exposes `public.py` facade -- other modules import only from this
-- [ ] **ARCH-03**: Unified Repository -> Service -> frozen DTO (`dataclasses(frozen=True, slots=True)`) pattern across all modules
+- [x] **ARCH-02**: Each module exposes `public.py` facade -- other modules import only from this
+- [x] **ARCH-03**: Unified Repository -> Service -> frozen DTO (`dataclasses(frozen=True, slots=True)`) pattern across all modules
 - [ ] **ARCH-04**: Composite UoWs decomposed -- each module UoW contains only its own repositories
 - [ ] **ARCH-05**: Application-layer orchestrators (FulfillmentService, OnboardingService) handle cross-domain transactions
 - [ ] **ARCH-06**: Orders God Service (1,151 lines) decomposed -- fulfillment logic extracted to application layer
@@ -130,8 +130,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | ARCH-01 | Phase 6 | Pending |
-| ARCH-02 | Phase 2 | Pending |
-| ARCH-03 | Phase 2 | Pending |
+| ARCH-02 | Phase 2 | Complete |
+| ARCH-03 | Phase 2 | Complete |
 | ARCH-04 | Phase 6 | Pending |
 | ARCH-05 | Phase 6 | Pending |
 | ARCH-06 | Phase 6 | Pending |
