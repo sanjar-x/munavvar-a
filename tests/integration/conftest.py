@@ -106,23 +106,32 @@ async def credit_account(
 async def system_entities(db_session: AsyncSession):
     """Query pre-existing system entities created by
     init_data(). Do NOT create these.
+
+    Note: system user is looked up by role, not by
+    SYSTEM_USER_ID constant, because init_data() uses
+    settings.SYSTEM_USER_ID (which may differ).
     """
     system_user = (
         await db_session.execute(
-            select(User).where(User.id == SYSTEM_USER_ID)
+            select(User).where(
+                User.role == Role.SYSTEM
+            )
         )
     ).scalar_one()
+    sys_uid = system_user.id
 
     walkin_user = (
         await db_session.execute(
-            select(User).where(User.id == WALKIN_USER_ID)
+            select(User).where(
+                User.id == WALKIN_USER_ID
+            )
         )
     ).scalar_one()
 
     revenue_account = (
         await db_session.execute(
             select(Account).where(
-                Account.user_id == SYSTEM_USER_ID,
+                Account.user_id == sys_uid,
                 Account.type == AccountType.REVENUE,
             )
         )
@@ -131,7 +140,7 @@ async def system_entities(db_session: AsyncSession):
     cash_account = (
         await db_session.execute(
             select(Account).where(
-                Account.user_id == SYSTEM_USER_ID,
+                Account.user_id == sys_uid,
                 Account.type == AccountType.CASH,
             )
         )
@@ -140,7 +149,7 @@ async def system_entities(db_session: AsyncSession):
     card_account = (
         await db_session.execute(
             select(Account).where(
-                Account.user_id == SYSTEM_USER_ID,
+                Account.user_id == sys_uid,
                 Account.type == AccountType.CARD,
             )
         )
@@ -149,8 +158,9 @@ async def system_entities(db_session: AsyncSession):
     virtual_vendor = (
         await db_session.execute(
             select(Inventory).where(
-                Inventory.user_id == SYSTEM_USER_ID,
-                Inventory.type == InventoryType.VIRTUAL_VENDOR,
+                Inventory.user_id == sys_uid,
+                Inventory.type
+                == InventoryType.VIRTUAL_VENDOR,
             )
         )
     ).scalar_one()
@@ -158,8 +168,9 @@ async def system_entities(db_session: AsyncSession):
     virtual_loss = (
         await db_session.execute(
             select(Inventory).where(
-                Inventory.user_id == SYSTEM_USER_ID,
-                Inventory.type == InventoryType.VIRTUAL_LOSS,
+                Inventory.user_id == sys_uid,
+                Inventory.type
+                == InventoryType.VIRTUAL_LOSS,
             )
         )
     ).scalar_one()

@@ -40,7 +40,9 @@ dev = [
 [tool.pytest.ini_options]
 # Автоматически запускать все async-тесты
 asyncio_mode = "auto"
-# Устанавливаем область видимости event_loop на сессию (требование новых версий)
-asyncio_default_fixture_loop_scope = "session"
+# Область видимости event_loop для фикстур и тестов
+asyncio_default_fixture_loop_scope = "function"
 # Указываем папку с тестами
 testpaths = ["tests"]
+# Добавляем корень проекта в sys.path для `from src.*` импортов
+pythonpath = ["."]
