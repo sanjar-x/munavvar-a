@@ -34,11 +34,12 @@ Decimal phases appear between their surrounding integers in numeric order.
   2. Warehouse pickup flow is covered by a passing test
   3. Walk-in sale flow is covered by a passing test
   4. Courier shift close flow (cash reconciliation + van stock verification) is covered by a passing test
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 01-01: TBD
-- [ ] 01-02: TBD
+- [ ] 01-01-PLAN.md -- Test infrastructure (conftest) + delivery fulfillment test (TEST-01)
+- [ ] 01-02-PLAN.md -- Warehouse pickup test (TEST-02) + walk-in sale test (TEST-03)
+- [ ] 01-03-PLAN.md -- Courier shift close test (TEST-04)
 
 ### Phase 2: Module Convention & Database Foundation
 **Goal**: Every module follows the same structural convention and the database starts clean
@@ -194,7 +195,7 @@ Note: Phases 8 and 9 can execute in parallel (both depend on Phase 7, not on eac
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Characterization Tests | 0/2 | Not started | - |
+| 1. Characterization Tests | 0/3 | Not started | - |
 | 2. Module Convention & Database Foundation | 0/2 | Not started | - |
 | 3. STAFF & CATALOG Extraction | 0/2 | Not started | - |
 | 4. Ledger Separation | 0/2 | Not started | - |
