@@ -1,7 +1,7 @@
 # Requirements: HOD (Home & Office Delivery)
 
 **Defined:** 2026-03-28
-**Core Value:** Dual ledger integrity — every stock movement and financial transaction traceable through double-entry bookkeeping
+**Core Value:** Dual ledger integrity -- every stock movement and financial transaction traceable through double-entry bookkeeping
 
 ## v1 Requirements
 
@@ -10,11 +10,11 @@ Requirements for this milestone. Each maps to roadmap phases.
 ### Architecture
 
 - [ ] **ARCH-01**: All 6 bounded contexts cleanly separated with own models, repositories, services, schemas
-- [ ] **ARCH-02**: Each module exposes `public.py` facade — other modules import only from this
-- [ ] **ARCH-03**: Unified Repository → Service → frozen DTO (`dataclasses(frozen=True, slots=True)`) pattern across all modules
-- [ ] **ARCH-04**: Composite UoWs decomposed — each module UoW contains only its own repositories
+- [ ] **ARCH-02**: Each module exposes `public.py` facade -- other modules import only from this
+- [ ] **ARCH-03**: Unified Repository -> Service -> frozen DTO (`dataclasses(frozen=True, slots=True)`) pattern across all modules
+- [ ] **ARCH-04**: Composite UoWs decomposed -- each module UoW contains only its own repositories
 - [ ] **ARCH-05**: Application-layer orchestrators (FulfillmentService, OnboardingService) handle cross-domain transactions
-- [ ] **ARCH-06**: Orders God Service (1,151 lines) decomposed — fulfillment logic extracted to application layer
+- [ ] **ARCH-06**: Orders God Service (1,151 lines) decomposed -- fulfillment logic extracted to application layer
 - [ ] **ARCH-07**: Stock Ledger (INVENTORY) and Financial Ledger (BILLING) cleanly separated as independent modules
 - [ ] **ARCH-08**: LOGISTICS module owns StockTransfer documents and StockTransaction entries
 - [ ] **ARCH-09**: CRM module owns clients, addresses, contracts, pricing
@@ -129,13 +129,74 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| (populated during roadmap creation) | | |
+| ARCH-01 | Phase 6 | Pending |
+| ARCH-02 | Phase 2 | Pending |
+| ARCH-03 | Phase 2 | Pending |
+| ARCH-04 | Phase 6 | Pending |
+| ARCH-05 | Phase 6 | Pending |
+| ARCH-06 | Phase 6 | Pending |
+| ARCH-07 | Phase 4 | Pending |
+| ARCH-08 | Phase 5 | Pending |
+| ARCH-09 | Phase 5 | Pending |
+| ARCH-10 | Phase 3 | Pending |
+| TEST-01 | Phase 1 | Pending |
+| TEST-02 | Phase 1 | Pending |
+| TEST-03 | Phase 1 | Pending |
+| TEST-04 | Phase 1 | Pending |
+| TEST-05 | Phase 6 | Pending |
+| DB-01 | Phase 2 | Pending |
+| DB-02 | Phase 2 | Pending |
+| AUTH-01 | Phase 7 | Pending |
+| AUTH-02 | Phase 7 | Pending |
+| AUTH-03 | Phase 7 | Pending |
+| AUTH-04 | Phase 7 | Pending |
+| COUR-01 | Phase 8 | Pending |
+| COUR-02 | Phase 8 | Pending |
+| COUR-03 | Phase 8 | Pending |
+| COUR-04 | Phase 8 | Pending |
+| COUR-05 | Phase 8 | Pending |
+| COUR-06 | Phase 8 | Pending |
+| COUR-07 | Phase 8 | Pending |
+| COUR-08 | Phase 8 | Pending |
+| COUR-09 | Phase 8 | Pending |
+| COUR-10 | Phase 8 | Pending |
+| COUR-11 | Phase 8 | Pending |
+| COUR-12 | Phase 8 | Pending |
+| CLNT-01 | Phase 9 | Pending |
+| CLNT-02 | Phase 9 | Pending |
+| CLNT-03 | Phase 9 | Pending |
+| CLNT-04 | Phase 9 | Pending |
+| CLNT-05 | Phase 9 | Pending |
+| CLNT-06 | Phase 9 | Pending |
+| CLNT-07 | Phase 9 | Pending |
+| CLNT-08 | Phase 9 | Pending |
+| CLNT-09 | Phase 9 | Pending |
+| CLNT-10 | Phase 9 | Pending |
+| CLNT-11 | Phase 9 | Pending |
+| CLNT-12 | Phase 9 | Pending |
+| CLNT-13 | Phase 9 | Pending |
+| STAF-01 | Phase 10 | Pending |
+| STAF-02 | Phase 10 | Pending |
+| STAF-03 | Phase 10 | Pending |
+| STAF-04 | Phase 10 | Pending |
+| STAF-05 | Phase 10 | Pending |
+| STAF-06 | Phase 10 | Pending |
+| STAF-07 | Phase 10 | Pending |
+| STAF-08 | Phase 10 | Pending |
+| STAF-09 | Phase 10 | Pending |
+| STAF-10 | Phase 10 | Pending |
+| STAF-11 | Phase 10 | Pending |
+| STAF-12 | Phase 10 | Pending |
+| STAF-13 | Phase 10 | Pending |
+| STAF-14 | Phase 10 | Pending |
+| STAF-15 | Phase 10 | Pending |
+| STAF-16 | Phase 10 | Pending |
 
 **Coverage:**
-- v1 requirements: 51 total
-- Mapped to phases: 0 (pending roadmap)
-- Unmapped: 51 ⚠️
+- v1 requirements: 62 total
+- Mapped to phases: 62
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-28*
-*Last updated: 2026-03-28 after initial definition*
+*Last updated: 2026-03-28 after roadmap creation*
