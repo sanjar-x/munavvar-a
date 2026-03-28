@@ -14,7 +14,7 @@ from src.modules.catalog.schemas import (
     ProductResponse,
     ProductUpdate,
 )
-from src.modules.catalog.services import CatalogService
+from src.modules.catalog.public import CatalogService
 
 catalog_router = APIRouter()
 

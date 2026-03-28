@@ -15,7 +15,7 @@ from src.application.client.schemas import (
 )
 from src.application.client.uow import ClientUnitOfWork
 from src.infrastructure.database.models import User
-from src.modules.catalog.services import CatalogService
+from src.modules.catalog.public import CatalogService
 from src.modules.inventory.enums import (
     InventoryType,
     TransferStatus,

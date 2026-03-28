@@ -6,7 +6,7 @@ from typing import cast
 
 from src.common.service import BaseService
 from src.infrastructure.database.models import Order
-from src.modules.catalog.services import CatalogService
+from src.modules.catalog.public import CatalogService
 from src.modules.finances.enums import TransactionStatus
 from src.modules.inventory.enums import (
     InventoryType,

@@ -7,7 +7,7 @@ from src.application.client.service import ClientService
 from src.application.client.uow import ClientUnitOfWork, IClientUnitOfWork
 from src.infrastructure.database.session import async_session_maker
 from src.modules.catalog.dependencies import get_catalog_service
-from src.modules.catalog.services import CatalogService
+from src.modules.catalog.public import CatalogService
 
 
 def get_client_uow() -> IClientUnitOfWork:

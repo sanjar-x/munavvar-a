@@ -5,7 +5,7 @@ from fastapi import Depends
 
 from src.infrastructure.database.session import async_session_maker
 from src.modules.catalog.dependencies import get_catalog_service
-from src.modules.catalog.services import CatalogService
+from src.modules.catalog.public import CatalogService
 from src.modules.orders.services import BaseOrderService
 from src.modules.orders.uow import BaseOrderUnitOfWork
 

@@ -3,7 +3,7 @@ from collections.abc import Sequence
 from datetime import datetime
 
 from src.infrastructure.database.models import Inventory, StockTransfer
-from src.modules.catalog.services import CatalogService
+from src.modules.catalog.public import CatalogService
 from src.modules.inventory.enums import (
     InventoryType,
     TransferStatus,

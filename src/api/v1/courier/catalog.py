@@ -9,7 +9,7 @@ from src.modules.auth.dependencies import get_current_user
 from src.modules.catalog.dependencies import get_catalog_service
 from src.modules.catalog.enums import ProductType
 from src.modules.catalog.schemas import ProductResponse
-from src.modules.catalog.services import CatalogService
+from src.modules.catalog.public import CatalogService
 
 catalog_router = APIRouter()
 
