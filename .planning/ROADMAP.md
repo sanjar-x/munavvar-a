@@ -37,7 +37,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Plans**: 3 plans
 
 Plans:
-- [ ] 01-01-PLAN.md -- Test infrastructure (conftest) + delivery fulfillment test (TEST-01)
+- [x] 01-01-PLAN.md -- Test infrastructure (conftest) + delivery fulfillment test (TEST-01)
 - [ ] 01-02-PLAN.md -- Warehouse pickup test (TEST-02) + walk-in sale test (TEST-03)
 - [ ] 01-03-PLAN.md -- Courier shift close test (TEST-04)
 

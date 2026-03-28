@@ -22,7 +22,7 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 ### Testing
 
-- [ ] **TEST-01**: Characterization tests for order delivery fulfillment flow (stock + financial atomicity)
+- [x] **TEST-01**: Characterization tests for order delivery fulfillment flow (stock + financial atomicity)
 - [ ] **TEST-02**: Characterization tests for warehouse pickup flow
 - [ ] **TEST-03**: Characterization tests for walk-in sale flow
 - [ ] **TEST-04**: Characterization tests for courier shift close flow
@@ -139,7 +139,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | ARCH-08 | Phase 5 | Pending |
 | ARCH-09 | Phase 5 | Pending |
 | ARCH-10 | Phase 3 | Pending |
-| TEST-01 | Phase 1 | Pending |
+| TEST-01 | Phase 1 | Complete |
 | TEST-02 | Phase 1 | Pending |
 | TEST-03 | Phase 1 | Pending |
 | TEST-04 | Phase 1 | Pending |
