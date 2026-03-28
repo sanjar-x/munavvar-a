@@ -30,8 +30,8 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 ### Database
 
-- [ ] **DB-01**: Alembic migrations rebuilt from scratch (clean schema)
-- [ ] **DB-02**: PG triggers preserved for ledger balance enforcement (stock + financial)
+- [x] **DB-01**: Alembic migrations rebuilt from scratch (clean schema)
+- [x] **DB-02**: PG triggers preserved for ledger balance enforcement (stock + financial)
 
 ### Auth & Security
 
@@ -144,8 +144,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | TEST-03 | Phase 1 | Complete |
 | TEST-04 | Phase 1 | Complete |
 | TEST-05 | Phase 6 | Pending |
-| DB-01 | Phase 2 | Pending |
-| DB-02 | Phase 2 | Pending |
+| DB-01 | Phase 2 | Complete |
+| DB-02 | Phase 2 | Complete |
 | AUTH-01 | Phase 7 | Pending |
 | AUTH-02 | Phase 7 | Pending |
 | AUTH-03 | Phase 7 | Pending |
