@@ -12,6 +12,6 @@ class AccountType(enum.StrEnum):
 
 
 class TransactionStatus(enum.StrEnum):
-    PENDING = "pending"  # Ждет проверки бухгалтером (скриншот загружен)
-    COMPLETED = "completed"  # Деньги реально на счету (влияет на баланс)
-    REJECTED = "rejected"  # Фейковый скриншот или отмена
+    PENDING = "pending"
+    COMPLETED = "completed"
+    REJECTED = "rejected"

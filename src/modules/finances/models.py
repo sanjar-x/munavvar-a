@@ -14,13 +14,18 @@ if TYPE_CHECKING:
     from src.modules.orders.models import Order
 
 account_type_enum = Enum(
-    AccountType, name="account_type_enum", native_enum=True, create_type=True
+    AccountType,
+    name="account_type_enum",
+    native_enum=True,
+    create_type=True,
+    values_callable=lambda e: [m.value for m in e],
 )
 transaction_status_enum = Enum(
     TransactionStatus,
     name="transaction_status_enum",
     native_enum=True,
     create_type=True,
+    values_callable=lambda e: [m.value for m in e],
 )
 
 
