@@ -25,6 +25,7 @@ The dual ledger system (Stock Ledger + Financial Ledger) must always maintain in
 - ✓ Database seeder for test data — existing
 - ✓ Backoffice API endpoints (partial) — existing
 - ✓ Frontend admin SPA (React 19, RTK Query, 13 pages) — existing
+- ✓ Characterization tests for 4 business flows (delivery, pickup, walk-in, shift close) — Phase 1
 
 ### Active
 
@@ -112,4 +113,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-03-28 after initialization*
+*Last updated: 2026-03-28 after Phase 1 completion*
