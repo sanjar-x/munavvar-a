@@ -132,6 +132,23 @@ class UserRepository(BaseRepository[User]):
     async def add_courier(self, **kwargs: Any) -> User:
         return await self.add_with_role(role=Role.COURIER, **kwargs)
 
+    async def get(
+        self,
+        id: uuid.UUID,
+        active_only: bool = True,
+        with_for_update: bool = False,
+    ) -> User | None:
+        query = select(self.model).where(self.model.id == id).options(
+            selectinload(self.model.identities)
+        )
+        if active_only:
+            query = query.where(self.model.is_active.is_(True))
+        if with_for_update:
+            query = query.with_for_update()
+
+        result = await self.session.execute(query)
+        return result.scalar_one_or_none()
+
     async def get_by_id(self, id: uuid.UUID) -> User | None:
         query = select(self.model).where(
             self.model.id == id, self.model.is_active.is_(True)

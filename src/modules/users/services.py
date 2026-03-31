@@ -22,7 +22,11 @@ from src.modules.users.exceptions import (
     UserUpdateConflictError,
 )
 from src.modules.users.repositories import IdentityRepository, UserRepository
-from src.modules.users.schemas import UserAdminCreate, UserAdminUpdate
+from src.modules.users.schemas import (
+    UserAdminCreate,
+    UserAdminUpdate,
+    UserClientCreate,
+)
 from src.modules.users.uow import UserUnitOfWork
 
 STAFF_ROLES: frozenset[Role] = frozenset(
@@ -109,7 +113,7 @@ class UserService(BaseService[User, UserAdminCreate, UserUnitOfWork]):
                 provider_identity_id=identity_id,
             )
 
-    async def register_client(self, schema: UserAdminCreate) -> User:
+    async def register_client(self, schema: UserClientCreate) -> User:
         """Регистрация клиента с созданием счета, инвентаря и стартовой тары"""
         async with self.uow:
             # 1. Проверяем, нет ли уже такого телефона в базе
@@ -134,7 +138,7 @@ class UserService(BaseService[User, UserAdminCreate, UserUnitOfWork]):
                 "provider_identity_id": schema.phone,
                 "password_hash": hashed_password,
             }
-            identity = await self.uow.identities.add(identity_data)
+            await self.uow.identities.add(identity_data)
 
             # 4. Создаем Счет клиента (Task 5 context)
             await self.uow.accounts.add(
@@ -192,9 +196,8 @@ class UserService(BaseService[User, UserAdminCreate, UserUnitOfWork]):
                     }
                 )
 
-            user.identities = [identity]
             await self.uow.commit()
-            return user
+            return await self._repo.get(user.id, active_only=False)
 
     async def register_local_user(self, schema: UserAdminCreate) -> User:
         """Регистрация пользователя по номеру телефона и паролю"""
@@ -222,16 +225,14 @@ class UserService(BaseService[User, UserAdminCreate, UserUnitOfWork]):
                 "provider_identity_id": schema.phone,
                 "password_hash": hashed_password,
             }
-            identity = await self.uow.identities.add(identity_data)
+            await self.uow.identities.add(identity_data)
 
             await self._ensure_courier_account(user)
-
-            user.identities = [identity]
 
             # 4. Фиксируем транзакцию
             await self.uow.commit()
 
-            return user
+            return await self._repo.get(user.id, active_only=False)
 
     async def update(self, id: uuid.UUID, schema: UserAdminUpdate) -> User:
         data = schema.model_dump(exclude_unset=True)
@@ -313,10 +314,7 @@ class UserService(BaseService[User, UserAdminCreate, UserUnitOfWork]):
 
             changed = await self._ensure_courier_account(user) or changed
 
-            if local_identity is not None:
-                user.identities = [local_identity]
-
             if changed:
                 await self.uow.commit()
 
-            return user
+            return await self._repo.get(id, active_only=False)

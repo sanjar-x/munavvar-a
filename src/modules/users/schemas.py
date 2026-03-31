@@ -60,6 +60,9 @@ class UserCreate(BaseModel):
 class UserAdminCreate(UserBase):
     phone: str
     password: PasswordStr
+
+
+class UserClientCreate(UserAdminCreate):
     initial_tare_quantity: int | None = Field(
         None, gt=0, description="Начальное количество тары при регистрации"
     )
