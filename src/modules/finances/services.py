@@ -1,7 +1,6 @@
 # src/modules/finances/services.py
 import uuid
-from collections.abc import Sequence
-from datetime import date, datetime
+from datetime import datetime
 
 from src.modules.finances.enums import (
     AccountType,
@@ -13,10 +12,9 @@ from src.modules.finances.exceptions import (
     SelfTransferError,
     TransactionNotFoundError,
 )
-from src.modules.finances.models import Account, Transaction
 from src.modules.finances.schemas import (
-    AcceptPaymentRequest,
     AccountDetail,
+    AccountResponse,
     AccountShort,
     AccountStatement,
     ClientDebt,
@@ -30,6 +28,7 @@ from src.modules.finances.schemas import (
     SystemAccountSummary,
     TransactionCreate,
     TransactionDetail,
+    TransactionResponse,
 )
 from src.modules.finances.uow import FinancesUnitOfWork
 
@@ -105,19 +104,31 @@ class BillingService:
 
     async def get_accounts(
         self,
-        filters: dict,
         skip: int,
         limit: int,
-    ) -> tuple[int, Sequence[Account]]:
+        type: AccountType | None = None,
+        search: str | None = None,
+        has_debt: bool | None = None,
+    ) -> dict:
         """Пагинированный список счетов с фильтрами."""
         async with self.uow:
-            return await self.uow.accounts.get_accounts_with_filters(
-                type=filters.get("type"),
-                search=filters.get("search"),
-                has_debt=filters.get("has_debt"),
-                skip=skip,
-                limit=limit,
+            total, items = (
+                await self.uow.accounts.get_accounts_with_filters(
+                    type=type,
+                    search=search,
+                    has_debt=has_debt,
+                    skip=skip,
+                    limit=limit,
+                )
             )
+            accounts = [
+                AccountResponse.model_validate(acc)
+                for acc in items
+            ]
+            return {
+                "total_count": total,
+                "accounts": accounts,
+            }
 
     async def get_account_detail(self, account_id: uuid.UUID) -> AccountDetail:
         """Детальная информация о счете с последними транзакциями."""
@@ -185,10 +196,10 @@ class BillingService:
     async def get_account_statement(
         self,
         account_id: uuid.UUID,
-        date_from: date,
-        date_to: date,
-        skip: int,
-        limit: int,
+        date_from: datetime | None = None,
+        date_to: datetime | None = None,
+        skip: int = 0,
+        limit: int = 50,
     ) -> AccountStatement:
         """Выписка по счету за период с running balance."""
         async with self.uow:
@@ -196,18 +207,20 @@ class BillingService:
             if not account:
                 raise AccountNotFoundError(account_id=account_id)
 
-            dt_from = datetime(
-                date_from.year,
-                date_from.month,
-                date_from.day,
+            now = datetime.now()
+            if date_from is None:
+                date_from = now.replace(
+                    day=1, hour=0, minute=0,
+                    second=0, microsecond=0,
+                )
+            if date_to is None:
+                date_to = now
+
+            dt_from = date_from.replace(
+                hour=0, minute=0, second=0, microsecond=0,
             )
-            dt_to = datetime(
-                date_to.year,
-                date_to.month,
-                date_to.day,
-                23,
-                59,
-                59,
+            dt_to = date_to.replace(
+                hour=23, minute=59, second=59, microsecond=0,
             )
 
             # Opening balance = incoming - outgoing до начала
@@ -275,8 +288,8 @@ class BillingService:
             )
 
             period = StatementPeriod(
-                date_from=date_from,
-                date_to=date_to,
+                date_from=dt_from.date(),
+                date_to=dt_to.date(),
                 opening_balance=opening_balance,
                 closing_balance=closing_balance,
                 total_incoming=total_incoming,
@@ -295,23 +308,66 @@ class BillingService:
 
     async def get_transactions(
         self,
-        filters: dict,
         skip: int,
         limit: int,
-    ) -> tuple[int, Sequence[Transaction]]:
+        status: TransactionStatus | None = None,
+        account_id: uuid.UUID | None = None,
+        order_id: uuid.UUID | None = None,
+        date_from: datetime | None = None,
+        date_to: datetime | None = None,
+        min_amount: int | None = None,
+        max_amount: int | None = None,
+    ) -> dict:
         """Пагинированный список транзакций с фильтрами."""
+        filters = {
+            "status": status,
+            "account_id": account_id,
+            "order_id": order_id,
+            "date_from": date_from,
+            "date_to": date_to,
+            "min_amount": min_amount,
+            "max_amount": max_amount,
+        }
         async with self.uow:
-            return await self.uow.transactions.get_transactions_with_filters(
-                filters=filters,
-                skip=skip,
-                limit=limit,
+            (
+                total,
+                items,
+            ) = (
+                await self.uow.transactions
+                .get_transactions_with_filters(
+                    filters=filters,
+                    skip=skip,
+                    limit=limit,
+                )
             )
+            transactions = [
+                TransactionDetail(
+                    id=t.id,
+                    from_account=AccountShort.model_validate(
+                        t.from_account,
+                    ),
+                    to_account=AccountShort.model_validate(
+                        t.to_account,
+                    ),
+                    amount=t.amount,
+                    status=t.status,
+                    reason=t.reason,
+                    order_id=t.order_id,
+                    verified_by_id=t.verified_by_id,
+                    created_at=t.created_at,
+                )
+                for t in items
+            ]
+            return {
+                "total_count": total,
+                "transactions": transactions,
+            }
 
-    async def create_manual_transaction(
+    async def create_transaction(
         self,
         dto: TransactionCreate,
         created_by_id: uuid.UUID,
-    ) -> Transaction:
+    ) -> TransactionResponse:
         """Ручная проводка (COMPLETED немедленно).
 
         Валидация: from != to, amount > 0, оба счета существуют.
@@ -324,14 +380,20 @@ class BillingService:
             if not from_account:
                 raise AccountNotFoundError(
                     account_id=dto.from_id,
-                    message=(f"Счет списания не найден: {dto.from_id}"),
+                    message=(
+                        "Счет списания не найден:"
+                        f" {dto.from_id}"
+                    ),
                 )
 
             to_account = await self.uow.accounts.get(dto.to_id)
             if not to_account:
                 raise AccountNotFoundError(
                     account_id=dto.to_id,
-                    message=(f"Счет зачисления не найден: {dto.to_id}"),
+                    message=(
+                        "Счет зачисления не найден:"
+                        f" {dto.to_id}"
+                    ),
                 )
 
             txn_data = {
@@ -346,22 +408,26 @@ class BillingService:
             txn = await self.uow.transactions.add(txn_data)
             await self.uow.commit()
 
-            return txn
+            return TransactionResponse.model_validate(txn)
 
     async def verify_transaction(
         self,
-        txn_id: uuid.UUID,
+        transaction_id: uuid.UUID,
         verified_by_id: uuid.UUID,
-    ) -> Transaction:
+    ) -> TransactionResponse:
         """PENDING -> COMPLETED. Устанавливает verified_by_id."""
         async with self.uow:
-            txn = await self.uow.transactions.get_for_update(txn_id)
+            txn = await self.uow.transactions.get_for_update(
+                transaction_id,
+            )
             if not txn:
-                raise TransactionNotFoundError(transaction_id=txn_id)
+                raise TransactionNotFoundError(
+                    transaction_id=transaction_id,
+                )
 
             if txn.status != TransactionStatus.PENDING:
                 raise InvalidTransactionStatusError(
-                    transaction_id=txn_id,
+                    transaction_id=transaction_id,
                     current_status=txn.status,
                 )
 
@@ -370,34 +436,40 @@ class BillingService:
             await self.uow.flush()
             await self.uow.commit()
 
-            return txn
+            return TransactionResponse.model_validate(txn)
 
     async def reject_transaction(
         self,
-        txn_id: uuid.UUID,
+        transaction_id: uuid.UUID,
         verified_by_id: uuid.UUID,
         reason: str | None = None,
-    ) -> Transaction:
+    ) -> TransactionResponse:
         """PENDING -> REJECTED. Устанавливает verified_by_id."""
         async with self.uow:
-            txn = await self.uow.transactions.get_for_update(txn_id)
+            txn = await self.uow.transactions.get_for_update(
+                transaction_id,
+            )
             if not txn:
-                raise TransactionNotFoundError(transaction_id=txn_id)
+                raise TransactionNotFoundError(
+                    transaction_id=transaction_id,
+                )
 
             if txn.status != TransactionStatus.PENDING:
                 raise InvalidTransactionStatusError(
-                    transaction_id=txn_id,
+                    transaction_id=transaction_id,
                     current_status=txn.status,
                 )
 
             txn.status = TransactionStatus.REJECTED
             txn.verified_by_id = verified_by_id
             if reason:
-                txn.reason = f"{txn.reason} | Отклонено: {reason}"
+                txn.reason = (
+                    f"{txn.reason} | Отклонено: {reason}"
+                )
             await self.uow.flush()
             await self.uow.commit()
 
-            return txn
+            return TransactionResponse.model_validate(txn)
 
     # ----------------------------------------------------------
     # Courier summary
@@ -465,7 +537,7 @@ class BillingService:
     # Client debts
     # ----------------------------------------------------------
 
-    async def get_clients_debts(
+    async def get_client_debts(
         self,
         min_debt: int = 0,
         skip: int = 0,
@@ -514,7 +586,8 @@ class BillingService:
             )
 
     async def _get_last_payment_date(
-        self, account_id: uuid.UUID,
+        self,
+        account_id: uuid.UUID,
     ) -> datetime | None:
         """Дата последнего исходящего COMPLETED-платежа."""
         from sqlalchemy import select
@@ -543,51 +616,64 @@ class BillingService:
 
     async def accept_payment(
         self,
-        dto: AcceptPaymentRequest,
-        cashier_id: uuid.UUID,
-    ) -> Transaction:
+        client_id: uuid.UUID,
+        amount: int,
+        payment_method: str,
+        reason: str,
+        accepted_by_id: uuid.UUID,
+        order_id: uuid.UUID | None = None,
+    ) -> TransactionResponse:
         """Касса: приём оплаты от клиента.
 
         cash: CLIENT -> CASH (COMPLETED)
         card: CLIENT -> CARD (PENDING)
         """
         async with self.uow:
-            # Получаем счёт клиента
-            client_account = await self.uow.accounts.get_client_account(
-                dto.client_id,
+            client_account = (
+                await self.uow.accounts.get_client_account(
+                    client_id,
+                )
             )
             if not client_account:
                 raise AccountNotFoundError(
                     message=(
-                        f"Лицевой счет клиента не найден: {dto.client_id}"
+                        "Лицевой счет клиента"
+                        f" не найден: {client_id}"
                     ),
                 )
 
-            # Определяем целевой счёт и статус
-            if dto.payment_method == "cash":
-                target = await self.uow.accounts.get_system_cash_account()
+            if payment_method == "cash":
+                target = (
+                    await self.uow.accounts
+                    .get_system_cash_account()
+                )
                 status = TransactionStatus.COMPLETED
             else:
-                target = await self.uow.accounts.get_system_card_account()
+                target = (
+                    await self.uow.accounts
+                    .get_system_card_account()
+                )
                 status = TransactionStatus.PENDING
 
             if not target:
                 raise AccountNotFoundError(
                     message=(
-                        "Системный счёт для метода оплаты "
-                        f"'{dto.payment_method}' не найден."
+                        "Системный счёт для метода"
+                        " оплаты "
+                        f"'{payment_method}'"
+                        " не найден."
                     ),
                 )
 
             txn_data = {
                 "from_id": client_account.id,
                 "to_id": target.id,
-                "amount": dto.amount,
-                "reason": dto.reason,
-                "order_id": dto.order_id,
+                "amount": amount,
+                "reason": reason,
+                "order_id": order_id,
                 "status": status,
                 "verified_by_id": (
-                    cashier_id
+                    accepted_by_id
                     if status == TransactionStatus.COMPLETED
                     else None
                 ),
@@ -596,4 +682,4 @@ class BillingService:
             txn = await self.uow.transactions.add(txn_data)
             await self.uow.commit()
 
-            return txn
+            return TransactionResponse.model_validate(txn)

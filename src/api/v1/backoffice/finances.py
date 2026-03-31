@@ -271,7 +271,7 @@ async def reject_transaction(
     """Отклонение PENDING-транзакции с указанием причины."""
     return await billing_service.reject_transaction(
         transaction_id=transaction_id,
-        rejected_by_id=current_user.id,
+        verified_by_id=current_user.id,
         reason=reason,
     )
 
