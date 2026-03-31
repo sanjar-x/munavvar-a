@@ -28,13 +28,17 @@ class IdentityRepository(BaseRepository[Identity]):
         super().__init__(model=Identity, session=session)
 
     async def add_local(
-        self, user_id: UUID, provider_identity_id: str
+        self,
+        user_id: UUID,
+        provider_identity_id: str,
+        password_hash: str | None = None,
     ) -> Identity:
         return await self.add(
             {
                 "user_id": user_id,
                 "provider": AuthProvider.LOCAL,
                 "provider_identity_id": provider_identity_id,
+                "password_hash": password_hash,
             }
         )
 
@@ -69,6 +73,14 @@ class IdentityRepository(BaseRepository[Identity]):
 
     async def get_local_by_user(self, user_id: UUID) -> Identity:
         return await self.get_by_user_and_provider(user_id, AuthProvider.LOCAL)
+
+    async def get_local_by_user_or_none(self, user_id: UUID) -> Identity | None:
+        query = select(self.model).where(
+            self.model.user_id == user_id,
+            self.model.provider == AuthProvider.LOCAL,
+        )
+        result = await self.session.execute(query)
+        return result.scalar_one_or_none()
 
 
 class UserRepository(BaseRepository[User]):
@@ -297,22 +309,29 @@ class UserRepository(BaseRepository[User]):
         result = await self.session.scalars(query)
         return total_count, result.all()
 
-    async def update(self, id: uuid.UUID, obj_data: dict[str, Any]) -> User:
+    async def update(
+        self,
+        id: uuid.UUID,
+        obj_data: dict[str, Any],
+        active_only: bool = True,
+    ) -> User:
         update_data = {
             k: v for k, v in obj_data.items() if k in self._updatable_keys
         }
 
         if not update_data:
-            query = select(self.model).where(
-                self.model.id == id, self.model.is_active.is_(True)
-            )
+            query = select(self.model).where(self.model.id == id)
+            if active_only:
+                query = query.where(self.model.is_active.is_(True))
             result = await self.session.execute(query)
             return result.scalar_one()
 
+        statement = update(self.model).where(self.model.id == id)
+        if active_only:
+            statement = statement.where(self.model.is_active.is_(True))
+
         statement = (
-            update(self.model)
-            .where(self.model.id == id, self.model.is_active.is_(True))
-            .values(update_data)
+            statement.values(update_data)
             .returning(self.model)
             .execution_options(synchronize_session="fetch")
         )

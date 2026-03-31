@@ -81,7 +81,11 @@ class UserProfileUpdate(BaseModel):
 
 
 # 2. Схема для администратора (Управление доступом)
-class UserAdminUpdate(UserAdminCreate):
+class UserAdminUpdate(BaseModel):
+    username: FullNameStr | None = None
+    phone: str | None = None
+    password: PasswordStr | None = None
+    role: Role | None = None
     is_active: bool | None = None
 
 

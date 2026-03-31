@@ -6,6 +6,7 @@ from src.core.exceptions import (
     ConflictError,
     ForbiddenError,
     NotFoundError,
+    UnprocessableEntityError,
     ServiceUnavailableError,
     UnauthorizedError,
 )
@@ -88,4 +89,16 @@ class UserDeleteConflictError(ConflictError):
             message=f"Отказ физического удаления. Пользователь {user_id} имеет жесткие связи в базе данных.",
             error_code="USER_DELETE_CONFLICT",
             details=details,
+        )
+
+
+class StaffPasswordRequiredError(UnprocessableEntityError):
+    def __init__(self, user_id: uuid.UUID, role: str):
+        super().__init__(
+            message=(
+                "Для назначения роли сотрудника необходимо задать пароль "
+                "для локального входа."
+            ),
+            error_code="STAFF_PASSWORD_REQUIRED",
+            details={"user_id": user_id, "role": role},
         )

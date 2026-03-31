@@ -2,7 +2,10 @@
 import uuid
 from typing import Any
 
+from sqlalchemy.exc import IntegrityError
+
 from src.common.service import BaseService
+from src.core.exceptions import BadRequestError
 from src.core.security.password import get_password_hash
 from src.infrastructure.database.models import User
 from src.modules.finances.enums import AccountType
@@ -12,10 +15,25 @@ from src.modules.inventory.enums import (
     TransferType,
 )
 from src.modules.users.enums import AuthProvider, Role
-from src.modules.users.exceptions import UserAlreadyExistsError
-from src.modules.users.repositories import UserRepository
-from src.modules.users.schemas import UserAdminCreate
+from src.modules.users.exceptions import (
+    StaffPasswordRequiredError,
+    UserAlreadyExistsError,
+    UserNotFoundError,
+    UserUpdateConflictError,
+)
+from src.modules.users.repositories import IdentityRepository, UserRepository
+from src.modules.users.schemas import UserAdminCreate, UserAdminUpdate
 from src.modules.users.uow import UserUnitOfWork
+
+STAFF_ROLES: frozenset[Role] = frozenset(
+    {
+        Role.ADMIN,
+        Role.ACCOUNTANT,
+        Role.STOREKEEPER,
+        Role.CASHIER,
+        Role.COURIER,
+    }
+)
 
 
 class UserService(BaseService[User, UserAdminCreate, UserUnitOfWork]):
@@ -25,6 +43,27 @@ class UserService(BaseService[User, UserAdminCreate, UserUnitOfWork]):
     @property
     def _repo(self) -> UserRepository:
         return self.uow.users
+
+    @property
+    def _identity_repo(self) -> IdentityRepository:
+        return self.uow.identities
+
+    async def _ensure_courier_account(self, user: User) -> bool:
+        if user.role != Role.COURIER:
+            return False
+
+        account = await self.uow.accounts.get_by(
+            user_id=user.id,
+            type=AccountType.COURIER,
+        )
+        if account:
+            return False
+
+        await self.uow.accounts.create_courier_account(
+            courier_id=user.id,
+            courier_name=user.username,
+        )
+        return True
 
     async def get_system_user(self) -> User:
         async with self.uow:
@@ -95,7 +134,7 @@ class UserService(BaseService[User, UserAdminCreate, UserUnitOfWork]):
                 "provider_identity_id": schema.phone,
                 "password_hash": hashed_password,
             }
-            await self.uow.identities.add(identity_data)
+            identity = await self.uow.identities.add(identity_data)
 
             # 4. Создаем Счет клиента (Task 5 context)
             await self.uow.accounts.add(
@@ -153,6 +192,7 @@ class UserService(BaseService[User, UserAdminCreate, UserUnitOfWork]):
                     }
                 )
 
+            user.identities = [identity]
             await self.uow.commit()
             return user
 
@@ -182,9 +222,101 @@ class UserService(BaseService[User, UserAdminCreate, UserUnitOfWork]):
                 "provider_identity_id": schema.phone,
                 "password_hash": hashed_password,
             }
-            await self.uow.identities.add(identity_data)
+            identity = await self.uow.identities.add(identity_data)
+
+            await self._ensure_courier_account(user)
+
+            user.identities = [identity]
 
             # 4. Фиксируем транзакцию
             await self.uow.commit()
+
+            return user
+
+    async def update(self, id: uuid.UUID, schema: UserAdminUpdate) -> User:
+        data = schema.model_dump(exclude_unset=True)
+        user_data = {
+            key: value
+            for key, value in data.items()
+            if key in {"username", "role", "is_active"}
+        }
+        phone = data.get("phone")
+        password = data.get("password")
+
+        async with self.uow:
+            user = await self._repo.get(id=id, active_only=False)
+            if not user:
+                raise UserNotFoundError(user_id=id)
+
+            local_identity = await self._identity_repo.get_local_by_user_or_none(
+                user_id=id
+            )
+            next_role = user_data.get("role", user.role)
+
+            if next_role in STAFF_ROLES:
+                if local_identity is None and phone is None:
+                    raise BadRequestError(
+                        message=(
+                            "Для локального staff-входа требуется номер телефона."
+                        ),
+                        error_code="STAFF_PHONE_REQUIRED",
+                        details={"user_id": id, "role": next_role.value},
+                    )
+                if (
+                    local_identity is None or not local_identity.password_hash
+                ) and not password:
+                    raise StaffPasswordRequiredError(
+                        user_id=id,
+                        role=next_role.value,
+                    )
+
+            changed = False
+
+            if user_data:
+                user = await self._repo.update(id, user_data, active_only=False)
+                changed = True
+
+            if phone is not None or password is not None:
+                identity_data: dict[str, str] = {}
+                if phone is not None:
+                    identity_data["provider_identity_id"] = phone
+                if password is not None:
+                    identity_data["password_hash"] = get_password_hash(password)
+
+                try:
+                    if local_identity is None:
+                        if phone is None:
+                            raise BadRequestError(
+                                message=(
+                                    "Нельзя создать локальный вход без номера телефона."
+                                ),
+                                error_code="PHONE_REQUIRED_FOR_LOCAL_IDENTITY",
+                                details={"user_id": id},
+                            )
+                        local_identity = await self._identity_repo.add_local(
+                            user_id=id,
+                            provider_identity_id=phone,
+                            password_hash=identity_data.get("password_hash"),
+                        )
+                    else:
+                        local_identity = await self._identity_repo.update(
+                            local_identity.id,
+                            identity_data,
+                        )
+                except IntegrityError as exc:
+                    raise UserUpdateConflictError(
+                        user_id=id,
+                        reason="Номер телефона уже используется другим пользователем.",
+                    ) from exc
+
+                changed = True
+
+            changed = await self._ensure_courier_account(user) or changed
+
+            if local_identity is not None:
+                user.identities = [local_identity]
+
+            if changed:
+                await self.uow.commit()
 
             return user
