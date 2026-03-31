@@ -4,6 +4,7 @@ import uuid
 from typing import Any
 
 from src.core.exceptions import (
+    BadRequestError,
     ConflictError,
     ForbiddenError,
     NotFoundError,
@@ -82,7 +83,7 @@ class OrderAccessDeniedError(ForbiddenError):
         )
 
 
-class EmptyCartError(ConflictError):
+class EmptyCartError(BadRequestError):
     """Выбрасывается при попытке оформить заказ без товаров."""
 
     def __init__(

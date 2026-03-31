@@ -61,38 +61,44 @@ class AccountRepository(BaseRepository[Account]):
 
     async def get_user_account_by_type(
         self, user_id: uuid.UUID, account_type: AccountType
-    ) -> Account:
+    ) -> Account | None:
         query = select(self.model).where(
             self.model.user_id == user_id,
             self.model.type == account_type,
             self.model.is_active.is_(True),
         )
         result = await self.session.execute(query)
-        return result.scalar_one()
+        return result.scalar_one_or_none()
 
-    async def get_system_account(self, account_type: AccountType) -> Account:
+    async def get_system_account(
+        self, account_type: AccountType
+    ) -> Account | None:
         return await self.get_user_account_by_type(
             user_id=settings.SYSTEM_USER_ID, account_type=account_type
         )
 
-    async def get_system_revenue_account(self) -> Account:
+    async def get_system_revenue_account(self) -> Account | None:
         return await self.get_system_account(account_type=AccountType.REVENUE)
 
-    async def get_system_cash_account(self) -> Account:
+    async def get_system_cash_account(self) -> Account | None:
         return await self.get_system_account(account_type=AccountType.CASH)
 
-    async def get_system_card_account(self) -> Account:
+    async def get_system_card_account(self) -> Account | None:
         return await self.get_system_account(account_type=AccountType.CARD)
 
-    async def get_system_bank_account(self) -> Account:
+    async def get_system_bank_account(self) -> Account | None:
         return await self.get_system_account(account_type=AccountType.BANK)
 
-    async def get_courier_account(self, courier_id: uuid.UUID) -> Account:
+    async def get_courier_account(
+        self, courier_id: uuid.UUID
+    ) -> Account | None:
         return await self.get_user_account_by_type(
             user_id=courier_id, account_type=AccountType.COURIER
         )
 
-    async def get_client_account(self, client_id: uuid.UUID) -> Account:
+    async def get_client_account(
+        self, client_id: uuid.UUID
+    ) -> Account | None:
         return await self.get_user_account_by_type(
             user_id=client_id, account_type=AccountType.CLIENT
         )

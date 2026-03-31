@@ -16,11 +16,13 @@ from src.modules.orders.repositories import (
     OrderItemRepository,
     OrderRepository,
 )
+from src.modules.users.repositories import UserRepository
 
 
 class BaseOrderUnitOfWork(BaseSQLAlchemyUoW):
     orders: OrderRepository
     order_items: OrderItemRepository
+    users: UserRepository
     inventories: InventoryRepository
     transfers: StockTransferRepository
     transfer_items: StockTransferItemRepository
@@ -33,6 +35,7 @@ class BaseOrderUnitOfWork(BaseSQLAlchemyUoW):
 
         self.orders = OrderRepository(session=self.session)
         self.order_items = OrderItemRepository(session=self.session)
+        self.users = UserRepository(session=self.session)
         self.inventories = InventoryRepository(session=self.session)
         self.transfers = StockTransferRepository(session=self.session)
         self.transfer_items = StockTransferItemRepository(session=self.session)

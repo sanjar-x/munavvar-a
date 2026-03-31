@@ -181,7 +181,7 @@ class OrderResponse(BaseModel):
             "авто-оприходование недостающей тары (INITIAL_BALANCE)."
         ),
     )
-    sale_type: str = Field(
+    sale_type: SaleType = Field(
         default=SaleType.DELIVERY,
         description="Тип продажи: delivery или warehouse_pickup",
     )

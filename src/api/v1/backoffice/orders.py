@@ -300,7 +300,7 @@ async def update_order_status(
         BaseOrderService, Depends(get_base_order_service)
     ],
 ):
-    """Принудительно изменить статус заказа (ручная корректировка)."""
+    """Изменить статус заказа в рамках допустимых FSM-переходов."""
     return await _update_backoffice_order_status(
         order_id=order_id,
         new_status=new_status,

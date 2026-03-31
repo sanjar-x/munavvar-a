@@ -347,6 +347,33 @@ class TaraCapitalizationLimitExceededError(ConflictError):
         )
 
 
+class InventoryReconciliationError(ConflictError):
+    """
+    Рассинхрон остатков при закрытии смены.
+    Выбрасывается, если фактическое количество не совпадает с системным.
+    """
+
+    def __init__(
+        self,
+        product_id: uuid.UUID | str,
+        system_qty: int,
+        returned_qty: int,
+        message: str = (
+            "Рассинхрон остатков. "
+            "Оформите акт списания перед закрытием смены."
+        ),
+    ):
+        super().__init__(
+            message=message,
+            error_code="INVENTORY_RECONCILIATION_MISMATCH",
+            details={
+                "product_id": str(product_id),
+                "system_quantity": system_qty,
+                "returned_quantity": returned_qty,
+            },
+        )
+
+
 class ReversalNotAllowedError(ForbiddenError):
     """Попытка отменить/отреверсировать накладную, которую отменять нельзя (например, Инвентаризацию)."""
 

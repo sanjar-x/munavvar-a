@@ -2,7 +2,7 @@ import uuid
 from collections.abc import Sequence
 from datetime import datetime
 
-from src.core.exceptions import ConflictError
+from src.core.exceptions import BadRequestError, ConflictError
 from src.infrastructure.database.models import Inventory, StockTransfer
 from src.modules.catalog.public import CatalogService
 from src.modules.inventory.enums import (
@@ -155,7 +155,11 @@ class TransportService:
                 InventoryType.VIRTUAL_VENDOR,
                 InventoryType.VIRTUAL_LOSS,
             ):
-                raise ValueError("Удаление системных складов запрещено")
+                raise BadRequestError(
+                    message="Удаление системных складов запрещено",
+                    error_code="SYSTEM_INVENTORY_DELETE_FORBIDDEN",
+                    details={"transport_id": str(transport_id)},
+                )
 
             success = await self.uow.inventories.delete(transport_id)
             await self.uow.commit()

@@ -37,7 +37,7 @@ async def check_tara_availability(
 async def create_order(
     dto: OrderCreate,
     client: Annotated[
-        User, Security(get_current_user, scopes=[Scope.ORDERS_EDIT])
+        User, Security(get_current_user, scopes=[Scope.ORDERS_CREATE])
     ],
     base_order_service: Annotated[
         BaseOrderService, Depends(get_base_order_service)
@@ -66,15 +66,18 @@ async def add_product_to_order(
     order_id: uuid.UUID,
     product_id: Annotated[uuid.UUID, Body(embed=True)],
     quantity: Annotated[int, Body(embed=True, gt=0)],
-    admin: Annotated[
-        User, Security(get_current_user, scopes=[Scope.ORDERS_EDIT])
+    client: Annotated[
+        User, Security(get_current_user, scopes=[Scope.ORDERS_CREATE])
     ],
     base_order_service: Annotated[
         BaseOrderService, Depends(get_base_order_service)
     ],
 ):
     return await base_order_service.add_product_to_order(
-        order_id=order_id, product_id=product_id, quantity=quantity
+        order_id=order_id,
+        product_id=product_id,
+        quantity=quantity,
+        requesting_user_id=client.id,
     )
 
 
@@ -85,7 +88,7 @@ async def remove_product_from_order(
     order_id: uuid.UUID,
     product_id: uuid.UUID,
     client: Annotated[
-        User, Security(get_current_user, scopes=[Scope.ORDERS_EDIT])
+        User, Security(get_current_user, scopes=[Scope.ORDERS_CREATE])
     ],
     base_order_service: Annotated[
         BaseOrderService, Depends(get_base_order_service)
@@ -93,7 +96,9 @@ async def remove_product_from_order(
 ):
     """Полностью удалить позицию товара из заказа."""
     return await base_order_service.remove_product_from_order(
-        order_id=order_id, product_id=product_id
+        order_id=order_id,
+        product_id=product_id,
+        requesting_user_id=client.id,
     )
 
 

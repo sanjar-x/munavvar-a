@@ -2,7 +2,7 @@
 import uuid
 from typing import TYPE_CHECKING
 
-from sqlalchemy import CheckConstraint, Enum, ForeignKey, Index, String
+from sqlalchemy import CheckConstraint, Enum, ForeignKey, Index, String, text
 from sqlalchemy.dialects.postgresql import BIGINT, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -53,6 +53,7 @@ class Account(BaseModel):
     balance: Mapped[int] = mapped_column(
         BIGINT,
         default=0,
+        server_default=text("0"),
         nullable=False,
         comment="Текущий баланс. Обновляется строго через SQL-триггер транзакций!",
     )

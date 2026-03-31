@@ -6,6 +6,10 @@ from src.modules.inventory.enums import (
     TransferStatus,
     TransferType,
 )
+from src.modules.inventory.exceptions import (
+    InventoryNotFoundError,
+    InventoryReconciliationError,
+)
 from src.modules.inventory.schemas import CloseShiftRequest
 from src.modules.inventory.uow import InventoryUnitOfWork
 
@@ -35,8 +39,12 @@ class ShiftService:
                     request.courier_id
                 )
                 if not inventory:
-                    raise ValueError(
-                        f"Активный инвентарь для курьера {request.courier_id} не найден"
+                    raise InventoryNotFoundError(
+                        inventory_id=request.courier_id,
+                        message=(
+                            f"Активный инвентарь для курьера "
+                            f"{request.courier_id} не найден"
+                        ),
                     )
 
                 # Повторно запрашиваем с блокировкой
@@ -47,7 +55,10 @@ class ShiftService:
                 )
 
             if not inventory:
-                raise ValueError("Не удалось заблокировать инвентарь")
+                raise InventoryNotFoundError(
+                    inventory_id=request.courier_id,
+                    message="Не удалось заблокировать инвентарь курьера",
+                )
 
             # 2. Сверка остатков
             current_balances = {
@@ -68,10 +79,10 @@ class ShiftService:
                 ret_qty = returned_map.get(pid, 0)
 
                 if sys_qty != ret_qty:
-                    raise ValueError(
-                        f"Рассинхрон остатков по товару {pid}. "
-                        f"В системе: {sys_qty}, сдано: {ret_qty}. "
-                        "Оформите акт списания перед закрытием смены."
+                    raise InventoryReconciliationError(
+                        product_id=pid,
+                        system_qty=sys_qty,
+                        returned_qty=ret_qty,
                     )
 
             # 3. Если сверка прошла успешно — перемещаем всё на главный склад

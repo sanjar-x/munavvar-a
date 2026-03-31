@@ -17,7 +17,7 @@ from src.infrastructure.database.models import (
     StockTransferItem,
     User,
 )
-from src.modules.orders.enums import OrderStatus, PaymentMethod
+from src.modules.orders.enums import OrderStatus, PaymentMethod, SaleType
 
 
 class OrderItemRepository(BaseRepository[OrderItem]):
@@ -137,7 +137,7 @@ class OrderRepository(BaseRepository[Order]):
         courier_id: uuid.UUID | None = None,
         client_id: uuid.UUID | None = None,
         client_inventory_id: uuid.UUID | None = None,
-        sale_type: str | None = None,
+        sale_type: SaleType | None = None,
         date_from: datetime | None = None,
         date_to: datetime | None = None,
         min_amount: int | None = None,
