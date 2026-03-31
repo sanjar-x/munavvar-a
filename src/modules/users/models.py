@@ -46,7 +46,7 @@ class Identity(BaseModel):
         comment="Хэш пароля (заполняется только для provider='local')",
     )
 
-    user: Mapped["User"] = relationship(back_populates="identities")
+    user: Mapped[User] = relationship(back_populates="identities")
 
     __table_args__ = (
         UniqueConstraint(
@@ -54,9 +54,7 @@ class Identity(BaseModel):
             "provider_identity_id",
             name="uq_identities_provider_identity_id",
         ),
-        {
-            "comment": "Учетные данные пользователей и привязки к соцсетям (OAuth)"
-        },
+        {"comment": "Учетные данные пользователей и привязки к соцсетям (OAuth)"},
     )
 
 
@@ -82,13 +80,13 @@ class User(BaseModel):
         comment="Уровень доступа (роль) пользователя в системе",
     )
 
-    identities: Mapped[list["Identity"]] = relationship(
+    identities: Mapped[list[Identity]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
     )
-    accounts: Mapped[list["Account"]] = relationship(
+    accounts: Mapped[list[Account]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
     )
-    inventories: Mapped[list["Inventory"]] = relationship(
+    inventories: Mapped[list[Inventory]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
     )
 
@@ -101,13 +99,13 @@ class User(BaseModel):
             pass
         return None
 
-    client_orders: Mapped[list["Order"]] = relationship(
+    client_orders: Mapped[list[Order]] = relationship(
         "Order",
         foreign_keys="[Order.client_id]",
         back_populates="client",
         order_by="desc(Order.created_at)",
     )
-    courier_orders: Mapped[list["Order"]] = relationship(
+    courier_orders: Mapped[list[Order]] = relationship(
         "Order",
         foreign_keys="[Order.courier_id]",
         back_populates="courier",

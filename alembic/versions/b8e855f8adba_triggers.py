@@ -1,20 +1,18 @@
-"""add balance triggers and orders.capitalization_applied
+"""triggers
 
-Revision ID: a1b2c3d4e5f6
-Revises: 0e04bb949a80
-Create Date: 2026-03-15 12:00:00.000000
+Revision ID: b8e855f8adba
+Revises: 4a1ea97312ca
+Create Date: 2026-03-31 12:55:54.617012
 
 """
 
 from collections.abc import Sequence
 
-import sqlalchemy as sa
-
 from alembic import op
 
 # revision identifiers, used by Alembic.
-revision: str = "a1b2c3d4e5f6"
-down_revision: str | Sequence[str] | None = "0e04bb949a80"
+revision: str = "b8e855f8adba"
+down_revision: str | Sequence[str] | None = "4a1ea97312ca"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
@@ -163,22 +161,8 @@ def upgrade() -> None:
     op.execute(DROP_INVENTORY_BALANCES_TRIGGER)
     op.execute(CREATE_INVENTORY_BALANCES_TRIGGER)
 
-    # 3. Новая колонка: orders.capitalization_applied
-    op.add_column(
-        "orders",
-        sa.Column(
-            "capitalization_applied",
-            sa.Boolean(),
-            server_default=sa.text("false"),
-            nullable=False,
-            comment="Было ли авто-оприходование тары при создании заказа",
-        ),
-    )
-
 
 def downgrade() -> None:
-    # 3. Удаляем колонку
-    op.drop_column("orders", "capitalization_applied")
 
     # 2. Удаляем триггер и функцию инвентаря
     op.execute(DROP_INVENTORY_BALANCES_TRIGGER)

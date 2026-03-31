@@ -67,9 +67,7 @@ async def test_local_login_masks_invalid_hash_as_invalid_credentials():
     service = AuthService(FakeUserService((user, identity)))
 
     with pytest.raises(UnauthorizedError) as exc:
-        await service.local_login(
-            LocalLogin(phone="00000000002", password="anything")
-        )
+        await service.local_login(LocalLogin(phone="00000000002", password="anything"))
 
     assert exc.value.error_code == "INVALID_CREDENTIALS"
 
