@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Iterable
+from dataclasses import dataclass
 
 import asyncpg
 from alembic.config import Config
@@ -9,7 +10,9 @@ from alembic.config import Config
 from alembic import command
 
 HEAD_REVISION = "91852d520f58"
+LEGACY_REVISION = "136be7821aac"
 INIT_REVISION = "6c8a17d92a32"
+TRIGGERS_REVISION = "e169f5901a8e"
 INIT_TABLES = frozenset(
     {
         "products",
@@ -34,12 +37,22 @@ TRIGGER_NAMES = frozenset(
 )
 
 
-def choose_bootstrap_revision(
+@dataclass(frozen=True, slots=True)
+class BootstrapPlan:
+    revision: str
+    purge_existing_versions: bool = False
+
+
+def choose_bootstrap_plan(
     current_versions: set[str],
     existing_tables: set[str],
     existing_triggers: set[str],
-) -> str | None:
-    if current_versions:
+) -> BootstrapPlan | None:
+    if (
+        HEAD_REVISION in current_versions
+        or INIT_REVISION in current_versions
+        or TRIGGERS_REVISION in current_versions
+    ):
         return None
 
     if not existing_tables:
@@ -53,10 +66,24 @@ def choose_bootstrap_revision(
             f"Missing tables: {missing}"
         )
 
-    if existing_triggers >= TRIGGER_NAMES:
-        return HEAD_REVISION
+    if current_versions == {LEGACY_REVISION}:
+        if existing_triggers >= TRIGGER_NAMES:
+            return BootstrapPlan(
+                revision=HEAD_REVISION,
+                purge_existing_versions=True,
+            )
+        return BootstrapPlan(
+            revision=INIT_REVISION,
+            purge_existing_versions=True,
+        )
 
-    return INIT_REVISION
+    if current_versions:
+        return None
+
+    if existing_triggers >= TRIGGER_NAMES:
+        return BootstrapPlan(revision=HEAD_REVISION)
+
+    return BootstrapPlan(revision=INIT_REVISION)
 
 
 async def fetch_existing_versions(conn: asyncpg.Connection) -> set[str]:
@@ -114,13 +141,13 @@ async def bootstrap_alembic_state() -> str | None:
     finally:
         await conn.close()
 
-    target_revision = choose_bootstrap_revision(
+    plan = choose_bootstrap_plan(
         current_versions=current_versions,
         existing_tables=existing_tables,
         existing_triggers=existing_triggers,
     )
 
-    if target_revision is None:
+    if plan is None:
         if current_versions:
             versions = ", ".join(sorted(current_versions))
             print(f"Alembic state already present: {versions}")
@@ -130,10 +157,14 @@ async def bootstrap_alembic_state() -> str | None:
 
     print(
         "Legacy schema detected without Alembic state. "
-        f"Stamping revision {target_revision}."
+        f"Stamping revision {plan.revision}."
     )
-    command.stamp(Config("alembic.ini"), target_revision)
-    return target_revision
+    command.stamp(
+        Config("alembic.ini"),
+        plan.revision,
+        purge=plan.purge_existing_versions,
+    )
+    return plan.revision
 
 
 def main() -> None:
