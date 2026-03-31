@@ -112,19 +112,14 @@ class BillingService:
     ) -> dict:
         """Пагинированный список счетов с фильтрами."""
         async with self.uow:
-            total, items = (
-                await self.uow.accounts.get_accounts_with_filters(
-                    type=type,
-                    search=search,
-                    has_debt=has_debt,
-                    skip=skip,
-                    limit=limit,
-                )
+            total, items = await self.uow.accounts.get_accounts_with_filters(
+                type=type,
+                search=search,
+                has_debt=has_debt,
+                skip=skip,
+                limit=limit,
             )
-            accounts = [
-                AccountResponse.model_validate(acc)
-                for acc in items
-            ]
+            accounts = [AccountResponse.model_validate(acc) for acc in items]
             return {
                 "total_count": total,
                 "accounts": accounts,
@@ -210,17 +205,26 @@ class BillingService:
             now = datetime.now()
             if date_from is None:
                 date_from = now.replace(
-                    day=1, hour=0, minute=0,
-                    second=0, microsecond=0,
+                    day=1,
+                    hour=0,
+                    minute=0,
+                    second=0,
+                    microsecond=0,
                 )
             if date_to is None:
                 date_to = now
 
             dt_from = date_from.replace(
-                hour=0, minute=0, second=0, microsecond=0,
+                hour=0,
+                minute=0,
+                second=0,
+                microsecond=0,
             )
             dt_to = date_to.replace(
-                hour=23, minute=59, second=59, microsecond=0,
+                hour=23,
+                minute=59,
+                second=59,
+                microsecond=0,
             )
 
             # Opening balance = incoming - outgoing до начала
@@ -332,13 +336,10 @@ class BillingService:
             (
                 total,
                 items,
-            ) = (
-                await self.uow.transactions
-                .get_transactions_with_filters(
-                    filters=filters,
-                    skip=skip,
-                    limit=limit,
-                )
+            ) = await self.uow.transactions.get_transactions_with_filters(
+                filters=filters,
+                skip=skip,
+                limit=limit,
             )
             transactions = [
                 TransactionDetail(
@@ -376,24 +377,22 @@ class BillingService:
             raise SelfTransferError(account_id=dto.from_id)
 
         async with self.uow:
-            from_account = await self.uow.accounts.get(dto.from_id)
+            from_account = await self.uow.accounts.get(
+                dto.from_id,
+            )
             if not from_account:
                 raise AccountNotFoundError(
                     account_id=dto.from_id,
-                    message=(
-                        "Счет списания не найден:"
-                        f" {dto.from_id}"
-                    ),
+                    message=(f"Счет списания не найден: {dto.from_id}"),
                 )
 
-            to_account = await self.uow.accounts.get(dto.to_id)
+            to_account = await self.uow.accounts.get(
+                dto.to_id,
+            )
             if not to_account:
                 raise AccountNotFoundError(
                     account_id=dto.to_id,
-                    message=(
-                        "Счет зачисления не найден:"
-                        f" {dto.to_id}"
-                    ),
+                    message=(f"Счет зачисления не найден: {dto.to_id}"),
                 )
 
             txn_data = {
@@ -408,7 +407,9 @@ class BillingService:
             txn = await self.uow.transactions.add(txn_data)
             await self.uow.commit()
 
-            return TransactionResponse.model_validate(txn)
+            return await self._load_transaction_response(
+                txn.id,
+            )
 
     async def verify_transaction(
         self,
@@ -436,7 +437,9 @@ class BillingService:
             await self.uow.flush()
             await self.uow.commit()
 
-            return TransactionResponse.model_validate(txn)
+            return await self._load_transaction_response(
+                transaction_id,
+            )
 
     async def reject_transaction(
         self,
@@ -463,13 +466,13 @@ class BillingService:
             txn.status = TransactionStatus.REJECTED
             txn.verified_by_id = verified_by_id
             if reason:
-                txn.reason = (
-                    f"{txn.reason} | Отклонено: {reason}"
-                )
+                txn.reason = f"{txn.reason} | Отклонено: {reason}"
             await self.uow.flush()
             await self.uow.commit()
 
-            return TransactionResponse.model_validate(txn)
+            return await self._load_transaction_response(
+                transaction_id,
+            )
 
     # ----------------------------------------------------------
     # Courier summary
@@ -585,6 +588,41 @@ class BillingService:
                 clients=clients,
             )
 
+    async def _load_transaction_response(
+        self,
+        transaction_id: uuid.UUID,
+    ) -> TransactionResponse:
+        """Перезагрузить транзакцию с from/to_account после commit.
+
+        После commit() SQLAlchemy помечает атрибуты ORM-объекта
+        как expired. Повторная загрузка с eager-load гарантирует
+        корректную сериализацию.
+        """
+        txn = await self.uow.transactions.get_with_accounts(
+            transaction_id,
+        )
+        if not txn:
+            raise TransactionNotFoundError(
+                transaction_id=transaction_id,
+            )
+        return TransactionResponse(
+            id=txn.id,
+            from_id=txn.from_id,
+            to_id=txn.to_id,
+            from_account=AccountShort.model_validate(
+                txn.from_account,
+            ),
+            to_account=AccountShort.model_validate(
+                txn.to_account,
+            ),
+            order_id=txn.order_id,
+            amount=txn.amount,
+            status=txn.status,
+            reason=txn.reason,
+            verified_by_id=txn.verified_by_id,
+            created_at=txn.created_at,
+        )
+
     async def _get_last_payment_date(
         self,
         account_id: uuid.UUID,
@@ -629,30 +667,19 @@ class BillingService:
         card: CLIENT -> CARD (PENDING)
         """
         async with self.uow:
-            client_account = (
-                await self.uow.accounts.get_client_account(
-                    client_id,
-                )
+            client_account = await self.uow.accounts.get_client_account(
+                client_id,
             )
             if not client_account:
                 raise AccountNotFoundError(
-                    message=(
-                        "Лицевой счет клиента"
-                        f" не найден: {client_id}"
-                    ),
+                    message=(f"Лицевой счет клиента не найден: {client_id}"),
                 )
 
             if payment_method == "cash":
-                target = (
-                    await self.uow.accounts
-                    .get_system_cash_account()
-                )
+                target = await self.uow.accounts.get_system_cash_account()
                 status = TransactionStatus.COMPLETED
             else:
-                target = (
-                    await self.uow.accounts
-                    .get_system_card_account()
-                )
+                target = await self.uow.accounts.get_system_card_account()
                 status = TransactionStatus.PENDING
 
             if not target:
@@ -682,4 +709,6 @@ class BillingService:
             txn = await self.uow.transactions.add(txn_data)
             await self.uow.commit()
 
-            return TransactionResponse.model_validate(txn)
+            return await self._load_transaction_response(
+                txn.id,
+            )

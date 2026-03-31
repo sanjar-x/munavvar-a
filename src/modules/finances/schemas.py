@@ -33,7 +33,8 @@ class AccountCreate(AccountBase):
     """
 
     user_id: uuid.UUID = Field(
-        ..., title="Владелец счета (Пользователь или Система)",
+        ...,
+        title="Владелец счета (Пользователь или Система)",
     )
 
 
@@ -61,6 +62,16 @@ class AccountResponse(AccountBase):
     )
     created_at: datetime
     updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class AccountShort(BaseModel):
+    """Краткая информация о счёте (для вложения в транзакции)."""
+
+    id: uuid.UUID
+    name: str
+    type: AccountType
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -109,14 +120,22 @@ class TransactionCreate(BaseModel):
 
 
 class TransactionResponse(BaseModel):
-    """История операций (Выписка по счету)."""
+    """Ответ для мутационных операций (create/verify/reject).
+
+    Содержит все поля, необходимые фронтенду для отображения
+    транзакции без дополнительного запроса.
+    """
 
     id: uuid.UUID
     from_id: uuid.UUID
     to_id: uuid.UUID
+    from_account: AccountShort | None = None
+    to_account: AccountShort | None = None
     order_id: uuid.UUID | None
     amount: int
+    status: TransactionStatus
     reason: str
+    verified_by_id: uuid.UUID | None = None
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
@@ -152,14 +171,6 @@ class FinanceDashboard(BaseModel):
 # =====================================================================
 # 4. ОБОГАЩЁННЫЕ ТРАНЗАКЦИИ (ENRICHED TRANSACTIONS)
 # =====================================================================
-
-
-class AccountShort(BaseModel):
-    id: uuid.UUID
-    name: str
-    type: AccountType
-
-    model_config = ConfigDict(from_attributes=True)
 
 
 class TransactionDetail(BaseModel):

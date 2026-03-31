@@ -28,7 +28,9 @@ class AccountRepository(BaseRepository[Account]):
         return account
 
     async def create_client_account(
-        self, client_id: uuid.UUID, client_name: str,
+        self,
+        client_id: uuid.UUID,
+        client_name: str,
     ) -> Account:
         return await self.create(
             user_id=client_id,
@@ -37,7 +39,9 @@ class AccountRepository(BaseRepository[Account]):
         )
 
     async def create_courier_account(
-        self, courier_id: uuid.UUID, courier_name: str,
+        self,
+        courier_id: uuid.UUID,
+        courier_name: str,
     ) -> Account:
         return await self.create(
             user_id=courier_id,
@@ -46,7 +50,8 @@ class AccountRepository(BaseRepository[Account]):
         )
 
     async def create_system_accounts(
-        self, system_user_id: uuid.UUID,
+        self,
+        system_user_id: uuid.UUID,
     ) -> list[Account]:
         accounts = []
         system_map = {
@@ -67,7 +72,9 @@ class AccountRepository(BaseRepository[Account]):
         return accounts
 
     async def get_user_account_by_type(
-        self, user_id: uuid.UUID, account_type: AccountType,
+        self,
+        user_id: uuid.UUID,
+        account_type: AccountType,
     ) -> Account | None:
         query = select(self.model).where(
             self.model.user_id == user_id,
@@ -78,7 +85,8 @@ class AccountRepository(BaseRepository[Account]):
         return result.scalar_one_or_none()
 
     async def get_system_account(
-        self, account_type: AccountType,
+        self,
+        account_type: AccountType,
     ) -> Account | None:
         return await self.get_user_account_by_type(
             user_id=settings.SYSTEM_USER_ID,
@@ -106,7 +114,8 @@ class AccountRepository(BaseRepository[Account]):
         return await self.get_system_account(account_type=AccountType.BANK)
 
     async def get_courier_account(
-        self, courier_id: uuid.UUID,
+        self,
+        courier_id: uuid.UUID,
     ) -> Account | None:
         return await self.get_user_account_by_type(
             user_id=courier_id,
@@ -267,7 +276,8 @@ class TransactionRepository(BaseRepository[Transaction]):
         super().__init__(model=Transaction, session=session)
 
     async def get_for_update(
-        self, transaction_id: uuid.UUID,
+        self,
+        transaction_id: uuid.UUID,
     ) -> Transaction | None:
         query = (
             select(Transaction)
@@ -276,6 +286,22 @@ class TransactionRepository(BaseRepository[Transaction]):
         )
         result = await self.session.execute(query)
         return result.scalar_one_or_none()
+
+    async def get_with_accounts(
+        self,
+        transaction_id: uuid.UUID,
+    ) -> Transaction | None:
+        """Загрузить транзакцию с eager-load from/to_account."""
+        query = (
+            select(Transaction)
+            .options(
+                joinedload(Transaction.from_account),
+                joinedload(Transaction.to_account),
+            )
+            .where(Transaction.id == transaction_id)
+        )
+        result = await self.session.execute(query)
+        return result.scalars().unique().one_or_none()
 
     async def change_status(
         self,
@@ -428,7 +454,10 @@ class TransactionRepository(BaseRepository[Transaction]):
     ) -> Sequence[Transaction]:
         """Все COMPLETED-транзакции за сегодня для счета."""
         today_start = datetime.now().replace(
-            hour=0, minute=0, second=0, microsecond=0,
+            hour=0,
+            minute=0,
+            second=0,
+            microsecond=0,
         )
         query = (
             select(Transaction)
