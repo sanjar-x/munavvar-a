@@ -38,6 +38,8 @@ class InvalidOrderStatusError(ConflictError):
         order_id: uuid.UUID | str,
         current_status: Any,
         expected_status: Any = None,
+        target_status: Any = None,
+        allowed_statuses: list[Any] | None = None,
         message: str = "Недопустимая операция для текущего статуса заказа",
     ):
         details = {
@@ -46,6 +48,12 @@ class InvalidOrderStatusError(ConflictError):
         }
         if expected_status:
             details["expected_status"] = str(expected_status)
+        if target_status:
+            details["target_status"] = str(target_status)
+        if allowed_statuses:
+            details["allowed_statuses"] = [
+                str(status) for status in allowed_statuses
+            ]
 
         super().__init__(
             message=message,

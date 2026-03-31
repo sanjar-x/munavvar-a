@@ -169,7 +169,18 @@ class TestWalkinSale:
         )
         assert result.scalar_one() == 1
 
-        # 3f. Revenue account delta: -20_000
+        # 3f. Virtual loss tara: issued container also leaves walk-in inventory
+        result = await db_session.execute(
+            select(Balance.quantity).where(
+                Balance.inventory_id
+                == virtual_loss.id,
+                Balance.product_id
+                == products["tara"].id,
+            )
+        )
+        assert result.scalar_one() == 1
+
+        # 3g. Revenue account delta: -20_000
         rev_after = (
             await db_session.execute(
                 select(Account.balance).where(
@@ -182,7 +193,7 @@ class TestWalkinSale:
         ).scalar_one()
         assert rev_after - rev_before == -20_000
 
-        # 3g. Cash account delta: +20_000
+        # 3h. Cash account delta: +20_000
         cash_after = (
             await db_session.execute(
                 select(Account.balance).where(
@@ -195,7 +206,7 @@ class TestWalkinSale:
         ).scalar_one()
         assert cash_after - cash_before == 20_000
 
-        # 3h. Walk-in account: net 0 (debt + payment)
+        # 3i. Walk-in account: net 0 (debt + payment)
         walkin_bal_after = (
             await db_session.execute(
                 select(Account.balance).where(

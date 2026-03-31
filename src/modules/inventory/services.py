@@ -349,7 +349,7 @@ class StockTransferService:
                 })
 
             await self.uow.commit()
-            return transfer
+            return await self.uow.transfers.get_transfer(transfer.id)
 
 
 class CapitalizeTaraService:

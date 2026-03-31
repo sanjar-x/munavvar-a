@@ -19,6 +19,7 @@ from src.modules.orders.dependencies import get_base_order_service
 from src.modules.orders.enums import OrderStatus, PaymentMethod, SaleType
 from src.modules.orders.schemas import (
     OrderCreate,
+    OrderDeliverRequest,
     OrderResponse,
     TaraCheckRequest,
     TaraCheckResponse,
@@ -28,6 +29,20 @@ from src.modules.orders.schemas import (
 from src.modules.orders.services import BaseOrderService
 
 orders_router = APIRouter()
+
+
+async def _update_backoffice_order_status(
+    *,
+    order_id: uuid.UUID,
+    new_status: OrderStatus,
+    base_order_service: BaseOrderService,
+    actual_items=None,
+):
+    return await base_order_service.update_status(
+        order_id=order_id,
+        new_status=new_status,
+        actual_items=actual_items,
+    )
 
 
 @orders_router.get("/", response_model=list[OrderResponse])
@@ -286,8 +301,66 @@ async def update_order_status(
     ],
 ):
     """Принудительно изменить статус заказа (ручная корректировка)."""
-    return await base_order_service.update_status(
-        order_id=order_id, new_status=new_status
+    return await _update_backoffice_order_status(
+        order_id=order_id,
+        new_status=new_status,
+        base_order_service=base_order_service,
+    )
+
+
+@orders_router.patch("/{orderId}/in-transit", response_model=OrderResponse)
+async def mark_order_in_transit(
+    order_id: Annotated[uuid.UUID, Path(alias="orderId")],
+    admin: Annotated[
+        User, Security(get_current_user, scopes=[Scope.ORDERS_EDIT])
+    ],
+    base_order_service: Annotated[
+        BaseOrderService, Depends(get_base_order_service)
+    ],
+):
+    """Перевести заказ в статус IN_TRANSIT."""
+    return await _update_backoffice_order_status(
+        order_id=order_id,
+        new_status=OrderStatus.IN_TRANSIT,
+        base_order_service=base_order_service,
+    )
+
+
+@orders_router.patch("/{orderId}/arrived", response_model=OrderResponse)
+async def mark_order_arrived(
+    order_id: Annotated[uuid.UUID, Path(alias="orderId")],
+    admin: Annotated[
+        User, Security(get_current_user, scopes=[Scope.ORDERS_EDIT])
+    ],
+    base_order_service: Annotated[
+        BaseOrderService, Depends(get_base_order_service)
+    ],
+):
+    """Перевести заказ в статус ARRIVED."""
+    return await _update_backoffice_order_status(
+        order_id=order_id,
+        new_status=OrderStatus.ARRIVED,
+        base_order_service=base_order_service,
+    )
+
+
+@orders_router.patch("/{orderId}/delivered", response_model=OrderResponse)
+async def mark_order_delivered(
+    order_id: Annotated[uuid.UUID, Path(alias="orderId")],
+    admin: Annotated[
+        User, Security(get_current_user, scopes=[Scope.ORDERS_EDIT])
+    ],
+    base_order_service: Annotated[
+        BaseOrderService, Depends(get_base_order_service)
+    ],
+    dto: OrderDeliverRequest | None = None,
+):
+    """Перевести заказ в статус DELIVERED."""
+    return await _update_backoffice_order_status(
+        order_id=order_id,
+        new_status=OrderStatus.DELIVERED,
+        actual_items=dto.actual_items if dto else None,
+        base_order_service=base_order_service,
     )
 
 

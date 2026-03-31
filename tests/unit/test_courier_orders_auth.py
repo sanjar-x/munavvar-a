@@ -63,6 +63,21 @@ async def courier_test_client():
     ("path", "method", "payload"),
     [
         (
+            "/api/v1/courier/orders/{order_id}/in-transit",
+            "patch",
+            None,
+        ),
+        (
+            "/api/v1/courier/orders/{order_id}/arrived",
+            "patch",
+            None,
+        ),
+        (
+            "/api/v1/courier/orders/{order_id}/delivered",
+            "patch",
+            {},
+        ),
+        (
             "/api/v1/courier/orders/{order_id}/deliver",
             "post",
             {},
@@ -78,16 +93,19 @@ async def test_courier_mutation_routes_accept_orders_deliver_scope(
     courier_test_client: AsyncClient,
     path: str,
     method: str,
-    payload: dict,
+    payload: dict | None,
 ):
     user_id = uuid.uuid4()
     order_id = uuid.uuid4()
     headers = make_auth_headers(user_id, [Scope.ORDERS_DELIVER])
 
+    request_kwargs = {"headers": headers}
+    if payload is not None:
+        request_kwargs["json"] = payload
+
     response = await getattr(courier_test_client, method)(
         path.format(order_id=order_id),
-        json=payload,
-        headers=headers,
+        **request_kwargs,
     )
 
     assert response.status_code == 404
@@ -98,6 +116,21 @@ async def test_courier_mutation_routes_accept_orders_deliver_scope(
 @pytest.mark.parametrize(
     ("path", "method", "payload"),
     [
+        (
+            "/api/v1/courier/orders/{order_id}/in-transit",
+            "patch",
+            None,
+        ),
+        (
+            "/api/v1/courier/orders/{order_id}/arrived",
+            "patch",
+            None,
+        ),
+        (
+            "/api/v1/courier/orders/{order_id}/delivered",
+            "patch",
+            {},
+        ),
         (
             "/api/v1/courier/orders/{order_id}/deliver",
             "post",
@@ -114,16 +147,19 @@ async def test_courier_mutation_routes_reject_missing_orders_deliver_scope(
     courier_test_client: AsyncClient,
     path: str,
     method: str,
-    payload: dict,
+    payload: dict | None,
 ):
     user_id = uuid.uuid4()
     order_id = uuid.uuid4()
     headers = make_auth_headers(user_id, [Scope.ORDERS_READ])
 
+    request_kwargs = {"headers": headers}
+    if payload is not None:
+        request_kwargs["json"] = payload
+
     response = await getattr(courier_test_client, method)(
         path.format(order_id=order_id),
-        json=payload,
-        headers=headers,
+        **request_kwargs,
     )
 
     assert response.status_code == 403

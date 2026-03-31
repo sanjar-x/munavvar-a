@@ -96,11 +96,26 @@ class TestDeliveryFulfillment:
         assert resp.status_code == 200, resp.text
         assert resp.json()["status"] == "assigned"
 
-        # == Step 3: Deliver ===========================
+        # == Step 3: Move order through delivery statuses ===
         resp = await client.patch(
             f"/api/v1/backoffice/orders/{order_id}"
-            "/status",
-            json={"newStatus": "delivered"},
+            "/in-transit",
+            headers=headers,
+        )
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["status"] == "in_transit"
+
+        resp = await client.patch(
+            f"/api/v1/backoffice/orders/{order_id}"
+            "/arrived",
+            headers=headers,
+        )
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["status"] == "arrived"
+
+        resp = await client.patch(
+            f"/api/v1/backoffice/orders/{order_id}"
+            "/delivered",
             headers=headers,
         )
         assert resp.status_code == 200, resp.text
@@ -160,7 +175,7 @@ class TestDeliveryFulfillment:
         )
         assert result.scalar_one() == 2
 
-        # 4d. Client tara: capitalized 2, returned 2 = 0
+        # 4d. Client tara: capitalized 2 + delivered 2 - returned 2 = 2
         result = await db_session.execute(
             select(Balance.quantity).where(
                 Balance.inventory_id
@@ -169,7 +184,7 @@ class TestDeliveryFulfillment:
                 == products["tara"].id,
             )
         )
-        assert result.scalar_one() == 0
+        assert result.scalar_one() == 2
 
         # 4e. Courier account: +40_000 (cash collected)
         result = await db_session.execute(

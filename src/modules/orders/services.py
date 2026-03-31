@@ -22,6 +22,7 @@ from src.modules.orders.exceptions import (
     DeliveryQuantityExceededError,
     EmptyCartError,
     InsufficientTaraError,
+    InvalidOrderStatusError,
     InvalidPickupOperationError,
     OrderAccessDeniedError,
     OrderNotFoundError,
@@ -39,6 +40,25 @@ from src.core.constants import WALKIN_USER_ID
 
 
 class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
+    _DELIVERY_ALLOWED_TRANSITIONS: dict[OrderStatus, set[OrderStatus]] = {
+        OrderStatus.NEW: {OrderStatus.CANCELLED},
+        OrderStatus.ASSIGNED: {
+            OrderStatus.IN_TRANSIT,
+            OrderStatus.CANCELLED,
+        },
+        OrderStatus.IN_TRANSIT: {
+            OrderStatus.ARRIVED,
+            OrderStatus.CANCELLED,
+        },
+        OrderStatus.ARRIVED: {
+            OrderStatus.DELIVERED,
+            OrderStatus.CANCELLED,
+        },
+    }
+    _PICKUP_ALLOWED_TRANSITIONS: dict[OrderStatus, set[OrderStatus]] = {
+        OrderStatus.NEW: {OrderStatus.CANCELLED},
+    }
+
     def __init__(
         self, uow: BaseOrderUnitOfWork, catalog_service: CatalogService
     ):
@@ -48,6 +68,69 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
     @property
     def _repo(self) -> OrderRepository:
         return self.uow.orders
+
+    @classmethod
+    def _get_allowed_statuses(
+        cls, *, sale_type: SaleType, current_status: OrderStatus
+    ) -> list[OrderStatus]:
+        transition_map = (
+            cls._PICKUP_ALLOWED_TRANSITIONS
+            if sale_type == SaleType.WAREHOUSE_PICKUP
+            else cls._DELIVERY_ALLOWED_TRANSITIONS
+        )
+        return sorted(
+            transition_map.get(current_status, set()),
+            key=lambda status: status.value,
+        )
+
+    @classmethod
+    def _ensure_status_transition_allowed(
+        cls,
+        *,
+        order: Order,
+        new_status: OrderStatus,
+    ) -> None:
+        if order.status == new_status:
+            return
+
+        if order.sale_type == SaleType.WAREHOUSE_PICKUP:
+            if new_status == OrderStatus.PICKUP_COMPLETED:
+                raise InvalidPickupOperationError(
+                    order_id=order.id,
+                    reason=(
+                        "Статус PICKUP_COMPLETED нельзя выставить вручную. "
+                        "Используйте complete-pickup."
+                    ),
+                )
+            if new_status in (
+                OrderStatus.ASSIGNED,
+                OrderStatus.IN_TRANSIT,
+                OrderStatus.ARRIVED,
+                OrderStatus.DELIVERED,
+            ):
+                raise InvalidPickupOperationError(
+                    order_id=order.id,
+                    reason=(
+                        f"Заказ самовывоза не может перейти в статус {new_status}. "
+                        "Используйте complete-pickup."
+                    ),
+                )
+
+        allowed_statuses = cls._get_allowed_statuses(
+            sale_type=order.sale_type,
+            current_status=order.status,
+        )
+        if new_status not in allowed_statuses:
+            raise InvalidOrderStatusError(
+                order_id=order.id,
+                current_status=order.status,
+                target_status=new_status,
+                allowed_statuses=allowed_statuses,
+                message=(
+                    "Недопустимый переход статуса заказа: "
+                    f"{order.status} -> {new_status}"
+                ),
+            )
 
     # --- БИЗНЕС-ЛОГИКА ---
 
@@ -557,11 +640,17 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
                     reason="Заказ самовывоза не может быть назначен курьеру",
                 )
 
-            if order.status in (OrderStatus.DELIVERED, OrderStatus.CANCELLED):
+            if order.status not in (
+                OrderStatus.NEW,
+                OrderStatus.ASSIGNED,
+            ):
                 raise CourierAssignmentError(
                     order_id=order_id,
                     courier_id=courier_id,
-                    reason="Заказ уже закрыт или отменен",
+                    reason=(
+                        "Назначение или смена курьера разрешены только "
+                        "для заказов в статусах NEW и ASSIGNED"
+                    ),
                 )
 
             updated_order = await self.uow.orders.update(
@@ -603,18 +692,10 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
 
             old_status = order.status
 
-            # Guard: pickup orders cannot use delivery statuses
-            if order.sale_type == SaleType.WAREHOUSE_PICKUP and new_status in (
-                OrderStatus.ASSIGNED,
-                OrderStatus.IN_TRANSIT,
-                OrderStatus.ARRIVED,
-                OrderStatus.DELIVERED,
-            ):
-                raise InvalidPickupOperationError(
-                    order_id=order_id,
-                    reason=f"Заказ самовывоза не может перейти в статус {new_status}. "
-                    "Используйте complete-pickup.",
-                )
+            self._ensure_status_transition_allowed(
+                order=order,
+                new_status=new_status,
+            )
 
             updated_order = await self.uow.orders.update_status(
                 order_id, new_status
@@ -634,6 +715,24 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
             await self.uow.commit()
             return updated_order
 
+    @staticmethod
+    def _build_returnable_items(
+        order_items: list,
+    ) -> list[dict[str, uuid.UUID | int]]:
+        """Aggregates container quantities paired with delivered water items."""
+        returnable_map: dict[uuid.UUID, int] = {}
+        for item in order_items:
+            if item.product.returnable_item_id and item.quantity > 0:
+                tare_id = item.product.returnable_item_id
+                returnable_map[tare_id] = (
+                    returnable_map.get(tare_id, 0) + item.quantity
+                )
+
+        return [
+            {"product_id": product_id, "quantity": quantity}
+            for product_id, quantity in returnable_map.items()
+        ]
+
     async def _handle_order_fulfillment(
         self,
         order: Order,
@@ -643,7 +742,8 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
         Автоматическое создание и проведение StockTransfer при доставке.
         1. [NEW] Корректировка заказа (если переданы actual_items)
         2. Списание полной воды: Курьер -> Клиент
-        3. Забор пустой тары: Клиент -> Курьер
+        3. Начисление физической тары клиенту: VIRTUAL_VENDOR -> Клиент
+        4. Забор пустой тары: Клиент -> Курьер
         """
         if not order.courier_id:
             raise ValueError("Заказ не может быть доставлен без курьера")
@@ -727,21 +827,25 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
             }
         )
 
-        # 2. Создаем накладную на возврат тары (Empty Water IN)
-        # Агрегируем тару по product_id (несколько позиций могут требовать одну тару)
-        # Пропускаем позиции с quantity=0 (товар не был доставлен)
-        returnable_map: dict[uuid.UUID, int] = {}
-        for item in order.items:
-            if item.product.returnable_item_id and item.quantity > 0:
-                tare_id = item.product.returnable_item_id
-                returnable_map[tare_id] = (
-                    returnable_map.get(tare_id, 0) + item.quantity
-                )
-        returnable_items = [
-            {"product_id": pid, "quantity": qty}
-            for pid, qty in returnable_map.items()
-        ]
+        # 2. Начисляем клиенту физическую тару, связанную с доставленной водой
+        returnable_items = self._build_returnable_items(order.items)
+        container_issue_transfer = None
+        if returnable_items:
+            vendor_inv = await self.uow.inventories.get_vendor_inventory()
+            container_issue_transfer = await self.uow.transfers.add(
+                {
+                    "from_id": vendor_inv.id,
+                    "to_id": order.client_inventory_id,
+                    "type": TransferType.INITIAL_BALANCE,
+                    "status": TransferStatus.COMPLETED,
+                    "created_by_id": order.courier_id,
+                    "accepted_by_id": order.client_id,
+                    "order_id": order.id,
+                    "reason": "Container issued with delivery",
+                }
+            )
 
+        # 3. Создаем накладную на возврат пустой тары (Empty Water IN)
         return_transfer = None
         if returnable_items:
             return_transfer = await self.uow.transfers.add(
@@ -778,7 +882,28 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
                 }
             )
 
-        # б) Возврат тары: Клиент → Курьер
+        # б) Начисление тары клиенту: VIRTUAL_VENDOR → Клиент
+        if container_issue_transfer:
+            vendor_inv = await self.uow.inventories.get_vendor_inventory()
+            for item_data in returnable_items:
+                await self.uow.transfer_items.add(
+                    {
+                        "transfer_id": container_issue_transfer.id,
+                        "product_id": item_data["product_id"],
+                        "quantity": item_data["quantity"],
+                    }
+                )
+                await self.uow.transactions.add(
+                    {
+                        "product_id": item_data["product_id"],
+                        "transfer_id": container_issue_transfer.id,
+                        "from_id": vendor_inv.id,
+                        "to_id": order.client_inventory_id,
+                        "quantity": item_data["quantity"],
+                    }
+                )
+
+        # в) Возврат тары: Клиент → Курьер
         if return_transfer:
             for item_data in returnable_items:
                 await self.uow.transfer_items.add(
@@ -810,8 +935,9 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
         Складские перемещения при самовывозе:
         1. Проверка остатков на складе
         2. WAREHOUSE_SALE: Warehouse → Client (товар)
-        3. WAREHOUSE_TARA_RETURN: Client → Warehouse (тара)
-        4. Финансовая проводка
+        3. VIRTUAL_VENDOR -> Client (физическая тара в полной бутыли)
+        4. WAREHOUSE_TARA_RETURN: Client → Warehouse (тара)
+        5. Финансовая проводка
         """
         if not order.warehouse_id:
             raise ValueError("Заказ самовывоза без warehouse_id")
@@ -849,19 +975,25 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
             }
         )
 
-        # 2. WAREHOUSE_TARA_RETURN: Client → Warehouse
-        returnable_map: dict[uuid.UUID, int] = {}
-        for item in order.items:
-            if item.product.returnable_item_id and item.quantity > 0:
-                tare_id = item.product.returnable_item_id
-                returnable_map[tare_id] = (
-                    returnable_map.get(tare_id, 0) + item.quantity
-                )
-        returnable_items = [
-            {"product_id": pid, "quantity": qty}
-            for pid, qty in returnable_map.items()
-        ]
+        # 2. Начисляем клиенту физическую тару, связанную с выданной водой
+        returnable_items = self._build_returnable_items(order.items)
+        container_issue_transfer = None
+        if returnable_items:
+            vendor_inv = await self.uow.inventories.get_vendor_inventory()
+            container_issue_transfer = await self.uow.transfers.add(
+                {
+                    "from_id": vendor_inv.id,
+                    "to_id": order.client_inventory_id,
+                    "type": TransferType.INITIAL_BALANCE,
+                    "status": TransferStatus.COMPLETED,
+                    "created_by_id": completed_by_id,
+                    "accepted_by_id": order.client_id,
+                    "order_id": order.id,
+                    "reason": "Container issued with warehouse pickup",
+                }
+            )
 
+        # 3. WAREHOUSE_TARA_RETURN: Client → Warehouse
         tara_transfer = None
         if returnable_items:
             tara_transfer = await self.uow.transfers.add(
@@ -876,7 +1008,7 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
                 }
             )
 
-        # 3. Строки накладных и проводки в леджере
+        # 4. Строки накладных и проводки в леджере
         for item in order.items:
             if item.quantity == 0:
                 continue
@@ -897,6 +1029,26 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
                 }
             )
 
+        if container_issue_transfer:
+            vendor_inv = await self.uow.inventories.get_vendor_inventory()
+            for item_data in returnable_items:
+                await self.uow.transfer_items.add(
+                    {
+                        "transfer_id": container_issue_transfer.id,
+                        "product_id": item_data["product_id"],
+                        "quantity": item_data["quantity"],
+                    }
+                )
+                await self.uow.transactions.add(
+                    {
+                        "product_id": item_data["product_id"],
+                        "transfer_id": container_issue_transfer.id,
+                        "from_id": vendor_inv.id,
+                        "to_id": order.client_inventory_id,
+                        "quantity": item_data["quantity"],
+                    }
+                )
+
         if tara_transfer:
             for item_data in returnable_items:
                 await self.uow.transfer_items.add(
@@ -916,7 +1068,7 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
                     }
                 )
 
-        # 4. Cleanup: списание товара с Walk-in inventory
+        # 5. Cleanup: списание товара с Walk-in inventory
         # Анонимный покупатель забрал товар и ушёл — обнуляем его inventory
         if order.client_id == WALKIN_USER_ID:
             loss_inv = await self.uow.inventories.get_loss_inventory()
@@ -931,27 +1083,35 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
                     "order_id": order.id,
                 }
             )
-            for item in order.items:
-                if item.quantity == 0:
-                    continue
+            cleanup_items = [
+                {
+                    "product_id": item.product_id,
+                    "quantity": item.quantity,
+                }
+                for item in order.items
+                if item.quantity > 0
+            ]
+            cleanup_items.extend(returnable_items)
+
+            for item_data in cleanup_items:
                 await self.uow.transfer_items.add(
                     {
                         "transfer_id": cleanup_transfer.id,
-                        "product_id": item.product_id,
-                        "quantity": item.quantity,
+                        "product_id": item_data["product_id"],
+                        "quantity": item_data["quantity"],
                     }
                 )
                 await self.uow.transactions.add(
                     {
-                        "product_id": item.product_id,
+                        "product_id": item_data["product_id"],
                         "transfer_id": cleanup_transfer.id,
                         "from_id": order.client_inventory_id,
                         "to_id": loss_inv.id,
-                        "quantity": item.quantity,
+                        "quantity": item_data["quantity"],
                     }
                 )
 
-        # 5. Финансовое закрытие
+        # 6. Финансовое закрытие
         await self._process_pickup_settlement(order)
 
     async def _process_financial_settlement(self, order: Order) -> None:

@@ -142,7 +142,7 @@ class TestWarehousePickup:
         )
         assert result.scalar_one() == 2
 
-        # 3d. Client tara: +2 capitalized - 2 returned
+        # 3d. Client tara: +2 capitalized + 2 issued - 2 returned = 2
         result = await db_session.execute(
             select(Balance.quantity).where(
                 Balance.inventory_id
@@ -151,7 +151,7 @@ class TestWarehousePickup:
                 == products["tara"].id,
             )
         )
-        assert result.scalar_one() == 0
+        assert result.scalar_one() == 2
 
         # 3e. Revenue account delta: -40_000
         rev_after = (

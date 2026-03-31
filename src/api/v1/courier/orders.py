@@ -14,6 +14,22 @@ from src.modules.orders.services import BaseOrderService
 orders_router = APIRouter()
 
 
+async def _update_courier_order_status(
+    *,
+    order_id: uuid.UUID,
+    new_status: OrderStatus,
+    courier: User,
+    base_order_service: BaseOrderService,
+    actual_items=None,
+):
+    return await base_order_service.update_status(
+        order_id=order_id,
+        new_status=new_status,
+        actual_items=actual_items,
+        requesting_user_id=courier.id,
+    )
+
+
 @orders_router.get("/", response_model=list[OrderResponse])
 @orders_router.get(
     "/tasks",
@@ -49,8 +65,71 @@ async def get_order_details(
     )
 
 
-@orders_router.post("/{order_id}/deliver", response_model=OrderResponse)
+@orders_router.patch("/{order_id}/in-transit", response_model=OrderResponse)
+async def mark_order_in_transit(
+    order_id: uuid.UUID,
+    courier: Annotated[
+        User, Security(get_current_courier, scopes=[Scope.ORDERS_DELIVER])
+    ],
+    base_order_service: Annotated[
+        BaseOrderService, Depends(get_base_order_service)
+    ],
+):
+    """Подтвердить, что курьер взял заказ в работу."""
+    return await _update_courier_order_status(
+        order_id=order_id,
+        new_status=OrderStatus.IN_TRANSIT,
+        courier=courier,
+        base_order_service=base_order_service,
+    )
+
+
+@orders_router.patch("/{order_id}/arrived", response_model=OrderResponse)
+async def mark_order_arrived(
+    order_id: uuid.UUID,
+    courier: Annotated[
+        User, Security(get_current_courier, scopes=[Scope.ORDERS_DELIVER])
+    ],
+    base_order_service: Annotated[
+        BaseOrderService, Depends(get_base_order_service)
+    ],
+):
+    """Подтвердить, что курьер прибыл к клиенту."""
+    return await _update_courier_order_status(
+        order_id=order_id,
+        new_status=OrderStatus.ARRIVED,
+        courier=courier,
+        base_order_service=base_order_service,
+    )
+
+
+@orders_router.patch("/{order_id}/delivered", response_model=OrderResponse)
 async def deliver_order(
+    order_id: uuid.UUID,
+    courier: Annotated[
+        User, Security(get_current_courier, scopes=[Scope.ORDERS_DELIVER])
+    ],
+    base_order_service: Annotated[
+        BaseOrderService, Depends(get_base_order_service)
+    ],
+    dto: Annotated[OrderDeliverRequest | None, Body()] = None,
+):
+    """Завершение доставки курьером."""
+    return await _update_courier_order_status(
+        order_id=order_id,
+        new_status=OrderStatus.DELIVERED,
+        actual_items=dto.actual_items if dto else None,
+        courier=courier,
+        base_order_service=base_order_service,
+    )
+
+
+@orders_router.post(
+    "/{order_id}/deliver",
+    response_model=OrderResponse,
+    include_in_schema=False,
+)
+async def deliver_order_legacy(
     order_id: uuid.UUID,
     dto: OrderDeliverRequest,
     courier: Annotated[
@@ -60,12 +139,13 @@ async def deliver_order(
         BaseOrderService, Depends(get_base_order_service)
     ],
 ):
-    """Завершение доставки курьером."""
-    return await base_order_service.update_status(
+    """Backwards-compatible alias for the delivered route."""
+    return await _update_courier_order_status(
         order_id=order_id,
         new_status=OrderStatus.DELIVERED,
         actual_items=dto.actual_items,
-        requesting_user_id=courier.id,
+        courier=courier,
+        base_order_service=base_order_service,
     )
 
 
@@ -81,8 +161,9 @@ async def update_order_status(
     ],
 ):
     """Смена статуса заказа текущим курьером."""
-    return await base_order_service.update_status(
+    return await _update_courier_order_status(
         order_id=order_id,
         new_status=new_status,
-        requesting_user_id=courier.id,
+        courier=courier,
+        base_order_service=base_order_service,
     )
