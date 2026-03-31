@@ -26,7 +26,7 @@ async def get_transfers(
         StockTransferService, Depends(get_stock_transfer_service)
     ],
     current_admin: Annotated[
-        User, Security(get_current_user, scopes=[Scope.USERS_WRITE])
+        User, Security(get_current_user, scopes=[Scope.LOGISTICS_TRANSFER])
     ],
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
@@ -43,7 +43,7 @@ async def get_transfers(
 async def create_transfer(
     schema: CreateTransferRequest,
     current_admin: Annotated[
-        User, Security(get_current_user, scopes=[Scope.INVENTORY_WRITE])
+        User, Security(get_current_user, scopes=[Scope.LOGISTICS_TRANSFER])
     ],
     transfer_service: Annotated[
         StockTransferService, Depends(get_stock_transfer_service)
