@@ -26,7 +26,7 @@ transport_router = APIRouter()
 )
 async def get_transports(
     current_admin: Annotated[
-        User, Security(get_current_user, scopes=[Scope.USERS_WRITE])
+        User, Security(get_current_user, scopes=[Scope.TRANSPORTS_READ])
     ],
     transport_service: Annotated[
         TransportService, Depends(get_transport_service)
