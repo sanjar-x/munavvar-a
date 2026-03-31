@@ -2,7 +2,12 @@ import uuid
 from collections.abc import Sequence
 from datetime import datetime
 
-from src.core.exceptions import BadRequestError, ConflictError
+from src.core.exceptions import (
+    BadRequestError,
+    ConflictError,
+    ForbiddenError,
+)
+from src.core.security.permissions import Scope
 from src.infrastructure.database.models import Inventory, StockTransfer
 from src.modules.catalog.public import CatalogService
 from src.modules.inventory.enums import (
@@ -11,6 +16,7 @@ from src.modules.inventory.enums import (
     TransferType,
 )
 from src.modules.inventory.exceptions import (
+    ArchivedProductsInTransferError,
     CourierAlreadyAssignedError,
     InsufficientStockError,
     InventoryNotFoundError,
@@ -223,14 +229,33 @@ class WarehouseService:
 
     async def get_warehouses_with_balances(
         self,
+        owner_id: uuid.UUID | None = None,
     ) -> Sequence[Inventory]:
         async with self.uow:
-            return await self.uow.inventories.get_all_warehouses_with_balances()
+            return (
+                await self.uow.inventories.get_all_warehouses_with_balances(
+                    owner_id=owner_id,
+                )
+            )
+
+
+# Типы накладных, требующие расширенного права logistics:adjustment.
+# Кладовщик с logistics:transfer не может их создавать.
+_ADJUSTMENT_TRANSFER_TYPES: frozenset[TransferType] = frozenset({
+    TransferType.INVENTORY_FINDING,
+    TransferType.INITIAL_BALANCE,
+    TransferType.LOSS_WRITE_OFF,
+})
 
 
 class StockTransferService:
-    def __init__(self, uow: InventoryUnitOfWork):
+    def __init__(
+        self,
+        uow: InventoryUnitOfWork,
+        catalog_service: CatalogService,
+    ):
         self.uow = uow
+        self.catalog_service = catalog_service
 
     async def search_transfers(
         self,
@@ -242,6 +267,7 @@ class StockTransferService:
         to_inventory_id: uuid.UUID | None = None,
         date_from: datetime | None = None,
         date_to: datetime | None = None,
+        warehouse_owner_id: uuid.UUID | None = None,
     ) -> Sequence[StockTransfer]:
         async with self.uow:
             return await self.uow.transfers.search_transfers(
@@ -253,16 +279,51 @@ class StockTransferService:
                 to_inventory_id=to_inventory_id,
                 date_from=date_from,
                 date_to=date_to,
+                warehouse_owner_id=warehouse_owner_id,
             )
 
     async def create_transfer(
         self,
         created_by_id: uuid.UUID,
         schema: CreateTransferRequest,
+        caller_scopes: list[str] | None = None,
     ) -> StockTransfer:
         """
         Единый метод создания и проведения накладной (single-step).
+
+        Типы INVENTORY_FINDING, INITIAL_BALANCE и LOSS_WRITE_OFF требуют
+        scope logistics:adjustment (только Админ). Кладовщик с
+        logistics:transfer не может их создавать.
         """
+        # 0. Проверка scope для чувствительных типов накладных
+        if schema.type in _ADJUSTMENT_TRANSFER_TYPES:
+            if caller_scopes is None or (
+                Scope.LOGISTICS_ADJUSTMENT not in caller_scopes
+            ):
+                raise ForbiddenError(
+                    message=(
+                        "Для создания накладной типа"
+                        f" '{schema.type}' требуется"
+                        " разрешение logistics:adjustment."
+                    ),
+                    error_code="INSUFFICIENT_PERMISSIONS",
+                    details={"transfer_type": schema.type},
+                )
+
+        # 0.1. Проверка: все товары в накладной должны быть активными.
+        # get_by_ids фильтрует по is_active=True — отсутствующие ID
+        # означают архивированные товары.
+        product_ids = [item.product_id for item in schema.items]
+        active_products = await self.catalog_service.get_by_ids(product_ids)
+        active_ids = {p.id for p in active_products}
+        archived_ids = [
+            pid for pid in product_ids if pid not in active_ids
+        ]
+        if archived_ids:
+            raise ArchivedProductsInTransferError(
+                archived_product_ids=archived_ids
+            )
+
         async with self.uow:
             # 1. Авто-подстановка виртуальных складов
             from_id = schema.from_id

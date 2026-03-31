@@ -47,6 +47,9 @@ class Scope:
     LOGISTICS_TRANSFER = (
         "logistics:transfer"  # Перемещение между складами (Кладовщик)
     )
+    LOGISTICS_ADJUSTMENT = (
+        "logistics:adjustment"  # Оприходование, списание, нач. остатки (Админ)
+    )
     ROUTES_READ = "routes:read"  # Просмотр маршрутных листов (Курьер, Админ)
 
     # --- ФИНАНСЫ И КАССА (Finances) ---
@@ -91,6 +94,7 @@ ROLE_SCOPES: dict[Role, list[str]] = {
         Scope.TRANSPORTS_READ,
         Scope.LOGISTICS_SUPPLY,
         Scope.LOGISTICS_TRANSFER,
+        Scope.LOGISTICS_ADJUSTMENT,
         Scope.ROUTES_READ,
         Scope.FINANCES_READ,
         Scope.FINANCES_WRITE,

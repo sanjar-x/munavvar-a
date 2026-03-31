@@ -5,13 +5,14 @@ from fastapi import APIRouter, Depends, Query, Security
 
 from src.core.security.permissions import Scope
 from src.infrastructure.database.models import User
-from src.modules.auth.dependencies import get_current_user
+from src.modules.auth.dependencies import get_caller_scopes, get_current_user
 from src.modules.inventory.dependencies import get_stock_transfer_service
 from src.modules.inventory.schemas import (
     CreateTransferRequest,
     TransferResponse,
 )
 from src.modules.inventory.services import StockTransferService
+from src.modules.users.enums import Role
 
 transfers_router = APIRouter()
 
@@ -32,7 +33,17 @@ async def get_transfers(
     size: int = Query(20, ge=1, le=100),
 ):
     skip = (page - 1) * size
-    return await transfer_service.search_transfers(skip=skip, limit=size)
+    # Storekeeper sees only transfers touching their warehouse(s); admin sees all
+    warehouse_owner_id = (
+        current_admin.id
+        if current_admin.role == Role.STOREKEEPER
+        else None
+    )
+    return await transfer_service.search_transfers(
+        skip=skip,
+        limit=size,
+        warehouse_owner_id=warehouse_owner_id,
+    )
 
 
 @transfers_router.post(
@@ -45,8 +56,11 @@ async def create_transfer(
     current_admin: Annotated[
         User, Security(get_current_user, scopes=[Scope.LOGISTICS_TRANSFER])
     ],
+    caller_scopes: Annotated[list[str], Depends(get_caller_scopes)],
     transfer_service: Annotated[
         StockTransferService, Depends(get_stock_transfer_service)
     ],
 ):
-    return await transfer_service.create_transfer(current_admin.id, schema)
+    return await transfer_service.create_transfer(
+        current_admin.id, schema, caller_scopes
+    )

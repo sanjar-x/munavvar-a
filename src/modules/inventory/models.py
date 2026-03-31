@@ -60,10 +60,14 @@ class Inventory(BaseModel):
     outgoing_transactions: Mapped[list["StockTransaction"]] = relationship(
         foreign_keys="StockTransaction.from_id",
         back_populates="from_inventory",
+        viewonly=True,
+        overlaps="transactions",
     )
     incoming_transactions: Mapped[list["StockTransaction"]] = relationship(
         foreign_keys="StockTransaction.to_id",
         back_populates="to_inventory",
+        viewonly=True,
+        overlaps="transactions",
     )
     balances: Mapped[list["Balance"]] = relationship(
         back_populates="inventory", cascade="all, delete-orphan"
@@ -167,7 +171,9 @@ class StockTransfer(BaseModel):
         back_populates="transfer", cascade="all, delete-orphan"
     )
     transactions: Mapped[list["StockTransaction"]] = relationship(
-        back_populates="transfer", cascade="all, delete-orphan"
+        back_populates="transfer",
+        cascade="all, delete-orphan",
+        overlaps="outgoing_transactions,incoming_transactions",
     )
 
     __table_args__ = (
@@ -283,14 +289,21 @@ class StockTransaction(BaseModel):
 
     product: Mapped["Product"] = relationship()
     from_inventory: Mapped["Inventory"] = relationship(
-        foreign_keys=[from_id], back_populates="outgoing_transactions"
+        foreign_keys=[from_id],
+        back_populates="outgoing_transactions",
+        overlaps="transactions",
     )
     to_inventory: Mapped["Inventory"] = relationship(
-        foreign_keys=[to_id], back_populates="incoming_transactions"
+        foreign_keys=[to_id],
+        back_populates="incoming_transactions",
+        overlaps="transactions",
     )
     transfer: Mapped["StockTransfer"] = relationship(
         back_populates="transactions",
-        overlaps="incoming_transactions,to_inventory,outgoing_transactions,from_inventory",
+        overlaps=(
+            "incoming_transactions,to_inventory,"
+            "outgoing_transactions,from_inventory"
+        ),
     )
 
     __table_args__ = (

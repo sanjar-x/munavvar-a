@@ -5,7 +5,7 @@ from typing import Any
 
 from sqlalchemy import case, desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload, selectinload
+from sqlalchemy.orm import joinedload, selectinload, with_loader_criteria
 
 from src.common.repository import BaseRepository
 from src.core.config import settings
@@ -162,7 +162,11 @@ class InventoryRepository(BaseRepository[Inventory]):
         inv_type: InventoryType | None = None,
         with_for_update: bool = False,
     ) -> Inventory | None:
-        """Получить инвентарь (склад/транспорт) с актуальными остатками."""
+        """Получить инвентарь (склад/транспорт) с актуальными остатками.
+
+        Балансы по архивированным товарам (is_active=False) исключаются
+        из выдачи: исторические данные остаются в БД, но не видны в UI.
+        """
         query = select(self.model).where(
             self.model.id == inventory_id,
             self.model.is_active.is_(True),
@@ -174,13 +178,31 @@ class InventoryRepository(BaseRepository[Inventory]):
             query = query.with_for_update()
 
         query = query.options(
-            selectinload(self.model.balances).joinedload(Balance.product)
+            selectinload(self.model.balances).joinedload(Balance.product),
+            with_loader_criteria(
+                Product, Product.is_active.is_(True), include_aliases=True
+            ),
         )
         result = await self.session.execute(query)
-        return result.unique().scalar_one_or_none()
+        inventory = result.unique().scalar_one_or_none()
+        if inventory is not None:
+            # Filter out balance rows whose product was not loaded
+            # (archived products are excluded by with_loader_criteria)
+            inventory.balances = [
+                b for b in inventory.balances if b.product is not None
+            ]
+        return inventory
 
-    async def get_all_warehouses_with_balances(self) -> Sequence[Inventory]:
-        """Получить все склады с их полными товарными остатками."""
+    async def get_all_warehouses_with_balances(
+        self,
+        owner_id: uuid.UUID | None = None,
+    ) -> Sequence[Inventory]:
+        """Получить все склады с их полными товарными остатками.
+
+        Балансы по архивированным товарам (is_active=False) исключаются.
+        Если owner_id задан — возвращаются только склады этого владельца
+        (используется для ограничения видимости кладовщика).
+        """
         query = (
             select(self.model)
             .where(
@@ -188,11 +210,23 @@ class InventoryRepository(BaseRepository[Inventory]):
                 self.model.is_active.is_(True),
             )
             .options(
-                selectinload(self.model.balances).joinedload(Balance.product)
+                selectinload(self.model.balances).joinedload(Balance.product),
+                with_loader_criteria(
+                    Product,
+                    Product.is_active.is_(True),
+                    include_aliases=True,
+                ),
             )
         )
+        if owner_id is not None:
+            query = query.where(self.model.user_id == owner_id)
         result = await self.session.execute(query)
-        return result.unique().scalars().all()
+        warehouses = result.unique().scalars().all()
+        for wh in warehouses:
+            wh.balances = [
+                b for b in wh.balances if b.product is not None
+            ]
+        return warehouses
 
 
 class StockTransferItemRepository(BaseRepository[StockTransferItem]):
@@ -268,6 +302,7 @@ class StockTransferRepository(BaseRepository[StockTransfer]):
         to_inventory_id: uuid.UUID | None = None,
         date_from: datetime | None = None,
         date_to: datetime | None = None,
+        warehouse_owner_id: uuid.UUID | None = None,
     ) -> Sequence[StockTransfer]:
         query = select(self.model)
 
@@ -283,6 +318,22 @@ class StockTransferRepository(BaseRepository[StockTransfer]):
             query = query.where(self.model.created_at >= date_from)
         if date_to:
             query = query.where(self.model.created_at <= date_to)
+        # Storekeeper scoping: show only transfers that touch their warehouse(s)
+        if warehouse_owner_id is not None:
+            owner_inv_ids = (
+                select(Inventory.id)
+                .where(
+                    Inventory.user_id == warehouse_owner_id,
+                    Inventory.type == InventoryType.WAREHOUSE,
+                )
+                .scalar_subquery()
+            )
+            query = query.where(
+                or_(
+                    self.model.from_id.in_(owner_inv_ids),
+                    self.model.to_id.in_(owner_inv_ids),
+                )
+            )
 
         query = (
             query.options(

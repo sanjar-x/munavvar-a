@@ -145,4 +145,6 @@ class CourierService:
                 "account": account,
                 "inventory": inventory,
                 "orders": courier.courier_orders,
+                "created_at": courier.created_at,
+                "updated_at": courier.updated_at,
             }

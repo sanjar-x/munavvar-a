@@ -366,6 +366,16 @@ class WarehouseDetailResponse(BaseModel):
 # --- НАКЛАДНЫЕ (TRANSFERS) ---
 
 
+class InventoryShortResponse(BaseModel):
+    """Краткое описание склада/инвентаря для вложения в накладную."""
+
+    id: uuid.UUID
+    name: str
+    type: InventoryType
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class TransferItemResponse(BaseModel):
     product: ProductSimpleResponse
     quantity: int
@@ -377,6 +387,9 @@ class TransferResponse(BaseModel):
     id: uuid.UUID
     from_id: uuid.UUID
     to_id: uuid.UUID
+    # Enriched inventory details (loaded via joinedload in repository)
+    from_inventory: InventoryShortResponse | None = None
+    to_inventory: InventoryShortResponse | None = None
     created_by_id: uuid.UUID
     accepted_by_id: uuid.UUID | None
     status: TransferStatus

@@ -110,6 +110,8 @@ class ClientResponse(BaseModel):
     account: Account | None = None
     inventories: list[Inventory]
     client_orders: list[Order]
+    created_at: datetime
+    updated_at: datetime
 
 
 class InventoryUpdate(BaseModel):

@@ -65,6 +65,8 @@ class CourierResponse(BaseModel):
     orders: list[
         Any
     ]  # Если заказы тоже падают с такой же ошибкой, их тоже нужно описать через DTO!
+    created_at: datetime
+    updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
 

@@ -40,5 +40,8 @@ def get_warehouse_service(
 
 def get_stock_transfer_service(
     uow: Annotated[InventoryUnitOfWork, Depends(get_inventory_uow)],
+    catalog_service: Annotated[
+        CatalogService, Depends(get_catalog_service)
+    ],
 ) -> StockTransferService:
-    return StockTransferService(uow=uow)
+    return StockTransferService(uow=uow, catalog_service=catalog_service)

@@ -374,6 +374,31 @@ class InventoryReconciliationError(ConflictError):
         )
 
 
+class ArchivedProductsInTransferError(BadRequestError):
+    """
+    Попытка создать накладную с архивированными товарами.
+    Архивированные товары (is_active=False) не могут участвовать
+    в новых движениях — только исторические данные остаются в БД.
+    """
+
+    def __init__(
+        self,
+        archived_product_ids: list[uuid.UUID],
+        message: str = (
+            "Нельзя создать накладную с архивированными товарами"
+        ),
+    ):
+        super().__init__(
+            message=message,
+            error_code="ARCHIVED_PRODUCTS_IN_TRANSFER",
+            details={
+                "archived_product_ids": [
+                    str(pid) for pid in archived_product_ids
+                ]
+            },
+        )
+
+
 class ReversalNotAllowedError(ForbiddenError):
     """Попытка отменить/отреверсировать накладную, которую отменять нельзя (например, Инвентаризацию)."""
 

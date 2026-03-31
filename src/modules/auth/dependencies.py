@@ -89,6 +89,16 @@ async def get_current_user(
     return user
 
 
+async def get_caller_scopes(
+    payload: Annotated[dict[str, Any], Depends(get_token_payload)],
+) -> list[str]:
+    """
+    Возвращает список scope'ов из JWT-токена текущего пользователя.
+    Используется там, где нужна тонкая проверка прав внутри сервиса.
+    """
+    return payload.get("scopes", [])
+
+
 async def get_current_courier(
     current_user: Annotated[User, Security(get_current_user)],
 ) -> User:

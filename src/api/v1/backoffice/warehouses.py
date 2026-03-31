@@ -14,6 +14,7 @@ from src.modules.inventory.schemas import (
     WarehouseDetailResponse,
 )
 from src.modules.inventory.services import WarehouseService
+from src.modules.users.enums import Role
 
 warehouses_router = APIRouter()
 
@@ -31,7 +32,15 @@ async def get_warehouses_with_balances(
         WarehouseService, Depends(get_warehouse_service)
     ],
 ):
-    return await warehouse_service.get_warehouses_with_balances()
+    # Storekeeper sees only their own warehouse(s); admin sees all
+    owner_id = (
+        current_admin.id
+        if current_admin.role == Role.STOREKEEPER
+        else None
+    )
+    return await warehouse_service.get_warehouses_with_balances(
+        owner_id=owner_id
+    )
 
 
 @warehouses_router.post(
@@ -69,6 +78,10 @@ async def get_warehouse_detail(
     warehouse = await warehouse_service.get_warehouse_with_balances(
         warehouse_id
     )
+    # Storekeeper can only view their own warehouse(s)
+    if warehouse and current_admin.role == Role.STOREKEEPER:
+        if warehouse.user_id != current_admin.id:
+            warehouse = None
     if not warehouse:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Warehouse not found"
