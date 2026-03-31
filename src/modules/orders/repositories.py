@@ -14,6 +14,7 @@ from src.infrastructure.database.models import (
     Order,
     OrderItem,
     StockTransfer,
+    StockTransferItem,
     User,
 )
 from src.modules.orders.enums import OrderStatus, PaymentMethod
@@ -57,6 +58,18 @@ class OrderRepository(BaseRepository[Order]):
     def __init__(self, session: AsyncSession):
         super().__init__(model=Order, session=session)
 
+    @staticmethod
+    def _details_options():
+        return (
+            joinedload(Order.client).selectinload(User.identities),
+            joinedload(Order.courier).selectinload(User.identities),
+            joinedload(Order.client_inventory).joinedload(Inventory.user),
+            selectinload(Order.items).joinedload(OrderItem.product),
+            selectinload(Order.stock_transfers)
+            .selectinload(StockTransfer.items)
+            .joinedload(StockTransferItem.product),
+        )
+
     async def get_client_orders(
         self, client_id: uuid.UUID, skip: int = 0, limit: int = 20
     ) -> Sequence[Order]:
@@ -67,13 +80,7 @@ class OrderRepository(BaseRepository[Order]):
         query = (
             select(self.model)
             .where(self.model.client_id == client_id)
-            .options(
-                joinedload(self.model.client).selectinload(User.identities),
-                joinedload(self.model.courier).selectinload(User.identities),
-                joinedload(self.model.client_inventory).joinedload(
-                    Inventory.user
-                ),
-            )
+            .options(*self._details_options())
             .order_by(desc(self.model.created_at))
             .offset(skip)
             .limit(limit)
@@ -100,14 +107,7 @@ class OrderRepository(BaseRepository[Order]):
                     ]
                 ),
             )
-            .options(
-                joinedload(self.model.client).selectinload(User.identities),
-                joinedload(self.model.courier).selectinload(User.identities),
-                joinedload(self.model.client_inventory).joinedload(
-                    Inventory.user
-                ),
-                selectinload(self.model.items).joinedload(OrderItem.product),
-            )
+            .options(*self._details_options())
             .order_by(self.model.created_at.asc())
         )
         result: Result = await self.session.execute(query)
@@ -119,17 +119,7 @@ class OrderRepository(BaseRepository[Order]):
         query = (
             select(self.model)
             .where(self.model.id == order_id)
-            .options(
-                joinedload(self.model.client).selectinload(User.identities),
-                joinedload(self.model.client_inventory).joinedload(
-                    Inventory.user
-                ),
-                joinedload(self.model.courier).selectinload(User.identities),
-                selectinload(self.model.items).joinedload(OrderItem.product),
-                selectinload(self.model.stock_transfers).selectinload(
-                    StockTransfer.items
-                ),
-            )
+            .options(*self._details_options())
         )
 
         if with_for_update:
@@ -188,15 +178,7 @@ class OrderRepository(BaseRepository[Order]):
             query = query.where(self.model.total_amount <= max_amount)
 
         query = (
-            query.options(
-                joinedload(self.model.client).selectinload(User.identities),
-                joinedload(self.model.client_inventory),
-                joinedload(self.model.courier).selectinload(User.identities),
-                selectinload(self.model.items).joinedload(OrderItem.product),
-                selectinload(self.model.stock_transfers).selectinload(
-                    StockTransfer.items
-                ),
-            )
+            query.options(*self._details_options())
             .order_by(desc(self.model.updated_at))
             .offset(skip)
             .limit(limit)

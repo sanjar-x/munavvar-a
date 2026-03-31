@@ -107,6 +107,22 @@ class TestDeliveryFulfillment:
         data = resp.json()
         assert data["status"] == "delivered"
 
+        # == Step 3.1: Backoffice list must serialize transfer items fully ===
+        resp = await client.get(
+            "/api/v1/backoffice/orders/",
+            headers=headers,
+        )
+        assert resp.status_code == 200, resp.text
+        listed_order = next(
+            item
+            for item in resp.json()
+            if item["id"] == order_id
+        )
+        assert listed_order["stock_transfers"]
+        first_transfer_item = listed_order["stock_transfers"][0]["items"][0]
+        assert first_transfer_item["product"]["id"]
+        assert first_transfer_item["product"]["name"]
+
         # == Step 4: Assert balance state ==============
         # Known amounts: water.price=20_000, qty=2,
         # total=40_000
