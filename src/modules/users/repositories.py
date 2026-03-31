@@ -202,6 +202,45 @@ class UserRepository(BaseRepository[User]):
     async def get_accountant(self, id: UUID) -> User | None:
         return await self._get_active_by_role_and_id(id, Role.ACCOUNTANT)
 
+    async def get_staff_with_details(
+        self,
+        skip: int,
+        limit: int,
+        roles: Sequence[Role],
+        search: str | None = None,
+    ) -> tuple[int, Sequence[User]]:
+        query = select(self.model).where(
+            self.model.is_active.is_(True),
+            self.model.role.in_(roles),
+        )
+
+        if search:
+            search_pattern = f"%{search}%"
+            query = query.where(
+                or_(
+                    self.model.username.ilike(search_pattern),
+                    self.model.identities.any(
+                        Identity.provider_identity_id.ilike(search_pattern)
+                    ),
+                )
+            )
+
+        count_query = query.with_only_columns(func.count()).order_by(None)
+        total_count = await self.session.scalar(count_query) or 0
+
+        if total_count == 0:
+            return 0, []
+
+        query = (
+            query.options(selectinload(self.model.identities))
+            .order_by(self.model.created_at.desc(), self.model.id.desc())
+            .offset(skip)
+            .limit(limit)
+        )
+
+        result = await self.session.scalars(query)
+        return total_count, result.all()
+
     async def get_couriers_with_details(
         self, skip: int, limit: int, search: str | None = None
     ) -> tuple[int, Sequence[User]]:

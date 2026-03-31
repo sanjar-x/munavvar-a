@@ -1,16 +1,18 @@
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Security, status
+from fastapi import APIRouter, Depends, Query, Security, status
 
 from src.core.security.permissions import Scope
 from src.infrastructure.database.models import User
 from src.modules.auth.dependencies import get_current_user
 from src.modules.users.dependencies import get_user_service
+from src.modules.users.enums import Role
 from src.modules.users.schemas import (
     UserAdminCreate,
     UserAdminUpdate,
     UserResponse,
+    UserResponseList,
 )
 from src.modules.users.services import UserService
 
@@ -35,6 +37,34 @@ async def create_user(
     """
     user = await user_service.register_local_user(schema)
     return user
+
+
+@users_router.get(
+    "/",
+    response_model=UserResponseList,
+    summary="Получить список сотрудников",
+)
+async def get_staff_users(
+    current_admin: Annotated[
+        User, Security(get_current_user, scopes=[Scope.USERS_READ])
+    ],
+    user_service: Annotated[UserService, Depends(get_user_service)],
+    skip: int = Query(0, ge=0, description="Сколько записей пропустить"),
+    limit: int = Query(
+        50, ge=1, le=100, description="Сколько записей вернуть"
+    ),
+    search: str | None = Query(None, description="Поиск по ФИО или телефону"),
+    roles: list[Role] | None = Query(
+        None,
+        description="Фильтр по staff-ролям. Можно передать несколько roles.",
+    ),
+):
+    return await user_service.get_staff(
+        skip=skip,
+        limit=limit,
+        search=search,
+        roles=roles,
+    )
 
 
 @users_router.get(

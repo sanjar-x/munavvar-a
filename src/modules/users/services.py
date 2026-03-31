@@ -106,6 +106,33 @@ class UserService(BaseService[User, UserAdminCreate, UserUnitOfWork]):
 
             return {"total_count": total, "couriers": items}
 
+    async def get_staff(
+        self,
+        skip: int,
+        limit: int,
+        search: str | None = None,
+        roles: list[Role] | None = None,
+    ) -> dict[str, Any]:
+        selected_roles = roles or list(STAFF_ROLES)
+        invalid_roles = [
+            role.value for role in selected_roles if role not in STAFF_ROLES
+        ]
+        if invalid_roles:
+            raise BadRequestError(
+                message="Фильтр roles принимает только роли сотрудников.",
+                error_code="INVALID_STAFF_ROLE_FILTER",
+                details={"roles": invalid_roles},
+            )
+
+        async with self.uow:
+            total, users = await self._repo.get_staff_with_details(
+                skip=skip,
+                limit=limit,
+                roles=selected_roles,
+                search=search,
+            )
+            return {"total_count": total, "users": list(users)}
+
     async def get_user_local_identity(self, identity_id: str):
         async with self.uow:
             return await self.uow.users.get_with_identity(
