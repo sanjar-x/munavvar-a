@@ -52,7 +52,7 @@ async def get_transports(
 async def create_transport(
     schema: TransportCreate,
     current_admin: Annotated[
-        User, Security(get_current_user, scopes=[Scope.USERS_WRITE])
+        User, Security(get_current_user, scopes=[Scope.TRANSPORTS_READ])
     ],
     transport_service: Annotated[
         TransportService, Depends(get_transport_service)
@@ -69,7 +69,7 @@ async def create_transport(
 async def get_transport_detail(
     transport_id: uuid.UUID,
     current_admin: Annotated[
-        User, Security(get_current_user, scopes=[Scope.USERS_WRITE])
+        User, Security(get_current_user, scopes=[Scope.TRANSPORTS_READ])
     ],
     transport_service: Annotated[
         TransportService, Depends(get_transport_service)

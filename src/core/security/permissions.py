@@ -31,6 +31,10 @@ class Scope:
     )
 
     # --- СКЛАД И ЛОГИСТИКА (Logistics & Inventory) ---
+    TRANSPORTS_READ = (
+        "transports:read"  # Просмотр остатков на складе (Кладовщик, Кассир)
+    )
+    # --- СКЛАД И ЛОГИСТИКА (Logistics & Inventory) ---
     INVENTORY_READ = (
         "inventory:read"  # Просмотр остатков на складе (Кладовщик, Кассир)
     )
@@ -84,6 +88,7 @@ ROLE_SCOPES: dict[Role, list[str]] = {
         Scope.ORDERS_CANCEL,
         Scope.INVENTORY_READ,
         Scope.INVENTORY_WRITE,
+        Scope.TRANSPORTS_READ,
         Scope.LOGISTICS_SUPPLY,
         Scope.LOGISTICS_TRANSFER,
         Scope.ROUTES_READ,
@@ -103,7 +108,7 @@ ROLE_SCOPES: dict[Role, list[str]] = {
     # Кладовщик (Только склад и логистика)
     Role.STOREKEEPER: BASE_SCOPES
     + [
-        Scope.ORDERS_READ,
+        Scope.TRANSPORTS_READ,
         Scope.INVENTORY_READ,
         Scope.INVENTORY_WRITE,
         Scope.LOGISTICS_SUPPLY,
