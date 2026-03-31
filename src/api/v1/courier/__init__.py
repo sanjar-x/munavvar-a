@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from src.api.v1.courier.catalog import catalog_router
+from src.api.v1.courier.finances import finances_router
 from src.api.v1.courier.login import login_router
 from src.api.v1.courier.orders import orders_router
 from src.api.v1.courier.profile import profile_router
@@ -18,4 +19,9 @@ courier_router.include_router(
 
 courier_router.include_router(
     orders_router, prefix="/orders", tags=["Courier | Orders"]
+)
+courier_router.include_router(
+    finances_router,
+    prefix="/finances",
+    tags=["Courier | Finances"],
 )

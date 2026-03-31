@@ -1081,6 +1081,7 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
         - Начисляет долг клиенту (Revenue → Client)
         - CASH: перебрасывает долг на курьера (Client → Courier)
         - CARD: создает pending-транзакцию на эквайринг (Client → Card)
+        - CONTRACT: только долг клиенту, оплата позже по договору
 
         ВАЖНО: Балансы accounts.balance обновляются ТРИГГЕРОМ БД
         (update_account_balances), а не приложением. Приложение
@@ -1098,7 +1099,9 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
                 error_code="CLIENT_ACCOUNT_NOT_FOUND",
                 details={"client_id": str(order.client_id)},
             )
-        revenue_account = await self.uow.accounts.get_system_revenue_account()
+        revenue_account = (
+            await self.uow.accounts.get_system_revenue_account()
+        )
 
         # Долг клиенту (balance обновит триггер при INSERT)
         financial_txns: list[dict] = [
@@ -1112,24 +1115,29 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
             }
         ]
 
-        if order.payment_method == PaymentMethod.CASH and order.courier_id:
-            courier_account = await self.uow.accounts.get_courier_account(
-                order.courier_id
-            )
-            if courier_account:
-                financial_txns.append(
-                    {
-                        "from_id": client_account.id,
-                        "to_id": courier_account.id,
-                        "amount": order.total_amount,
-                        "order_id": order.id,
-                        "status": TransactionStatus.COMPLETED,
-                        "reason": "Оплата наличными курьеру",
-                    }
+        if order.payment_method == PaymentMethod.CASH:
+            if order.courier_id:
+                courier_account = (
+                    await self.uow.accounts.get_courier_account(
+                        order.courier_id
+                    )
                 )
+                if courier_account:
+                    financial_txns.append(
+                        {
+                            "from_id": client_account.id,
+                            "to_id": courier_account.id,
+                            "amount": order.total_amount,
+                            "order_id": order.id,
+                            "status": TransactionStatus.COMPLETED,
+                            "reason": "Оплата наличными курьеру",
+                        }
+                    )
 
         elif order.payment_method == PaymentMethod.CARD:
-            card_account = await self.uow.accounts.get_system_card_account()
+            card_account = (
+                await self.uow.accounts.get_system_card_account()
+            )
             financial_txns.append(
                 {
                     "from_id": client_account.id,
@@ -1141,14 +1149,18 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
                 }
             )
 
+        # CONTRACT: только Revenue → Client, долг остается
+        # на балансе клиента до оплаты по договору
+
         await self.uow.financial_transactions.add_many(financial_txns)
 
     async def _process_pickup_settlement(self, order: Order) -> None:
         """
-        Финансовое закрытие самовывоза:
-        1. Revenue → Client (долг)
-        2. Client → Cash (оплата наличными на складе)
-        Обе транзакции COMPLETED — деньги сразу в кассе.
+        Финансовое закрытие самовывоза.
+        Создает транзакции в зависимости от способа оплаты:
+        - CASH: Revenue→Client + Client→Cash (обе COMPLETED)
+        - CARD: Revenue→Client (COMPLETED) + Client→Card (PENDING)
+        - CONTRACT: только Revenue→Client (COMPLETED), долг остается
         """
         client_account = await self.uow.accounts.get_client_account(
             order.client_id
@@ -1156,34 +1168,66 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
         if not client_account:
             raise NotFoundError(
                 message=(
-                    f"Финансовый счет клиента {order.client_id} не найден"
+                    "Финансовый счет клиента "
+                    f"{order.client_id} не найден"
                 ),
                 error_code="CLIENT_ACCOUNT_NOT_FOUND",
                 details={"client_id": str(order.client_id)},
             )
-        revenue_account = await self.uow.accounts.get_system_revenue_account()
-        cash_account = await self.uow.accounts.get_system_cash_account()
+        revenue_account = (
+            await self.uow.accounts.get_system_revenue_account()
+        )
 
-        await self.uow.financial_transactions.add_many(
-            [
-                {
-                    "from_id": revenue_account.id,
-                    "to_id": client_account.id,
-                    "amount": order.total_amount,
-                    "order_id": order.id,
-                    "status": TransactionStatus.COMPLETED,
-                    "reason": "Задолженность за заказ (самовывоз)",
-                },
+        # Долг клиенту (самовывоз)
+        financial_txns: list[dict] = [
+            {
+                "from_id": revenue_account.id,
+                "to_id": client_account.id,
+                "amount": order.total_amount,
+                "order_id": order.id,
+                "status": TransactionStatus.COMPLETED,
+                "reason": "Задолженность за заказ (самовывоз)",
+            }
+        ]
+
+        if order.payment_method == PaymentMethod.CASH:
+            cash_account = (
+                await self.uow.accounts.get_system_cash_account()
+            )
+            financial_txns.append(
                 {
                     "from_id": client_account.id,
                     "to_id": cash_account.id,
                     "amount": order.total_amount,
                     "order_id": order.id,
                     "status": TransactionStatus.COMPLETED,
-                    "reason": "Оплата наличными на складе",
-                },
-            ]
-        )
+                    "reason": (
+                        "Оплата наличными на складе (самовывоз)"
+                    ),
+                }
+            )
+
+        elif order.payment_method == PaymentMethod.CARD:
+            card_account = (
+                await self.uow.accounts.get_system_card_account()
+            )
+            financial_txns.append(
+                {
+                    "from_id": client_account.id,
+                    "to_id": card_account.id,
+                    "amount": order.total_amount,
+                    "order_id": order.id,
+                    "status": TransactionStatus.PENDING,
+                    "reason": (
+                        "Перевод на карту (самовывоз)"
+                    ),
+                }
+            )
+
+        # CONTRACT: только Revenue → Client, долг остается
+        # на балансе клиента до оплаты по договору
+
+        await self.uow.financial_transactions.add_many(financial_txns)
 
     async def check_tara_availability(self, dto: TaraCheckRequest) -> dict:
         """

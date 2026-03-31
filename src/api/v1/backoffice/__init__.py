@@ -3,6 +3,7 @@ from fastapi import APIRouter
 from src.api.v1.backoffice.catalog import catalog_router
 from src.api.v1.backoffice.clients import clients_router
 from src.api.v1.backoffice.couriers import couriers_router
+from src.api.v1.backoffice.finances import finances_router
 from src.api.v1.backoffice.orders import orders_router
 from src.api.v1.backoffice.profile import profile_router
 from src.api.v1.backoffice.shifts import shifts_router
@@ -40,6 +41,11 @@ backoffice.include_router(
 )
 backoffice.include_router(
     orders_router, prefix="/orders", tags=["Backoffice | Orders"]
+)
+backoffice.include_router(
+    finances_router,
+    prefix="/finances",
+    tags=["Backoffice | Finances"],
 )
 backoffice.include_router(
     shifts_router, prefix="/shifts", tags=["Backoffice | Shifts"]
