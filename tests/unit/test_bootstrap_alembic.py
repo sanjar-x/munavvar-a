@@ -58,12 +58,7 @@ def test_repairs_legacy_only_version_state_with_triggers() -> None:
     )
 
 
-def test_raises_for_partially_initialized_schema() -> None:
+def test_returns_none_for_partially_initialized_schema() -> None:
     existing_tables = INIT_TABLES - {"transactions"}
 
-    try:
-        choose_bootstrap_plan(set(), existing_tables, set())
-    except RuntimeError as exc:
-        assert "Missing tables: transactions" in str(exc)
-    else:
-        raise AssertionError("Expected RuntimeError for partial schema")
+    assert choose_bootstrap_plan(set(), existing_tables, set()) is None

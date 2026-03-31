@@ -85,11 +85,12 @@ def upgrade() -> None:
     sa.CheckConstraint('price >= 0', name='ck_product_price_pos'),
     sa.ForeignKeyConstraint(['returnable_item_id'], ['products.id'], ondelete='RESTRICT'),
     sa.PrimaryKeyConstraint('id'),
+    if_not_exists=True,
     comment='Единый каталог товаров, услуг и оборотной тары'
     )
-    op.create_index('idx_product_attributes_gin', 'products', ['attributes'], unique=False, postgresql_using='gin')
-    op.create_index(op.f('ix_products_returnable_item_id'), 'products', ['returnable_item_id'], unique=False)
-    op.create_index(op.f('ix_products_type'), 'products', ['type'], unique=False)
+    op.create_index('idx_product_attributes_gin', 'products', ['attributes'], unique=False, postgresql_using='gin', if_not_exists=True)
+    op.create_index(op.f('ix_products_returnable_item_id'), 'products', ['returnable_item_id'], unique=False, if_not_exists=True)
+    op.create_index(op.f('ix_products_type'), 'products', ['type'], unique=False, if_not_exists=True)
     op.create_table('users',
     sa.Column('username', sa.String(length=255), nullable=False, comment='ФИО (для физлиц) или Название компании (для B2B)'),
     sa.Column('role', _pg_enum('user_role_enum', 'system', 'admin', 'accountant', 'storekeeper', 'cashier', 'courier', 'client_b2c', 'client_b2b'), nullable=False, comment='Уровень доступа (роль) пользователя в системе'),
@@ -98,9 +99,10 @@ def upgrade() -> None:
     sa.Column('created_at', sa.TIMESTAMP(timezone=True), server_default=sa.text('now()'), nullable=False, comment='Дата и время создания записи'),
     sa.Column('updated_at', sa.TIMESTAMP(timezone=True), server_default=sa.text('now()'), nullable=False, comment='Дата и время последнего обновления'),
     sa.PrimaryKeyConstraint('id'),
+    if_not_exists=True,
     comment='Глобальный реестр пользователей, клиентов и сотрудников'
     )
-    op.create_index(op.f('ix_users_role'), 'users', ['role'], unique=False)
+    op.create_index(op.f('ix_users_role'), 'users', ['role'], unique=False, if_not_exists=True)
     op.create_table('accounts',
     sa.Column('user_id', sa.UUID(), nullable=False, comment='Владелец счета'),
     sa.Column('type', _pg_enum('account_type_enum', 'revenue', 'cash', 'card', 'bank', 'discount', 'client', 'courier'), nullable=False, comment='Тип счета (CASH, CARD, DEBT, COMPANY_PROFIT)'),
@@ -112,10 +114,11 @@ def upgrade() -> None:
     sa.Column('updated_at', sa.TIMESTAMP(timezone=True), server_default=sa.text('now()'), nullable=False, comment='Дата и время последнего обновления'),
     sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='RESTRICT'),
     sa.PrimaryKeyConstraint('id'),
+    if_not_exists=True,
     comment='Счета для хранения денег (наличные, безнал, долги клиентов)'
     )
-    op.create_index('idx_account_user_type', 'accounts', ['user_id', 'type'], unique=False)
-    op.create_index(op.f('ix_accounts_type'), 'accounts', ['type'], unique=False)
+    op.create_index('idx_account_user_type', 'accounts', ['user_id', 'type'], unique=False, if_not_exists=True)
+    op.create_index(op.f('ix_accounts_type'), 'accounts', ['type'], unique=False, if_not_exists=True)
     op.create_table('identities',
     sa.Column('user_id', sa.UUID(), nullable=False, comment='Ссылка на профиль пользователя'),
     sa.Column('provider', _pg_enum('auth_provider_enum', 'local', 'google', 'telegram', 'apple'), nullable=False, comment='Провайдер авторизации (local, google, telegram и т.д.)'),
@@ -128,9 +131,10 @@ def upgrade() -> None:
     sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('provider', 'provider_identity_id', name='uq_identities_provider_identity_id'),
+    if_not_exists=True,
     comment='Учетные данные пользователей и привязки к соцсетям (OAuth)'
     )
-    op.create_index(op.f('ix_identities_user_id'), 'identities', ['user_id'], unique=False)
+    op.create_index(op.f('ix_identities_user_id'), 'identities', ['user_id'], unique=False, if_not_exists=True)
     op.create_table('inventories',
     sa.Column('user_id', sa.UUID(), nullable=False, comment='Кто материально ответственен за эту точку (курьер, клиент, кладовщик)?'),
     sa.Column('type', _pg_enum('inventory_type_enum', 'WAREHOUSE', 'COURIER', 'CLIENT', 'VIRTUAL_LOSS', 'VIRTUAL_VENDOR'), nullable=False, comment='Тип инвентаря: WAREHOUSE, COURIER, CLIENT, VIRTUAL'),
@@ -141,11 +145,12 @@ def upgrade() -> None:
     sa.Column('updated_at', sa.TIMESTAMP(timezone=True), server_default=sa.text('now()'), nullable=False, comment='Дата и время последнего обновления'),
     sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='RESTRICT'),
     sa.PrimaryKeyConstraint('id'),
+    if_not_exists=True,
     comment='Реестр всех физических и виртуальных мест хранения (склады, машины, клиенты)'
     )
-    op.create_index('idx_inventory_user_type', 'inventories', ['user_id', 'type'], unique=False)
-    op.create_index(op.f('ix_inventories_type'), 'inventories', ['type'], unique=False)
-    op.create_index('uq_active_courier_inventory', 'inventories', ['user_id'], unique=True, postgresql_where=sa.text("type = 'COURIER' AND is_active = true"))
+    op.create_index('idx_inventory_user_type', 'inventories', ['user_id', 'type'], unique=False, if_not_exists=True)
+    op.create_index(op.f('ix_inventories_type'), 'inventories', ['type'], unique=False, if_not_exists=True)
+    op.create_index('uq_active_courier_inventory', 'inventories', ['user_id'], unique=True, postgresql_where=sa.text("type = 'COURIER' AND is_active = true"), if_not_exists=True)
     op.create_table('inventory_balances',
     sa.Column('inventory_id', sa.UUID(), nullable=False),
     sa.Column('product_id', sa.UUID(), nullable=False),
@@ -158,9 +163,10 @@ def upgrade() -> None:
     sa.ForeignKeyConstraint(['product_id'], ['products.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('inventory_id', 'product_id', name='uq_inventory_product_balance'),
+    if_not_exists=True,
     comment='Материализованные (закэшированные) остатки. Обновляется триггером базы данных'
     )
-    op.create_index(op.f('ix_inventory_balances_product_id'), 'inventory_balances', ['product_id'], unique=False)
+    op.create_index(op.f('ix_inventory_balances_product_id'), 'inventory_balances', ['product_id'], unique=False, if_not_exists=True)
     op.create_table('orders',
     sa.Column('client_id', sa.UUID(), nullable=False, comment='Покупатель (B2B или B2C)'),
     sa.Column('client_inventory_id', sa.UUID(), nullable=False, comment='Инвентарь (адрес) клиента для отгрузки товаров и тары'),
@@ -180,14 +186,15 @@ def upgrade() -> None:
     sa.ForeignKeyConstraint(['courier_id'], ['users.id'], ondelete='SET NULL'),
     sa.ForeignKeyConstraint(['warehouse_id'], ['inventories.id'], ondelete='RESTRICT'),
     sa.PrimaryKeyConstraint('id'),
+    if_not_exists=True,
     comment='Главная таблица заказов клиентов'
     )
-    op.create_index(op.f('ix_orders_client_id'), 'orders', ['client_id'], unique=False)
-    op.create_index(op.f('ix_orders_client_inventory_id'), 'orders', ['client_inventory_id'], unique=False)
-    op.create_index(op.f('ix_orders_courier_id'), 'orders', ['courier_id'], unique=False)
-    op.create_index(op.f('ix_orders_sale_type'), 'orders', ['sale_type'], unique=False)
-    op.create_index(op.f('ix_orders_status'), 'orders', ['status'], unique=False)
-    op.create_index(op.f('ix_orders_warehouse_id'), 'orders', ['warehouse_id'], unique=False)
+    op.create_index(op.f('ix_orders_client_id'), 'orders', ['client_id'], unique=False, if_not_exists=True)
+    op.create_index(op.f('ix_orders_client_inventory_id'), 'orders', ['client_inventory_id'], unique=False, if_not_exists=True)
+    op.create_index(op.f('ix_orders_courier_id'), 'orders', ['courier_id'], unique=False, if_not_exists=True)
+    op.create_index(op.f('ix_orders_sale_type'), 'orders', ['sale_type'], unique=False, if_not_exists=True)
+    op.create_index(op.f('ix_orders_status'), 'orders', ['status'], unique=False, if_not_exists=True)
+    op.create_index(op.f('ix_orders_warehouse_id'), 'orders', ['warehouse_id'], unique=False, if_not_exists=True)
     op.create_table('order_items',
     sa.Column('order_id', sa.UUID(), nullable=False),
     sa.Column('product_id', sa.UUID(), nullable=False),
@@ -202,10 +209,11 @@ def upgrade() -> None:
     sa.ForeignKeyConstraint(['order_id'], ['orders.id'], ondelete='CASCADE'),
     sa.ForeignKeyConstraint(['product_id'], ['products.id'], ondelete='RESTRICT'),
     sa.PrimaryKeyConstraint('id'),
+    if_not_exists=True,
     comment='Строки (позиции) конкретного заказа'
     )
-    op.create_index(op.f('ix_order_items_order_id'), 'order_items', ['order_id'], unique=False)
-    op.create_index(op.f('ix_order_items_product_id'), 'order_items', ['product_id'], unique=False)
+    op.create_index(op.f('ix_order_items_order_id'), 'order_items', ['order_id'], unique=False, if_not_exists=True)
+    op.create_index(op.f('ix_order_items_product_id'), 'order_items', ['product_id'], unique=False, if_not_exists=True)
     op.create_table('stock_transfers',
     sa.Column('from_id', sa.UUID(), nullable=False),
     sa.Column('to_id', sa.UUID(), nullable=False),
@@ -228,14 +236,15 @@ def upgrade() -> None:
     sa.ForeignKeyConstraint(['to_id'], ['inventories.id'], ondelete='RESTRICT'),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('id', 'from_id', 'to_id', name='uq_stock_transfer_route'),
+    if_not_exists=True,
     comment='Документы (накладные) на перемещение товаров между складами/клиентами'
     )
-    op.create_index(op.f('ix_stock_transfers_from_id'), 'stock_transfers', ['from_id'], unique=False)
-    op.create_index(op.f('ix_stock_transfers_order_id'), 'stock_transfers', ['order_id'], unique=False)
-    op.create_index(op.f('ix_stock_transfers_route_sheet_id'), 'stock_transfers', ['route_sheet_id'], unique=False)
-    op.create_index(op.f('ix_stock_transfers_status'), 'stock_transfers', ['status'], unique=False)
-    op.create_index(op.f('ix_stock_transfers_to_id'), 'stock_transfers', ['to_id'], unique=False)
-    op.create_index(op.f('ix_stock_transfers_type'), 'stock_transfers', ['type'], unique=False)
+    op.create_index(op.f('ix_stock_transfers_from_id'), 'stock_transfers', ['from_id'], unique=False, if_not_exists=True)
+    op.create_index(op.f('ix_stock_transfers_order_id'), 'stock_transfers', ['order_id'], unique=False, if_not_exists=True)
+    op.create_index(op.f('ix_stock_transfers_route_sheet_id'), 'stock_transfers', ['route_sheet_id'], unique=False, if_not_exists=True)
+    op.create_index(op.f('ix_stock_transfers_status'), 'stock_transfers', ['status'], unique=False, if_not_exists=True)
+    op.create_index(op.f('ix_stock_transfers_to_id'), 'stock_transfers', ['to_id'], unique=False, if_not_exists=True)
+    op.create_index(op.f('ix_stock_transfers_type'), 'stock_transfers', ['type'], unique=False, if_not_exists=True)
     op.create_table('transactions',
     sa.Column('from_id', sa.UUID(), nullable=False, comment='Счет списания'),
     sa.Column('to_id', sa.UUID(), nullable=False, comment='Счет зачисления'),
@@ -255,12 +264,13 @@ def upgrade() -> None:
     sa.ForeignKeyConstraint(['to_id'], ['accounts.id'], ondelete='RESTRICT'),
     sa.ForeignKeyConstraint(['verified_by_id'], ['users.id'], ondelete='RESTRICT'),
     sa.PrimaryKeyConstraint('id'),
+    if_not_exists=True,
     comment='Финансовый леджер (Event Sourcing). Строго только добавление (Append-only)'
     )
-    op.create_index('idx_transaction_from_status', 'transactions', ['from_id', 'status'], unique=False)
-    op.create_index('idx_transaction_to_status', 'transactions', ['to_id', 'status'], unique=False)
-    op.create_index(op.f('ix_transactions_order_id'), 'transactions', ['order_id'], unique=False)
-    op.create_index(op.f('ix_transactions_verified_by_id'), 'transactions', ['verified_by_id'], unique=False)
+    op.create_index('idx_transaction_from_status', 'transactions', ['from_id', 'status'], unique=False, if_not_exists=True)
+    op.create_index('idx_transaction_to_status', 'transactions', ['to_id', 'status'], unique=False, if_not_exists=True)
+    op.create_index(op.f('ix_transactions_order_id'), 'transactions', ['order_id'], unique=False, if_not_exists=True)
+    op.create_index(op.f('ix_transactions_verified_by_id'), 'transactions', ['verified_by_id'], unique=False, if_not_exists=True)
     op.create_table('stock_transactions',
     sa.Column('product_id', sa.UUID(), nullable=False),
     sa.Column('transfer_id', sa.UUID(), nullable=False),
@@ -277,14 +287,15 @@ def upgrade() -> None:
     sa.ForeignKeyConstraint(['to_id'], ['inventories.id'], ondelete='RESTRICT'),
     sa.ForeignKeyConstraint(['transfer_id', 'from_id', 'to_id'], ['stock_transfers.id', 'stock_transfers.from_id', 'stock_transfers.to_id'], name='fk_stock_transaction_strict_route', ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id'),
+    if_not_exists=True,
     comment='Строгий леджер движения товаров (Event Sourcing). Истина в последней инстанции'
     )
-    op.create_index('idx_st_product_from', 'stock_transactions', ['product_id', 'from_id'], unique=False)
-    op.create_index('idx_st_product_to', 'stock_transactions', ['product_id', 'to_id'], unique=False)
-    op.create_index(op.f('ix_stock_transactions_from_id'), 'stock_transactions', ['from_id'], unique=False)
-    op.create_index(op.f('ix_stock_transactions_product_id'), 'stock_transactions', ['product_id'], unique=False)
-    op.create_index(op.f('ix_stock_transactions_to_id'), 'stock_transactions', ['to_id'], unique=False)
-    op.create_index(op.f('ix_stock_transactions_transfer_id'), 'stock_transactions', ['transfer_id'], unique=False)
+    op.create_index('idx_st_product_from', 'stock_transactions', ['product_id', 'from_id'], unique=False, if_not_exists=True)
+    op.create_index('idx_st_product_to', 'stock_transactions', ['product_id', 'to_id'], unique=False, if_not_exists=True)
+    op.create_index(op.f('ix_stock_transactions_from_id'), 'stock_transactions', ['from_id'], unique=False, if_not_exists=True)
+    op.create_index(op.f('ix_stock_transactions_product_id'), 'stock_transactions', ['product_id'], unique=False, if_not_exists=True)
+    op.create_index(op.f('ix_stock_transactions_to_id'), 'stock_transactions', ['to_id'], unique=False, if_not_exists=True)
+    op.create_index(op.f('ix_stock_transactions_transfer_id'), 'stock_transactions', ['transfer_id'], unique=False, if_not_exists=True)
     op.create_table('stock_transfer_items',
     sa.Column('transfer_id', sa.UUID(), nullable=False),
     sa.Column('product_id', sa.UUID(), nullable=False),
@@ -297,10 +308,11 @@ def upgrade() -> None:
     sa.ForeignKeyConstraint(['product_id'], ['products.id'], ondelete='RESTRICT'),
     sa.ForeignKeyConstraint(['transfer_id'], ['stock_transfers.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id'),
+    if_not_exists=True,
     comment='Черновик строк накладной (не влияет на остатки, пока статус DRAFT)'
     )
-    op.create_index(op.f('ix_stock_transfer_items_product_id'), 'stock_transfer_items', ['product_id'], unique=False)
-    op.create_index(op.f('ix_stock_transfer_items_transfer_id'), 'stock_transfer_items', ['transfer_id'], unique=False)
+    op.create_index(op.f('ix_stock_transfer_items_product_id'), 'stock_transfer_items', ['product_id'], unique=False, if_not_exists=True)
+    op.create_index(op.f('ix_stock_transfer_items_transfer_id'), 'stock_transfer_items', ['transfer_id'], unique=False, if_not_exists=True)
     # ### end Alembic commands ###
 
 

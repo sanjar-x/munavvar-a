@@ -60,11 +60,7 @@ def choose_bootstrap_plan(
 
     missing_tables = INIT_TABLES - existing_tables
     if missing_tables:
-        missing = ", ".join(sorted(missing_tables))
-        raise RuntimeError(
-            "Detected a partially initialized schema without Alembic state. "
-            f"Missing tables: {missing}"
-        )
+        return None
 
     if current_versions == {LEGACY_REVISION}:
         if existing_triggers >= TRIGGER_NAMES:
@@ -140,6 +136,15 @@ async def bootstrap_alembic_state() -> str | None:
         existing_triggers = await fetch_existing_triggers(conn, TRIGGER_NAMES)
     finally:
         await conn.close()
+
+    missing_tables = INIT_TABLES - existing_tables
+    if existing_tables and missing_tables:
+        missing = ", ".join(sorted(missing_tables))
+        print(
+            "Partial init schema detected; letting Alembic resume migration. "
+            f"Missing tables: {missing}"
+        )
+        return None
 
     plan = choose_bootstrap_plan(
         current_versions=current_versions,
