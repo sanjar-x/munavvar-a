@@ -6,7 +6,7 @@ from fastapi import APIRouter, Security
 
 from src.core.security.permissions import Scope
 from src.infrastructure.database.models import User
-from src.modules.auth.dependencies import get_current_user
+from src.modules.auth.dependencies import get_current_courier
 from src.modules.users.schemas import UserResponse
 
 profile_router = APIRouter()
@@ -19,7 +19,7 @@ profile_router = APIRouter()
 )
 async def get_me(
     current_user: Annotated[
-        User, Security(get_current_user, scopes=[Scope.PROFILE_READ])
+        User, Security(get_current_courier, scopes=[Scope.PROFILE_READ])
     ],
 ):
     """

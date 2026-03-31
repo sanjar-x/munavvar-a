@@ -585,6 +585,7 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
         order_id: uuid.UUID,
         new_status: OrderStatus,
         actual_items: list[OrderItemActual] | None = None,
+        requesting_user_id: uuid.UUID | None = None,
     ) -> Order:
         async with self.uow:
             # Блокируем заказ для обновления статуса и возможных движений товаров
@@ -593,6 +594,12 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
             )
             if not order:
                 raise OrderNotFoundError(order_id=order_id)
+
+            if requesting_user_id and requesting_user_id != order.courier_id:
+                raise OrderAccessDeniedError(
+                    user_id=requesting_user_id,
+                    order_id=order_id,
+                )
 
             old_status = order.status
 

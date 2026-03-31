@@ -61,6 +61,37 @@ async def test_local_login_rejects_client_accounts_even_with_valid_password():
 
 
 @pytest.mark.asyncio
+async def test_courier_login_returns_courier_token_with_role_scopes():
+    user = make_user(Role.COURIER)
+    identity = make_identity(get_password_hash("secret-123"))
+    service = AuthService(FakeUserService((user, identity)))
+
+    result = await service.courier_login(
+        LocalLogin(phone="+998901234567", password="secret-123")
+    )
+
+    payload = decode_access_token(result.access_token)
+
+    assert result.token_type == "bearer"
+    assert payload["sub"] == str(user.id)
+    assert payload["scopes"] == ROLE_SCOPES[Role.COURIER]
+
+
+@pytest.mark.asyncio
+async def test_courier_login_rejects_non_courier_staff_accounts():
+    user = make_user(Role.ADMIN)
+    identity = make_identity(get_password_hash("secret-123"))
+    service = AuthService(FakeUserService((user, identity)))
+
+    with pytest.raises(ForbiddenError) as exc:
+        await service.courier_login(
+            LocalLogin(phone="+998901234567", password="secret-123")
+        )
+
+    assert exc.value.error_code == "COURIER_LOGIN_ONLY"
+
+
+@pytest.mark.asyncio
 async def test_local_login_masks_invalid_hash_as_invalid_credentials():
     user = make_user(Role.CLIENT_B2C, user_id=WALKIN_USER_ID)
     identity = make_identity("!disabled")

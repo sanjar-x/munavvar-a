@@ -1,10 +1,14 @@
 from fastapi import APIRouter
 
 from src.api.v1.courier.catalog import catalog_router
+from src.api.v1.courier.login import login_router
 from src.api.v1.courier.orders import orders_router
 from src.api.v1.courier.profile import profile_router
 
 courier_router = APIRouter()
+courier_router.include_router(
+    login_router, prefix="/login", tags=["Courier | Auth"]
+)
 courier_router.include_router(
     profile_router, prefix="/profile", tags=["Courier | Profile"]
 )

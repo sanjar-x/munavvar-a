@@ -25,7 +25,7 @@ warehouses_router = APIRouter()
 )
 async def get_warehouses_with_balances(
     current_admin: Annotated[
-        User, Security(get_current_user, scopes=[Scope.USERS_WRITE])
+        User, Security(get_current_user, scopes=[Scope.INVENTORY_READ])
     ],
     warehouse_service: Annotated[
         WarehouseService, Depends(get_warehouse_service)
@@ -43,7 +43,7 @@ async def get_warehouses_with_balances(
 async def create_warehouse(
     schema: WarehouseCreate,
     current_admin: Annotated[
-        User, Security(get_current_user, scopes=[Scope.USERS_WRITE])
+        User, Security(get_current_user, scopes=[Scope.INVENTORY_WRITE])
     ],
     warehouse_service: Annotated[
         WarehouseService, Depends(get_warehouse_service)
@@ -60,7 +60,7 @@ async def create_warehouse(
 async def get_warehouse_detail(
     warehouse_id: uuid.UUID,
     current_admin: Annotated[
-        User, Security(get_current_user, scopes=[Scope.USERS_WRITE])
+        User, Security(get_current_user, scopes=[Scope.INVENTORY_READ])
     ],
     warehouse_service: Annotated[
         WarehouseService, Depends(get_warehouse_service)

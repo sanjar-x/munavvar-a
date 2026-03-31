@@ -5,11 +5,11 @@ from fastapi import APIRouter, Depends, Query, Security
 
 from src.core.security.permissions import Scope
 from src.infrastructure.database.models import User
-from src.modules.auth.dependencies import get_current_user
+from src.modules.auth.dependencies import get_current_courier
+from src.modules.catalog.public import CatalogService
 from src.modules.catalog.dependencies import get_catalog_service
 from src.modules.catalog.enums import ProductType
 from src.modules.catalog.schemas import ProductResponse
-from src.modules.catalog.public import CatalogService
 
 catalog_router = APIRouter()
 
@@ -21,7 +21,7 @@ catalog_router = APIRouter()
 )
 async def get_catalog(
     current_user: Annotated[
-        User, Security(get_current_user, scopes=[Scope.CATALOG_READ])
+        User, Security(get_current_courier, scopes=[Scope.CATALOG_READ])
     ],
     catalog_service: Annotated[CatalogService, Depends(get_catalog_service)],
     product_type: Annotated[

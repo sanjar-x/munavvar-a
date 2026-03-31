@@ -33,9 +33,7 @@ class AuthService:
         access_token = create_access_token(payload_data=payload_data)
         return TokenResponse(access_token=access_token, token_type="bearer")
 
-    async def local_login(self, data: LocalLogin) -> TokenResponse:
-        """Вход для staff-пользователей по телефону и паролю."""
-
+    async def _authenticate_local_user(self, data: LocalLogin):
         result = await self.user_service.get_user_local_identity(
             identity_id=data.phone,
         )
@@ -69,10 +67,28 @@ class AuthService:
                 error_code="INVALID_CREDENTIALS",
             )
 
+        return user
+
+    async def local_login(self, data: LocalLogin) -> TokenResponse:
+        """Вход для staff-пользователей по телефону и паролю."""
+        user = await self._authenticate_local_user(data)
+
         if user.role not in STAFF_ROLES:
             raise ForbiddenError(
                 message="Этот вход доступен только для сотрудников.",
                 error_code="STAFF_LOGIN_ONLY",
+            )
+
+        return self._build_token_response(user)
+
+    async def courier_login(self, data: LocalLogin) -> TokenResponse:
+        """Отдельный вход для курьеров по телефону и паролю."""
+        user = await self._authenticate_local_user(data)
+
+        if user.role != Role.COURIER:
+            raise ForbiddenError(
+                message="Этот вход доступен только для курьеров.",
+                error_code="COURIER_LOGIN_ONLY",
             )
 
         return self._build_token_response(user)

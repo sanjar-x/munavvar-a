@@ -120,3 +120,18 @@ async def block_user(
     Мягкое удаление / блокировка пользователя (is_active = False).
     """
     await user_service.archive(user_id)
+
+
+@users_router.delete(
+    "/{user_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Удалить сотрудника",
+)
+async def delete_user(
+    user_id: uuid.UUID,
+    current_admin: Annotated[
+        User, Security(get_current_user, scopes=[Scope.USERS_WRITE])
+    ],
+    user_service: Annotated[UserService, Depends(get_user_service)],
+):
+    await user_service.delete_staff(user_id)

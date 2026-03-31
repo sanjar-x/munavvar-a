@@ -345,3 +345,15 @@ class UserService(BaseService[User, UserAdminCreate, UserUnitOfWork]):
                 await self.uow.commit()
 
             return await self._repo.get(id, active_only=False)
+
+    async def delete_staff(self, id: uuid.UUID) -> None:
+        async with self.uow:
+            user = await self._repo.get(id=id, active_only=False)
+            if not user or user.role not in STAFF_ROLES:
+                raise UserNotFoundError(user_id=id)
+
+            is_deleted = await self._repo.delete(id)
+            if not is_deleted:
+                raise UserNotFoundError(user_id=id)
+
+            await self.uow.commit()

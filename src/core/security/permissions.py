@@ -83,6 +83,7 @@ ROLE_SCOPES: dict[Role, list[str]] = {
         Scope.ORDERS_EDIT,
         Scope.ORDERS_CANCEL,
         Scope.INVENTORY_READ,
+        Scope.INVENTORY_WRITE,
         Scope.ROUTES_READ,
         Scope.FINANCES_READ,
         Scope.FINANCES_WRITE,

@@ -2,7 +2,7 @@
 import uuid
 from typing import Annotated, Any
 
-from fastapi import Depends
+from fastapi import Depends, Security
 from fastapi.security import OAuth2PasswordBearer, SecurityScopes
 
 from src.core.config import settings
@@ -12,6 +12,7 @@ from src.core.security.permissions import Scope
 from src.infrastructure.database.models import User
 from src.modules.auth.services import AuthService
 from src.modules.users.dependencies import get_user_service
+from src.modules.users.enums import Role
 from src.modules.users.services import UserService
 
 # 1. ДИНАМИЧЕСКАЯ ГЕНЕРАЦИЯ SCOPES ДЛЯ SWAGGER
@@ -66,7 +67,7 @@ async def get_current_user(
     user_id_str = payload.get("sub")
     try:
         user_id = uuid.UUID(user_id_str)
-    except ValueError, TypeError:
+    except (ValueError, TypeError):
         raise UnauthorizedError(  # noqa: B904
             message="Некорректный формат ID пользователя в токене.",
             error_code="INVALID_USER_ID",
@@ -86,6 +87,17 @@ async def get_current_user(
         )
 
     return user
+
+
+async def get_current_courier(
+    current_user: Annotated[User, Security(get_current_user)],
+) -> User:
+    if current_user.role != Role.COURIER:
+        raise ForbiddenError(
+            message="Эта ручка доступна только для курьеров.",
+            error_code="COURIER_ONLY",
+        )
+    return current_user
 
 
 def get_auth_service(
