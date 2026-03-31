@@ -26,23 +26,23 @@ Backoffice для диспетчера/оператора должен покр�
 
 ### Статусы delivery-заказа
 
-| Статус | Значение | Что означает |
-|---|---|---|
-| `new` | Новый | Заказ создан, но курьер еще не назначен |
-| `assigned` | Назначен | Курьер назначен |
-| `in_transit` | В пути | Курьер взял заказ в работу |
-| `arrived` | На месте | Курьер прибыл к клиенту |
-| `delivered` | Доставлен | Доставка завершена, складские и финансовые проводки выполнены |
-| `cancelled` | Отменен | Заказ отменен |
+| Статус       | Значение  | Что означает                                                  |
+| ------------ | --------- | ------------------------------------------------------------- |
+| `new`        | Новый     | Заказ создан, но курьер еще не назначен                       |
+| `assigned`   | Назначен  | Курьер назначен                                               |
+| `in_transit` | В пути    | Курьер взял заказ в работу                                    |
+| `arrived`    | На месте  | Курьер прибыл к клиенту                                       |
+| `delivered`  | Доставлен | Доставка завершена, складские и финансовые проводки выполнены |
+| `cancelled`  | Отменен   | Заказ отменен                                                 |
 
 ### Разрешенные переходы
 
-| Откуда | Куда |
-|---|---|
-| `new` | `assigned`, `cancelled` |
-| `assigned` | `in_transit`, `cancelled` |
-| `in_transit` | `arrived`, `cancelled` |
-| `arrived` | `delivered`, `cancelled` |
+| Откуда       | Куда                      |
+| ------------ | ------------------------- |
+| `new`        | `assigned`, `cancelled`   |
+| `assigned`   | `in_transit`, `cancelled` |
+| `in_transit` | `arrived`, `cancelled`    |
+| `arrived`    | `delivered`, `cancelled`  |
 
 ### Что важно для UI
 
@@ -67,6 +67,7 @@ GET /api/v1/backoffice/clients/?skip=0&limit=50&search=99890
 ```
 
 Использовать для:
+
 - таблицы клиентов
 - поиска по имени/телефону
 
@@ -77,11 +78,13 @@ GET /api/v1/backoffice/clients/{client_id}
 ```
 
 Использовать для:
+
 - выбора адреса доставки
 - отображения текущих остатков клиента
 - просмотра прошлых заказов
 
 Из ответа фронту важны:
+
 - `id`
 - `username`
 - `phone`
@@ -98,6 +101,7 @@ GET /api/v1/backoffice/catalog/?product_type=WATER
 ```
 
 Использовать для:
+
 - выбора воды, тары, оборудования
 - отображения названия и цены товара в корзине
 
@@ -108,6 +112,7 @@ GET /api/v1/backoffice/couriers/?page=1&size=50&search=
 ```
 
 Использовать для:
+
 - select списка курьеров при назначении заказа
 
 ---
@@ -171,6 +176,7 @@ POST /api/v1/backoffice/orders/check-tara
 ```
 
 Логика UI:
+
 - если `can_order=true`, можно создавать заказ без предупреждения
 - если `can_order=false`, показать дефицит тары
 - если оператор согласен, отправить `capitalize_missing_tara: true`
@@ -182,6 +188,7 @@ POST /api/v1/backoffice/orders/?clientId={client_id}
 ```
 
 После успешного ответа:
+
 - сохранить `order.id`
 - сразу перейти на деталку заказа
 - желательно сделать `GET /api/v1/backoffice/orders/{orderId}` и строить экран уже из каноничного ответа
@@ -284,6 +291,7 @@ DELETE /api/v1/backoffice/orders/{orderId}/items/{productId}
 ### Правило UI
 
 Когда статус заказа не `new`:
+
 - скрыть edit action-ы для корзины
 - сделать список товаров readonly
 
@@ -393,6 +401,7 @@ arrived -> delivered
    пустая тара: `client -> courier`
 
 То есть после завершения доставки:
+
 - статус заказа меняется на `delivered`
 - `stock_transfers` в заказе уже содержат фактические проводки
 - остатки клиента и курьера уже обновлены
@@ -400,6 +409,7 @@ arrived -> delivered
 ### Правило UI
 
 После `PATCH /delivered`:
+
 - перезапросить `GET /orders/{id}`
 - на деталке показать `stock_transfers`
 - заказ становится readonly
@@ -448,14 +458,14 @@ GET /api/v1/backoffice/orders/?skip=0&limit=50&statuses=new&statuses=assigned&sa
 
 ## 10. Матрица action-кнопок по статусу
 
-| Статус | Edit items | Assign courier | In transit | Arrived | Delivered |
-|---|---|---|---|---|---|
-| `new` | yes | yes | no | no | no |
-| `assigned` | no | yes | yes | no | no |
-| `in_transit` | no | no | no | yes | no |
-| `arrived` | no | no | no | no | yes |
-| `delivered` | no | no | no | no | no |
-| `cancelled` | no | no | no | no | no |
+| Статус       | Edit items | Assign courier | In transit | Arrived | Delivered |
+| ------------ | ---------- | -------------- | ---------- | ------- | --------- |
+| `new`        | yes        | yes            | no         | no      | no        |
+| `assigned`   | no         | yes            | yes        | no      | no        |
+| `in_transit` | no         | no             | no         | yes     | no        |
+| `arrived`    | no         | no             | no         | no      | yes       |
+| `delivered`  | no         | no             | no         | no      | no        |
+| `cancelled`  | no         | no             | no         | no      | no        |
 
 ---
 
@@ -463,29 +473,29 @@ GET /api/v1/backoffice/orders/?skip=0&limit=50&statuses=new&statuses=assigned&sa
 
 ### При создании
 
-| Код | Когда прилетает |
-|---|---|
-| `EMPTY_CART` | Корзина пустая |
-| `PRODUCTS_UNAVAILABLE` | Товар не найден или недоступен |
-| `CLIENT_INVENTORY_NOT_FOUND` | У клиента нет выбранного адреса |
-| `INSUFFICIENT_TARA` | Не хватает тары и `capitalize_missing_tara=false` |
+| Код                          | Когда прилетает                                   |
+| ---------------------------- | ------------------------------------------------- |
+| `EMPTY_CART`                 | Корзина пустая                                    |
+| `PRODUCTS_UNAVAILABLE`       | Товар не найден или недоступен                    |
+| `CLIENT_INVENTORY_NOT_FOUND` | У клиента нет выбранного адреса                   |
+| `INSUFFICIENT_TARA`          | Не хватает тары и `capitalize_missing_tara=false` |
 
 ### При редактировании
 
-| Код | Когда прилетает |
-|---|---|
+| Код                       | Когда прилетает                  |
+| ------------------------- | -------------------------------- |
 | `CANNOT_REMOVE_LAST_ITEM` | Попытка удалить последнюю строку |
 
 ### При статусных переходах
 
-| Код | Когда прилетает |
-|---|---|
-| `INVALID_ORDER_STATUS` | Неверный переход, например `new -> delivered` |
-| `COURIER_ASSIGNMENT_ERROR` | Смена курьера в неверном статусе |
+| Код                          | Когда прилетает                                    |
+| ---------------------------- | -------------------------------------------------- |
+| `INVALID_ORDER_STATUS`       | Неверный переход, например `new -> delivered`      |
+| `COURIER_ASSIGNMENT_ERROR`   | Смена курьера в неверном статусе                   |
 | `DELIVERY_QUANTITY_EXCEEDED` | В `actual_items` указали больше, чем было заказано |
-| `INSUFFICIENT_STOCK` | У курьера не хватает товара для доставки |
-| `INVALID_PICKUP_OPERATION` | Delivery endpoint вызвали для warehouse pickup |
-| `ORDER_NOT_FOUND` | Заказ не найден |
+| `INSUFFICIENT_STOCK`         | У курьера не хватает товара для доставки           |
+| `INVALID_PICKUP_OPERATION`   | Delivery endpoint вызвали для warehouse pickup     |
+| `ORDER_NOT_FOUND`            | Заказ не найден                                    |
 
 ### Практика для frontend
 
@@ -500,6 +510,7 @@ GET /api/v1/backoffice/orders/?skip=0&limit=50&statuses=new&statuses=assigned&sa
 Этот документ описывает только `sale_type=delivery`.
 
 Для `sale_type=warehouse_pickup` flow другой:
+
 - заказ создается через `POST /api/v1/backoffice/orders/warehouse-sale`
 - завершается через `PATCH /api/v1/backoffice/orders/{orderId}/complete-pickup`
 - статусы `assigned`, `in_transit`, `arrived`, `delivered` для него не использовать
@@ -548,4 +559,3 @@ if order.sale_type !== "delivery":
 - Источник истины по адресам клиента: `GET /backoffice/clients/{clientId}`
 - Источник истины по итоговым движениям товара: `order.stock_transfers`
 - После каждой мутации лучше делать refetch списка и refetch деталки заказа
-
