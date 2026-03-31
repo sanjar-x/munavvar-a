@@ -15,15 +15,12 @@ login_router = APIRouter()
     "",
     response_model=TokenResponse,
     status_code=status.HTTP_200_OK,
-    summary="Вход в систему (Получение Access Token)",
+    summary="Вход клиента (Получение Access Token)",
 )
 async def login(
     phone: str,
-    # FastAPI сам распарсит x-www-form-urlencoded и достанет username/password
     auth_service: Annotated[AuthService, Depends(get_auth_service)],
 ):
-    # Адаптируем данные из OAuth2 формы под нашу внутреннюю Pydantic-схему
-
     token_response = await auth_service.client_login(phone)
 
     return token_response

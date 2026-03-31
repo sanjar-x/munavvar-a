@@ -88,7 +88,7 @@ async def deliver_order(
     order_id: uuid.UUID,
     dto: OrderDeliverRequest,
     courier: Annotated[
-        User, Security(get_current_user, scopes=[Scope.ORDERS_EDIT])
+        User, Security(get_current_user, scopes=[Scope.ORDERS_DELIVER])
     ],
     base_order_service: Annotated[
         BaseOrderService, Depends(get_base_order_service)
@@ -107,7 +107,7 @@ async def update_order_status(
     order_id: uuid.UUID,
     new_status: Annotated[OrderStatus, Body(embed=True)],
     courier: Annotated[
-        User, Security(get_current_user, scopes=[Scope.ORDERS_EDIT])
+        User, Security(get_current_user, scopes=[Scope.ORDERS_DELIVER])
     ],
     base_order_service: Annotated[
         BaseOrderService, Depends(get_base_order_service)

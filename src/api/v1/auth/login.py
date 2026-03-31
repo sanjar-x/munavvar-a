@@ -16,14 +16,14 @@ login_router = APIRouter()
     "",
     response_model=TokenResponse,
     status_code=status.HTTP_200_OK,
-    summary="Вход в систему (Получение Access Token)",
+    summary="Вход для staff (Получение Access Token)",
 )
 async def login(
-    # FastAPI сам распарсит x-www-form-urlencoded и достанет username/password
+    # Swagger OAuth2 использует поле username,
+    # поэтому здесь адаптируем его к phone.
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
     auth_service: Annotated[AuthService, Depends(get_auth_service)],
 ):
-    # Адаптируем данные из OAuth2 формы под нашу внутреннюю Pydantic-схему
     login_data = LocalLogin(
         phone=form_data.username, password=form_data.password
     )

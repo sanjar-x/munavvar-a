@@ -1,20 +1,45 @@
 # src/modules/auth/services.py
-from src.core.exceptions import UnauthorizedError
+from pwdlib.exceptions import UnknownHashError
+
+from src.core.constants import WALKIN_USER_ID
+from src.core.exceptions import ForbiddenError, UnauthorizedError
 from src.core.security.jwt import create_access_token
 from src.core.security.password import verify_password
 from src.core.security.permissions import ROLE_SCOPES
 from src.modules.auth.schemas import LocalLogin, TokenResponse
+from src.modules.users.enums import Role
 from src.modules.users.services import UserService
+
+STAFF_ROLES: frozenset[Role] = frozenset(
+    {
+        Role.ADMIN,
+        Role.ACCOUNTANT,
+        Role.STOREKEEPER,
+        Role.CASHIER,
+        Role.COURIER,
+    }
+)
+CLIENT_ROLES: frozenset[Role] = frozenset(
+    {Role.CLIENT_B2B, Role.CLIENT_B2C}
+)
 
 
 class AuthService:
     def __init__(self, user_service: UserService):
         self.user_service = user_service
 
-    async def local_login(self, data: LocalLogin) -> TokenResponse:
-        """Бизнес-процесс входа в систему"""
+    def _build_token_response(self, user) -> TokenResponse:
+        user_scopes = ROLE_SCOPES.get(user.role, [])
+        payload_data = {
+            "sub": str(user.id),
+            "scopes": user_scopes,
+        }
+        access_token = create_access_token(payload_data=payload_data)
+        return TokenResponse(access_token=access_token, token_type="bearer")
 
-        # 1. Получаем пользователя и его учетные данные для локального входа
+    async def local_login(self, data: LocalLogin) -> TokenResponse:
+        """Вход для staff-пользователей по телефону и паролю."""
+
         result = await self.user_service.get_user_local_identity(
             identity_id=data.phone,
         )
@@ -34,29 +59,32 @@ class AuthService:
                 error_code="INVALID_CREDENTIALS",
             )
 
-        # 4. Строгая проверка валидности пароля
-        is_valid_password = verify_password(
-            data.password, identity.password_hash
-        )
+        try:
+            is_valid_password = verify_password(
+                data.password, identity.password_hash
+            )
+        except UnknownHashError as exc:
+            raise UnauthorizedError(
+                message="Неверный номер телефона или пароль",
+                error_code="INVALID_CREDENTIALS",
+            ) from exc
+
         if not is_valid_password:
             raise UnauthorizedError(
                 message="Неверный номер телефона или пароль",
                 error_code="INVALID_CREDENTIALS",
             )
 
-        # 5. Подготовка Payload и генерация JWT
-        user_scopes = ROLE_SCOPES.get(user.role, [])
-        payload_data = {
-            "sub": str(user.id),
-            "scopes": user_scopes,
-        }
+        if user.role not in STAFF_ROLES:
+            raise ForbiddenError(
+                message="Этот вход доступен только для сотрудников.",
+                error_code="STAFF_LOGIN_ONLY",
+            )
 
-        access_token = create_access_token(payload_data=payload_data)
+        return self._build_token_response(user)
 
-        return TokenResponse(access_token=access_token, token_type="bearer")
-
-    async def client_login(self, phone) -> TokenResponse:
-        """Бизнес-процесс входа в систему"""
+    async def client_login(self, phone: str) -> TokenResponse:
+        """Упрощенный вход только для клиентских аккаунтов."""
 
         result = await self.user_service.get_user_local_identity(
             identity_id=phone,
@@ -77,13 +105,19 @@ class AuthService:
                 error_code="INVALID_CREDENTIALS",
             )
 
-        # 5. Подготовка Payload и генерация JWT
-        user_scopes = ROLE_SCOPES.get(user.role, [])
-        payload_data = {
-            "sub": str(user.id),
-            "scopes": user_scopes,
-        }
+        if user.id == WALKIN_USER_ID:
+            raise ForbiddenError(
+                message=(
+                    "Системный walk-in пользователь "
+                    "не может входить в систему."
+                ),
+                error_code="WALKIN_LOGIN_FORBIDDEN",
+            )
 
-        access_token = create_access_token(payload_data=payload_data)
+        if user.role not in CLIENT_ROLES:
+            raise ForbiddenError(
+                message="Для сотрудников используйте вход по паролю.",
+                error_code="CLIENT_LOGIN_ONLY",
+            )
 
-        return TokenResponse(access_token=access_token, token_type="bearer")
+        return self._build_token_response(user)
