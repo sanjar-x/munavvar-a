@@ -16,6 +16,7 @@ from src.infrastructure.database.models import (
     StockTransaction,
     StockTransfer,
     StockTransferItem,
+    User,
 )
 from src.modules.inventory.enums import (
     InventoryType,
@@ -27,6 +28,24 @@ from src.modules.inventory.enums import (
 class InventoryRepository(BaseRepository[Inventory]):
     def __init__(self, session: AsyncSession):
         super().__init__(model=Inventory, session=session)
+
+    async def get_with_user(
+        self,
+        inventory_id: uuid.UUID,
+        active_only: bool = True,
+    ) -> Inventory | None:
+        query = (
+            select(self.model)
+            .where(self.model.id == inventory_id)
+            .options(
+                joinedload(self.model.user).selectinload(User.identities)
+            )
+        )
+        if active_only:
+            query = query.where(self.model.is_active.is_(True))
+
+        result = await self.session.execute(query)
+        return result.unique().scalar_one_or_none()
 
     async def create_courier_inventory(
         self, user_id: uuid.UUID, inventory_name: str

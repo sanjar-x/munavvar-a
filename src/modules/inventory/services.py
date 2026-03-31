@@ -189,7 +189,10 @@ class WarehouseService:
                 "type": InventoryType.WAREHOUSE,
             })
             await self.uow.commit()
-            return warehouse
+            return await self.uow.inventories.get_with_user(
+                warehouse.id,
+                active_only=False,
+            )
 
     async def get_warehouses(
         self,
