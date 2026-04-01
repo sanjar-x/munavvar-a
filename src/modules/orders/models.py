@@ -2,7 +2,7 @@
 import uuid
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, CheckConstraint, Enum, ForeignKey
+from sqlalchemy import Boolean, CheckConstraint, Enum, ForeignKey, String
 from sqlalchemy.dialects.postgresql import BIGINT, INTEGER, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -77,13 +77,7 @@ class Order(BaseModel):
         comment="Было ли авто-оприходование тары при создании заказа",
     )
     sale_type: Mapped[SaleType] = mapped_column(
-        Enum(
-            SaleType,
-            name="sale_type_enum",
-            native_enum=True,
-            create_type=True,
-            values_callable=lambda e: [m.value for m in e],
-        ),
+        String(30),
         default=SaleType.DELIVERY,
         server_default="delivery",
         nullable=False,
