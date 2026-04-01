@@ -119,7 +119,13 @@ class BillingService:
                 skip=skip,
                 limit=limit,
             )
-            accounts = [AccountResponse.model_validate(acc) for acc in items]
+            accounts = []
+            for acc in items:
+                resp = AccountResponse.model_validate(acc)
+                resp.user_name = (
+                    acc.user.username if acc.user else None
+                )
+                accounts.append(resp)
             return {
                 "total_count": total,
                 "accounts": accounts,
@@ -542,11 +548,12 @@ class BillingService:
 
     async def get_client_debts(
         self,
-        min_debt: int = 0,
+        min_debt: int | None = None,
         skip: int = 0,
         limit: int = 50,
     ) -> ClientsDebtsResponse:
         """Клиенты с положительным балансом (долгом)."""
+        effective_min_debt = min_debt or 0
         async with self.uow:
             total_debt = await self.uow.accounts.get_total_client_debt()
 
@@ -554,7 +561,7 @@ class BillingService:
                 debtors_count,
                 debtor_accounts,
             ) = await self.uow.accounts.get_client_debtors(
-                min_debt=min_debt,
+                min_debt=effective_min_debt,
                 skip=skip,
                 limit=limit,
             )

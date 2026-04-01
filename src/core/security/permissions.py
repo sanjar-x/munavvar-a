@@ -98,6 +98,7 @@ ROLE_SCOPES: dict[Role, list[str]] = {
         Scope.ROUTES_READ,
         Scope.FINANCES_READ,
         Scope.FINANCES_WRITE,
+        Scope.PAYMENTS_CREATE,
         Scope.SETTINGS_READ,
         Scope.SETTINGS_WRITE,
     ],
@@ -124,6 +125,7 @@ ROLE_SCOPES: dict[Role, list[str]] = {
         Scope.ORDERS_READ,
         Scope.ORDERS_CREATE,
         Scope.INVENTORY_READ,
+        Scope.FINANCES_READ,
         Scope.PAYMENTS_CREATE,
     ],
     # Курьер (Доставка, маршруты, прием налички у двери)

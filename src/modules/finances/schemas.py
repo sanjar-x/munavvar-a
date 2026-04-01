@@ -53,6 +53,7 @@ class AccountResponse(AccountBase):
 
     id: uuid.UUID
     user_id: uuid.UUID
+    user_name: str | None = None
     balance: int = Field(
         title="Текущий баланс",
         description=(
@@ -225,7 +226,6 @@ class AccountStatement(BaseModel):
 
 
 class AccountDetail(AccountResponse):
-    user_name: str | None = None
     recent_transactions: list[TransactionDetail] = []
 
 
