@@ -46,6 +46,23 @@ class ProductHasStockError(BadRequestError):
         )
 
 
+class ProductHasAssociatedProductsError(BadRequestError):
+    """Нельзя удалить товар, если другие товары ссылаются на него как на возвратную тару."""
+
+    def __init__(
+        self,
+        product_id: uuid.UUID,
+        details: dict[str, Any] | None = None,
+    ):
+        error_details = details or {}
+        error_details["product_id"] = str(product_id)
+        super().__init__(
+            message="Невозможно удалить товар: другие товары ссылаются на него как на возвратную тару",
+            error_code="PRODUCT_HAS_ASSOCIATED_PRODUCTS",
+            details=error_details,
+        )
+
+
 class InvalidReturnableItemError(BadRequestError):
     """Выбрасывается при нарушении бизнес-правил привязки возвратной тары."""
 

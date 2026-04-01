@@ -9,6 +9,7 @@ from src.modules.catalog.dtos import ProductDTO, product_to_dto
 from src.modules.catalog.enums import ProductType
 from src.modules.catalog.exceptions import (
     InvalidReturnableItemError,
+    ProductHasAssociatedProductsError,
     ProductHasStockError,
     ProductNotFoundError,
 )
@@ -140,6 +141,11 @@ class CatalogService(
 
             if await self._repo.has_stock(product_id):
                 raise ProductHasStockError(product_id=product_id)
+
+            if await self._repo.has_associated_products(product_id):
+                raise ProductHasAssociatedProductsError(
+                    product_id=product_id
+                )
 
             await self._repo.delete(product_id)
             await self.uow.commit()

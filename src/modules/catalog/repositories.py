@@ -61,6 +61,16 @@ class ProductRepository(BaseRepository[Product]):
         result = await self.session.execute(query)
         return (result.scalar() or 0) > 0
 
+    async def has_associated_products(
+        self, product_id: uuid.UUID
+    ) -> bool:
+        """Проверяет, ссылаются ли другие товары на этот через returnable_item_id."""
+        query = select(func.count()).where(
+            self.model.returnable_item_id == product_id
+        )
+        result = await self.session.execute(query)
+        return (result.scalar() or 0) > 0
+
     async def get_by_json_attribute(
         self, key: str, value: Any, skip: int = 0, limit: int = 100
     ) -> Sequence[Product]:
