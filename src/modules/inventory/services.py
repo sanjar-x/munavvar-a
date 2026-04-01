@@ -31,6 +31,7 @@ from src.modules.inventory.schemas import (
     TransportCreate,
     TransportUpdate,
     WarehouseCreate,
+    WarehouseUpdate,
 )
 from src.modules.inventory.uow import InventoryUnitOfWork
 
@@ -237,6 +238,71 @@ class WarehouseService:
                     owner_id=owner_id,
                 )
             )
+
+    async def update_warehouse(
+        self,
+        warehouse_id: uuid.UUID,
+        schema: WarehouseUpdate,
+    ) -> Inventory | None:
+        async with self.uow:
+            warehouse = await self.uow.inventories.get(warehouse_id)
+            if not warehouse or warehouse.type != InventoryType.WAREHOUSE:
+                return None
+
+            update_data = schema.model_dump(exclude_unset=True)
+            if not update_data:
+                return warehouse
+
+            new_name = update_data.get("name")
+            if new_name and new_name != warehouse.name:
+                existing = (
+                    await self.uow.inventories.search_inventories(
+                        search_query=new_name,
+                        inv_type=InventoryType.WAREHOUSE,
+                        limit=1,
+                    )
+                )
+                if existing and existing[0].name == new_name:
+                    raise ConflictError(
+                        message=(
+                            f"Склад с именем '{new_name}' уже существует"
+                        ),
+                        error_code="INVENTORY_NAME_DUPLICATE",
+                        details={
+                            "name": new_name,
+                            "existing_id": str(existing[0].id),
+                        },
+                    )
+
+            await self.uow.inventories.update(
+                warehouse_id, update_data
+            )
+            await self.uow.commit()
+            return await self.uow.inventories.get_with_user(
+                warehouse_id, active_only=False
+            )
+
+    async def archive_warehouse(
+        self, warehouse_id: uuid.UUID
+    ) -> bool:
+        async with self.uow:
+            warehouse = await self.uow.inventories.get(warehouse_id)
+            if not warehouse or warehouse.type != InventoryType.WAREHOUSE:
+                return False
+
+            if warehouse.type in (
+                InventoryType.VIRTUAL_VENDOR,
+                InventoryType.VIRTUAL_LOSS,
+            ):
+                raise BadRequestError(
+                    message="Удаление системных складов запрещено",
+                    error_code="SYSTEM_INVENTORY_DELETE_FORBIDDEN",
+                    details={"warehouse_id": str(warehouse_id)},
+                )
+
+            success = await self.uow.inventories.archive(warehouse_id)
+            await self.uow.commit()
+            return success
 
 
 # Типы накладных, требующие расширенного права logistics:adjustment.

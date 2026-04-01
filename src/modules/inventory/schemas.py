@@ -348,6 +348,11 @@ class WarehouseCreate(BaseModel):
     name: str = Field(..., max_length=255)
 
 
+class WarehouseUpdate(BaseModel):
+    name: str | None = Field(None, max_length=255)
+    user_id: uuid.UUID | None = None
+
+
 class BalanceItem(BaseModel):
     product: ProductSimpleResponse
     quantity: int

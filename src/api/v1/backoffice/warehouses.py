@@ -12,6 +12,7 @@ from src.modules.inventory.schemas import (
     InventoryResponse,
     WarehouseCreate,
     WarehouseDetailResponse,
+    WarehouseUpdate,
 )
 from src.modules.inventory.services import WarehouseService
 from src.modules.users.enums import Role
@@ -34,9 +35,7 @@ async def get_warehouses_with_balances(
 ):
     # Storekeeper sees only their own warehouse(s); admin sees all
     owner_id = (
-        current_admin.id
-        if current_admin.role == Role.STOREKEEPER
-        else None
+        current_admin.id if current_admin.role == Role.STOREKEEPER else None
     )
     return await warehouse_service.get_warehouses_with_balances(
         owner_id=owner_id
@@ -84,6 +83,55 @@ async def get_warehouse_detail(
             warehouse = None
     if not warehouse:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Warehouse not found"
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Warehouse not found",
         )
     return warehouse
+
+
+@warehouses_router.patch(
+    "/{warehouse_id}",
+    response_model=InventoryResponse,
+    summary="Обновление склада (название, ответственный)",
+)
+async def update_warehouse(
+    warehouse_id: uuid.UUID,
+    schema: WarehouseUpdate,
+    current_admin: Annotated[
+        User,
+        Security(get_current_user, scopes=[Scope.INVENTORY_WRITE]),
+    ],
+    warehouse_service: Annotated[
+        WarehouseService, Depends(get_warehouse_service)
+    ],
+):
+    warehouse = await warehouse_service.update_warehouse(warehouse_id, schema)
+    if not warehouse:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Warehouse not found",
+        )
+    return warehouse
+
+
+@warehouses_router.delete(
+    "/{warehouse_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Архивация склада (soft-delete)",
+)
+async def archive_warehouse(
+    warehouse_id: uuid.UUID,
+    current_admin: Annotated[
+        User,
+        Security(get_current_user, scopes=[Scope.INVENTORY_WRITE]),
+    ],
+    warehouse_service: Annotated[
+        WarehouseService, Depends(get_warehouse_service)
+    ],
+):
+    success = await warehouse_service.archive_warehouse(warehouse_id)
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Warehouse not found",
+        )
