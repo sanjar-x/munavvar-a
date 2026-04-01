@@ -44,6 +44,7 @@ B2B/B2C платформа управления доставкой бутили�
 ### Типичные потоки
 
 **Доставка заказа:**
+
 ```
 Клиент создаёт заказ -> Проверка тары -> Автооприходование дефицита
 -> Админ назначает курьера -> Курьер загружает товар (WAREHOUSE -> COURIER)
@@ -53,6 +54,7 @@ B2B/B2C платформа управления доставкой бутили�
 ```
 
 **Самовывоз:**
+
 ```
 Клиент приходит на склад -> Возврат тары (CLIENT -> WAREHOUSE)
 -> Создание заказа -> Продажа со склада (WAREHOUSE -> CLIENT)
@@ -63,21 +65,20 @@ B2B/B2C платформа управления доставкой бутили�
 
 ## Технологический стек
 
-| Слой | Технологии |
-|------|-----------|
-| Runtime | Python 3.14+, CPython |
-| Web Framework | FastAPI (async, ASGI/Uvicorn) |
-| ORM | SQLAlchemy 2.x (async mode, asyncpg) |
-| База данных | PostgreSQL 18 (триггеры, PL/pgSQL) |
-| Миграции | Alembic |
-| Валидация | Pydantic v2 |
-| Аутентификация | JWT (PyJWT, HS256), Argon2/Bcrypt (pwdlib) |
-| Логирование | structlog (JSON в проде, консоль в dev) |
-| Пакетный менеджер | uv (Astral) |
-| Линтер/форматтер | Ruff (line-length: 79) |
-| Тесты | pytest + pytest-asyncio + httpx |
-| Frontend | React 19 + Redux Toolkit + Vite |
-| Деплой | Railway (backend), Vercel (frontend) |
+| Слой              | Технологии                                 |
+| ----------------- | ------------------------------------------ |
+| Runtime           | Python 3.14+, CPython                      |
+| Web Framework     | FastAPI (async, ASGI/Uvicorn)              |
+| ORM               | SQLAlchemy 2.x (async mode, asyncpg)       |
+| База данных       | PostgreSQL 18 (триггеры, PL/pgSQL)         |
+| Миграции          | Alembic                                    |
+| Валидация         | Pydantic v2                                |
+| Аутентификация    | JWT (PyJWT, HS256), Argon2/Bcrypt (pwdlib) |
+| Логирование       | structlog (JSON в проде, консоль в dev)    |
+| Пакетный менеджер | uv (Astral)                                |
+| Линтер/форматтер  | Ruff (line-length: 79)                     |
+| Тесты             | pytest + pytest-asyncio + httpx            |
+| Деплой            | Railway (backend)                          |
 
 ---
 
@@ -118,15 +119,15 @@ src/
 
 ### Целостность данных
 
-| Механизм | Что защищает |
-|----------|-------------|
-| PG триггер `update_account_balances()` | Атомарное обновление баланса счёта при INSERT/UPDATE транзакции |
+| Механизм                                 | Что защищает                                                         |
+| ---------------------------------------- | -------------------------------------------------------------------- |
+| PG триггер `update_account_balances()`   | Атомарное обновление баланса счёта при INSERT/UPDATE транзакции      |
 | PG триггер `update_inventory_balances()` | Атомарное обновление складских остатков при INSERT stock_transaction |
-| Блокировка DELETE на леджерах | Невозможно удалить записи из `transactions` и `stock_transactions` |
-| `ondelete="RESTRICT"` | Критические FK не допускают каскадного удаления |
-| `lazy="raise"` | Защита от N+1 запросов на bulk-рисковых связях |
-| CheckConstraint | Валидация на уровне БД (price >= 0, quantity > 0) |
-| Валидация маршрутов | Каждый тип перемещения имеет допустимые пары (from_type, to_type) |
+| Блокировка DELETE на леджерах            | Невозможно удалить записи из `transactions` и `stock_transactions`   |
+| `ondelete="RESTRICT"`                    | Критические FK не допускают каскадного удаления                      |
+| `lazy="raise"`                           | Защита от N+1 запросов на bulk-рисковых связях                       |
+| CheckConstraint                          | Валидация на уровне БД (price >= 0, quantity > 0)                    |
+| Валидация маршрутов                      | Каждый тип перемещения имеет допустимые пары (from_type, to_type)    |
 
 ---
 
@@ -150,20 +151,18 @@ uv run fastapi dev src/main.py
 # Тесты
 make test
 
-# Frontend
-cd frontend && npm install && npm run dev
 ```
 
 ### Переменные окружения
 
-| Переменная | Описание |
-|-----------|---------|
-| `PGHOST`, `PGPORT`, `PGUSER`, `PGPASSWORD`, `PGDATABASE` | Подключение к PostgreSQL |
-| `SECRET_KEY` | Ключ подписи JWT |
-| `ENVIRONMENT` | `dev` / `test` / `prod` |
-| `DEBUG` | SQL echo + console renderer |
-| `ADMIN_PHONE`, `ADMIN_PASSWORD` | Начальный админ |
-| `CORS_ORIGINS` | Разрешённые origins |
+| Переменная                                               | Описание                    |
+| -------------------------------------------------------- | --------------------------- |
+| `PGHOST`, `PGPORT`, `PGUSER`, `PGPASSWORD`, `PGDATABASE` | Подключение к PostgreSQL    |
+| `SECRET_KEY`                                             | Ключ подписи JWT            |
+| `ENVIRONMENT`                                            | `dev` / `test` / `prod`     |
+| `DEBUG`                                                  | SQL echo + console renderer |
+| `ADMIN_PHONE`, `ADMIN_PASSWORD`                          | Начальный админ             |
+| `CORS_ORIGINS`                                           | Разрешённые origins         |
 
 ---
 

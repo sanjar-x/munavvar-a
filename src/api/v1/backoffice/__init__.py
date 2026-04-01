@@ -3,6 +3,9 @@ from fastapi import APIRouter
 from src.api.v1.backoffice.catalog import catalog_router
 from src.api.v1.backoffice.clients import clients_router
 from src.api.v1.backoffice.couriers import couriers_router
+from src.api.v1.backoffice.dashboard import (
+    dashboard_router,
+)
 from src.api.v1.backoffice.finances import finances_router
 from src.api.v1.backoffice.orders import orders_router
 from src.api.v1.backoffice.profile import profile_router
@@ -51,7 +54,9 @@ backoffice.include_router(
     shifts_router, prefix="/shifts", tags=["Backoffice | Shifts"]
 )
 backoffice.include_router(
-    system_router, prefix="/system", tags=["Backoffice | System"]
+    dashboard_router,
+    prefix="/dashboard",
+    tags=["Backoffice | Dashboard"],
 )
 backoffice.include_router(
     system_router, prefix="/system", tags=["Backoffice | System"]

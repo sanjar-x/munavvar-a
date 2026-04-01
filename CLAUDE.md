@@ -24,7 +24,6 @@ A B2B/B2C water delivery management platform that automates the full cycle: from
 
 ## Languages
 - Python 3.14 - Backend API, business logic, database models, migrations (`src/`, `alembic/`, `scripts/`)
-- JavaScript (ES2020+, JSX) - Frontend admin SPA (`frontend/src/`)
 - SQL (PL/pgSQL) - Database triggers for balance materialization (`src/infrastructure/database/scripts/*.sql`)
 - Shell (POSIX sh) - Entrypoint and deployment scripts (`scripts/entrypoint.sh`)
 ## Runtime
@@ -32,18 +31,13 @@ A B2B/B2C water delivery management platform that automates the full cycle: from
 - Base Docker image: `python:3.14-slim-trixie` (`deploy/docker/Dockerfile.railway`)
 - ASGI server: Uvicorn (bundled with FastAPI via `fastapi[standard]`)
 - Node.js (version not pinned; no `.nvmrc` or `.node-version` present)
-- Browser target: ES2020+ (configured in `frontend/eslint.config.js`)
 - `uv` (Astral) - Python dependency management and task runner
-- `npm` - Frontend dependency management
+
 ## Frameworks
 - FastAPI >=0.132.0 - Async REST API framework (`src/api/server.py`)
 - SQLAlchemy >=2.1.0b1 (async mode) - ORM with asyncpg driver (`src/infrastructure/database/session.py`)
 - Pydantic v2 (via pydantic-settings) - Schema validation and settings management (`src/core/config.py`)
-- React 19.2.0 - Frontend UI library (`frontend/package.json`)
-- Redux Toolkit 2.11.2 + RTK Query - Frontend state management and API layer (`frontend/src/app/store.js`, `frontend/src/services/baseApi.js`)
-- Vite 7.3.1 - Frontend build tool (`frontend/vite.config.js`)
 - Ruff >=0.15.1 - Python linter and formatter (`pyproject.toml` [tool.ruff])
-- ESLint 9.39.1 - JavaScript linter (`frontend/eslint.config.js`)
 - pre-commit - Git hooks for code quality (`.pre-commit-config.yaml`)
 - pytest >=9.0.2 - Test runner (`pyproject.toml` [tool.pytest.ini_options])
 - pytest-asyncio >=1.3.0 - Async test support (asyncio_mode = "auto")
@@ -63,7 +57,6 @@ A B2B/B2C water delivery management platform that automates the full cycle: from
 - `structlog` >=25.5.0 - Structured logging framework (`src/core/logger.py`)
 - `structlog-config` >=0.11.0 - Structlog configuration helpers
 - `pydantic-settings` - Environment variable loading and validation (`src/core/config.py`)
-- `react-router-dom` ^7.13.0 - Frontend client-side routing (`frontend/package.json`)
 ## Configuration
 - `SECRET_KEY` - JWT signing key (SecretStr)
 - `PGHOST`, `PGPORT`, `PGUSER`, `PGPASSWORD`, `PGDATABASE` - PostgreSQL connection
@@ -79,9 +72,6 @@ A B2B/B2C water delivery management platform that automates the full cycle: from
 - `VITE_MOCK_SALES_ANALYTICS` - Enable mock analytics data
 - `pyproject.toml` - Python project config, Ruff config, pytest config
 - `alembic.ini` - Alembic migration config
-- `frontend/vite.config.js` - Vite build config with `@` alias to `./src`
-- `frontend/eslint.config.js` - ESLint flat config
-- `frontend/vercel.json` - Vercel SPA rewrites
 - `.pre-commit-config.yaml` - pre-commit hooks (ruff, trailing whitespace, YAML check, large file check, secret detection)
 - Line length: 79
 - Auto-fix enabled
@@ -91,10 +81,8 @@ A B2B/B2C water delivery management platform that automates the full cycle: from
 - Python >=3.14 (latest; uses new generic syntax `class Foo[T: Base]`)
 - Docker + Docker Compose (for local PostgreSQL via `deploy/compose.db.yml`)
 - `uv` package manager (replaces pip/poetry)
-- Node.js + npm (for frontend)
 - Make (optional, for `Makefile` shortcuts)
 - Backend: Railway (Dockerfile-based deployment via `railway.toml` pointing to `deploy/docker/Dockerfile.railway`)
-- Frontend: Vercel (SPA with `vercel.json` rewrites)
 - Database: PostgreSQL 18 (Alpine image in dev; Railway-hosted in prod)
 - Entrypoint runs migrations before starting: `scripts/entrypoint.sh`
 <!-- GSD:stack-end -->
@@ -210,7 +198,6 @@ A B2B/B2C water delivery management platform that automates the full cycle: from
 - Location: `src/api/`
 - Contains: FastAPI routers grouped by audience (backoffice, client, courier, auth), middleware, exception handlers
 - Depends on: Application layer services, Module layer services, Auth dependencies
-- Used by: External HTTP clients (frontend SPA, mobile apps)
 - Purpose: Cross-domain business processes that span multiple modules
 - Location: `src/application/`
 - Contains: `client/`, `courier/`, `order/`, `inventories/` -- each with service, schemas, UoW, dependencies, exceptions
