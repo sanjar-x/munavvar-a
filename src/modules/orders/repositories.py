@@ -68,6 +68,12 @@ class OrderRepository(BaseRepository[Order]):
             selectinload(Order.stock_transfers)
             .selectinload(StockTransfer.items)
             .joinedload(StockTransferItem.product),
+            selectinload(Order.stock_transfers).joinedload(
+                StockTransfer.from_inventory
+            ),
+            selectinload(Order.stock_transfers).joinedload(
+                StockTransfer.to_inventory
+            ),
         )
 
     async def get_client_orders(
