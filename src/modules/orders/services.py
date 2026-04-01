@@ -1304,7 +1304,7 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
         courier_id: uuid.UUID | None = None,
         client_id: uuid.UUID | None = None,
         client_inventory_id: uuid.UUID | None = None,
-        sale_type: str | None = None,
+        sale_type: SaleType | None = None,
         date_from: datetime | None = None,
         date_to: datetime | None = None,
         min_amount: int | None = None,
