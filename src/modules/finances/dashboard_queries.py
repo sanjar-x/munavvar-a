@@ -65,22 +65,24 @@ class FinanceDashboardQueries:
         date_to: date,
         granularity: str = "day",
     ) -> RevenueTrendResponse:
+        end = date_to + timedelta(days=1)
+        period_col = func.date_trunc(granularity, Order.created_at).cast(Date)
+
         stmt = (
             select(
-                func.date_trunc(granularity, Order.created_at)
-                .cast(Date)
-                .label("period"),
+                period_col.label("period"),
                 func.count().label("cnt"),
                 func.coalesce(func.sum(Order.total_amount), 0).label("rev"),
             )
+            .select_from(Order)
             .where(
                 Order.status.in_(_COMPLETED_STATUSES),
                 Order.created_at >= date_from,
-                Order.created_at < date_to + timedelta(days=1),
+                Order.created_at < end,
                 Order.is_active.is_(True),
             )
-            .group_by(func.date_trunc(granularity, Order.created_at))
-            .order_by(func.date_trunc(granularity, Order.created_at))
+            .group_by(period_col)
+            .order_by(period_col)
         )
         rows = (await self.session.execute(stmt)).all()
 
