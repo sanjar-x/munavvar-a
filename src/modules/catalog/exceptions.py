@@ -29,6 +29,23 @@ class ProductNotFoundError(NotFoundError):
         )
 
 
+class ProductHasStockError(BadRequestError):
+    """Нельзя удалить товар, если он есть на складах/транспортах."""
+
+    def __init__(
+        self,
+        product_id: uuid.UUID,
+        details: dict[str, Any] | None = None,
+    ):
+        error_details = details or {}
+        error_details["product_id"] = str(product_id)
+        super().__init__(
+            message="Невозможно удалить товар: на складах или в транспортах есть остатки",
+            error_code="PRODUCT_HAS_STOCK",
+            details=error_details,
+        )
+
+
 class InvalidReturnableItemError(BadRequestError):
     """Выбрасывается при нарушении бизнес-правил привязки возвратной тары."""
 

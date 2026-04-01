@@ -9,6 +9,7 @@ from src.modules.catalog.dtos import ProductDTO, product_to_dto
 from src.modules.catalog.enums import ProductType
 from src.modules.catalog.exceptions import (
     InvalidReturnableItemError,
+    ProductHasStockError,
     ProductNotFoundError,
 )
 from src.modules.catalog.repositories import ProductRepository
@@ -49,7 +50,9 @@ class CatalogService(
                     limit=limit,
                 )
             else:
-                products = await self._repo.get_multi(skip=skip, limit=limit)
+                products = await self._repo.get_multi(
+                    skip=skip, limit=limit, active_only=False
+                )
             return [product_to_dto(p) for p in products]
 
     async def get_by_ids(
@@ -123,6 +126,21 @@ class CatalogService(
             await self.uow.commit()
             return product_to_dto(new_product)
 
-    # Примечание: методы get(), get_multi(), update(), archive() и delete()
-    # уже доступны благодаря наследованию от BaseService.
-    # Если для update() потребуется особая валидация тары, мы переопределим его (override).
+    async def hard_delete(self, product_id: uuid.UUID) -> bool:
+        """
+        Полное удаление товара из БД.
+        Запрещено если на складах/транспортах есть остатки.
+        """
+        async with self.uow:
+            product = await self._repo.get(
+                product_id, active_only=False
+            )
+            if not product:
+                raise ProductNotFoundError(product_id=product_id)
+
+            if await self._repo.has_stock(product_id):
+                raise ProductHasStockError(product_id=product_id)
+
+            await self._repo.delete(product_id)
+            await self.uow.commit()
+            return True

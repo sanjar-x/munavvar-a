@@ -73,10 +73,10 @@ async def update_product(
     return await catalog_service.update(id=product_id, schema=schema)
 
 
-@catalog_router.delete(
-    "/{product_id}",
+@catalog_router.patch(
+    "/{product_id}/archive",
     status_code=status.HTTP_204_NO_CONTENT,
-    summary="Удалить товар (Архивация)",
+    summary="Архивировать товар (Soft delete)",
 )
 async def archive_product(
     product_id: uuid.UUID,
@@ -87,3 +87,19 @@ async def archive_product(
 ):
     """Мягкое удаление товара из каталога (перевод is_active=False)."""
     await catalog_service.archive(id=product_id)
+
+
+@catalog_router.delete(
+    "/{product_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Удалить товар (Hard delete)",
+)
+async def delete_product(
+    product_id: uuid.UUID,
+    current_admin: Annotated[
+        User, Security(get_current_user, scopes=[Scope.CATALOG_WRITE])
+    ],
+    catalog_service: Annotated[CatalogService, Depends(get_catalog_service)],
+):
+    """Полное удаление товара. Невозможно если есть остатки на складах/транспортах."""
+    await catalog_service.hard_delete(product_id=product_id)
