@@ -49,11 +49,7 @@ class CatalogService(
                     limit=limit,
                 )
             else:
-                products = await self._repo.get_multi(
-                    skip=skip,
-                    limit=limit,
-                    active_only=True,
-                )
+                products = await self._repo.get_multi(skip=skip, limit=limit)
             return [product_to_dto(p) for p in products]
 
     async def get_by_ids(
@@ -66,9 +62,7 @@ class CatalogService(
         if not product_ids:
             return []
         async with self.uow:
-            products = await self._repo.get_multi_by_ids(
-                product_ids
-            )
+            products = await self._repo.get_multi_by_ids(product_ids)
             return [product_to_dto(p) for p in products]
 
     async def search_by_attribute(
@@ -83,13 +77,11 @@ class CatalogService(
         Позволяет найти все кулеры цвета "white" или компрессорного типа охлаждения.
         """
         async with self.uow:
-            products = (
-                await self._repo.get_by_json_attribute(
-                    key=key,
-                    value=value,
-                    skip=skip,
-                    limit=limit,
-                )
+            products = await self._repo.get_by_json_attribute(
+                key=key,
+                value=value,
+                skip=skip,
+                limit=limit,
             )
             return [product_to_dto(p) for p in products]
 
@@ -97,9 +89,7 @@ class CatalogService(
     # COMMANDS (МУТАЦИИ ДЛЯ АДМИНКИ)
     # ==========================================
 
-    async def add_product(
-        self, dto: ProductCreate
-    ) -> ProductDTO:
+    async def add_product(self, dto: ProductCreate) -> ProductDTO:
         """
         Создание нового товара с жесткой бизнес-валидацией.
         """

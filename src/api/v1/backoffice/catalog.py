@@ -9,12 +9,12 @@ from src.infrastructure.database.models import User
 from src.modules.auth.dependencies import get_current_user
 from src.modules.catalog.dependencies import get_catalog_service
 from src.modules.catalog.enums import ProductType
+from src.modules.catalog.public import CatalogService
 from src.modules.catalog.schemas import (
     ProductCreate,
     ProductResponse,
     ProductUpdate,
 )
-from src.modules.catalog.public import CatalogService
 
 catalog_router = APIRouter()
 
