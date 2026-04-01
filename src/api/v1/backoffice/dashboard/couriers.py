@@ -7,7 +7,6 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query, Security
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.api.v1.backoffice.dashboard import month_ago
 from src.core.security.permissions import Scope
 from src.infrastructure.database.models import User
 from src.infrastructure.database.session import (

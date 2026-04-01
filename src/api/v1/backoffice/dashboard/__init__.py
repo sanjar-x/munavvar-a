@@ -1,8 +1,6 @@
 # src/api/v1/backoffice/dashboard/__init__.py
 """Dashboard API — агрегатор sub-роутеров."""
 
-from datetime import date, timedelta
-
 from fastapi import APIRouter
 
 from src.api.v1.backoffice.dashboard.couriers import (
@@ -30,8 +28,3 @@ dashboard_router.include_router(
 dashboard_router.include_router(
     couriers_dashboard_router,
 )
-
-
-def month_ago(ref: date) -> date:
-    """30 дней назад от ref — общий хелпер для dashboard."""
-    return ref - timedelta(days=30)
