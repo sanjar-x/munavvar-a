@@ -229,6 +229,7 @@ class ProductSimpleResponse(BaseModel):
     id: uuid.UUID
     name: str
     type: ProductType
+    is_active: bool = True
 
     model_config = ConfigDict(from_attributes=True)
 

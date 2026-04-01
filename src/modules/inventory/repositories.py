@@ -5,7 +5,7 @@ from typing import Any
 
 from sqlalchemy import case, desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload, selectinload, with_loader_criteria
+from sqlalchemy.orm import joinedload, selectinload
 
 from src.common.repository import BaseRepository
 from src.core.config import settings
@@ -164,8 +164,8 @@ class InventoryRepository(BaseRepository[Inventory]):
     ) -> Inventory | None:
         """Получить инвентарь (склад/транспорт) с актуальными остатками.
 
-        Балансы по архивированным товарам (is_active=False) исключаются
-        из выдачи: исторические данные остаются в БД, но не видны в UI.
+        Загружаются все балансы, включая архивированные товары —
+        архивный статус отображается в UI, а не скрывается.
         """
         query = select(self.model).where(
             self.model.id == inventory_id,
@@ -178,20 +178,12 @@ class InventoryRepository(BaseRepository[Inventory]):
             query = query.with_for_update()
 
         query = query.options(
-            selectinload(self.model.balances).joinedload(Balance.product),
-            with_loader_criteria(
-                Product, Product.is_active.is_(True), include_aliases=True
+            selectinload(self.model.balances).joinedload(
+                Balance.product
             ),
         )
         result = await self.session.execute(query)
-        inventory = result.unique().scalar_one_or_none()
-        if inventory is not None:
-            # Filter out balance rows whose product was not loaded
-            # (archived products are excluded by with_loader_criteria)
-            inventory.balances = [
-                b for b in inventory.balances if b.product is not None
-            ]
-        return inventory
+        return result.unique().scalar_one_or_none()
 
     async def get_all_warehouses_with_balances(
         self,
@@ -199,7 +191,7 @@ class InventoryRepository(BaseRepository[Inventory]):
     ) -> Sequence[Inventory]:
         """Получить все склады с их полными товарными остатками.
 
-        Балансы по архивированным товарам (is_active=False) исключаются.
+        Включает балансы по всем товарам, в том числе архивированным.
         Если owner_id задан — возвращаются только склады этого владельца
         (используется для ограничения видимости кладовщика).
         """
@@ -210,23 +202,15 @@ class InventoryRepository(BaseRepository[Inventory]):
                 self.model.is_active.is_(True),
             )
             .options(
-                selectinload(self.model.balances).joinedload(Balance.product),
-                with_loader_criteria(
-                    Product,
-                    Product.is_active.is_(True),
-                    include_aliases=True,
+                selectinload(self.model.balances).joinedload(
+                    Balance.product
                 ),
             )
         )
         if owner_id is not None:
             query = query.where(self.model.user_id == owner_id)
         result = await self.session.execute(query)
-        warehouses = result.unique().scalars().all()
-        for wh in warehouses:
-            wh.balances = [
-                b for b in wh.balances if b.product is not None
-            ]
-        return warehouses
+        return result.unique().scalars().all()
 
 
 class StockTransferItemRepository(BaseRepository[StockTransferItem]):
