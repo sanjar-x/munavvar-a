@@ -5,6 +5,8 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from src.modules.inventory.schemas import BalanceResponse
+
 # --- ЗАПРОСЫ (REQUESTS) ---
 
 
@@ -45,12 +47,14 @@ class InventoryShortDTO(BaseModel):
     id: uuid.UUID
     name: str
 
+    model_config = ConfigDict(from_attributes=True)
+
 
 # --- ВЛОЖЕННЫЕ СХЕМЫ (ДЛЯ ОТВЕТОВ) ---
 
 
 class CourierInventoryWithBalancesDTO(InventoryShortDTO):
-    balances: list[Any]
+    balances: list[BalanceResponse]
 
 
 class CourierResponse(BaseModel):
@@ -62,9 +66,7 @@ class CourierResponse(BaseModel):
     is_active: bool
     account: AccountShortDTO | None  # УБРАЛИ Any
     inventory: CourierInventoryWithBalancesDTO | None
-    orders: list[
-        Any
-    ]  # Если заказы тоже падают с такой же ошибкой, их тоже нужно описать через DTO!
+    orders: list[Any]
     created_at: datetime
     updated_at: datetime
 
