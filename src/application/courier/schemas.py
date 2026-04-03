@@ -1,11 +1,11 @@
 # src/application/courier/schemas.py
 import uuid
 from datetime import datetime
-from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from src.modules.inventory.schemas import BalanceResponse
+from src.modules.orders.enums import OrderStatus, PaymentMethod, SaleType
 
 # --- ЗАПРОСЫ (REQUESTS) ---
 
@@ -57,6 +57,19 @@ class CourierInventoryWithBalancesDTO(InventoryShortDTO):
     balances: list[BalanceResponse]
 
 
+class CourierOrderDTO(BaseModel):
+    """Заказ в карточке курьера"""
+
+    id: uuid.UUID
+    status: OrderStatus
+    payment_method: PaymentMethod
+    sale_type: SaleType
+    total_amount: int
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class CourierResponse(BaseModel):
     """Полная карточка курьера для детального просмотра"""
 
@@ -64,9 +77,9 @@ class CourierResponse(BaseModel):
     username: str
     phone: str | None
     is_active: bool
-    account: AccountShortDTO | None  # УБРАЛИ Any
+    account: AccountShortDTO | None
     inventory: CourierInventoryWithBalancesDTO | None
-    orders: list[Any]
+    orders: list[CourierOrderDTO]
     created_at: datetime
     updated_at: datetime
 
@@ -80,10 +93,8 @@ class Courier(BaseModel):
     id: uuid.UUID
     username: str
     phone: str | None
-    account: (
-        AccountShortDTO | None
-    )  # УБРАЛИ Any, теперь Pydantic знает как парсить!
-    inventory: InventoryShortDTO | None  # УБРАЛИ Any!
+    account: AccountShortDTO | None
+    inventory: InventoryShortDTO | None
     is_active: bool
     orders: int = Field(description="Количество выполненных заказов")
     created_at: datetime
