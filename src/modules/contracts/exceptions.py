@@ -220,3 +220,24 @@ class DuplicateInvoicePeriodError(ConflictError):
                 "period_to": str(period_to),
             },
         )
+
+
+class DuplicateAmendmentNumberError(ConflictError):
+    """Доп. соглашение с таким номером уже существует для данного договора."""
+
+    def __init__(
+        self,
+        contract_id: uuid.UUID | str,
+        number: str,
+    ):
+        super().__init__(
+            message=(
+                f"Доп. соглашение с номером '{number}' "
+                "уже существует для данного договора."
+            ),
+            error_code="DUPLICATE_AMENDMENT_NUMBER",
+            details={
+                "contract_id": str(contract_id),
+                "number": number,
+            },
+        )

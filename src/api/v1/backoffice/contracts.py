@@ -11,14 +11,18 @@ from src.modules.auth.dependencies import get_current_user
 from src.modules.contracts.dependencies import get_contract_service
 from src.modules.contracts.enums import ContractStatus
 from src.modules.contracts.schemas import (
+    AmendmentCreate,
+    AmendmentResponse,
     ContractCreate,
     ContractDetailResponse,
     ContractResponse,
+    ContractStatusLogResponse,
     ContractSuspendRequest,
     ContractTerminateRequest,
     ContractUpdate,
     InvoiceGenerateRequest,
     InvoiceResponse,
+    JobResponse,
     PriceItemCreate,
     PriceItemResponse,
     ReconciliationResponse,
@@ -141,6 +145,7 @@ async def suspend_contract(
     return await service.suspend_contract(
         contract_id=contract_id,
         reason=data.reason,
+        changed_by_id=current_user.id,
     )
 
 
@@ -156,7 +161,10 @@ async def reinstate_contract(
     contract_id: Annotated[uuid.UUID, Path()],
     service: Annotated[ContractService, Depends(get_contract_service)],
 ):
-    return await service.reinstate_contract(contract_id=contract_id)
+    return await service.reinstate_contract(
+        contract_id=contract_id,
+        changed_by_id=current_user.id,
+    )
 
 
 @contracts_router.post(
@@ -175,6 +183,7 @@ async def terminate_contract(
     return await service.terminate_contract(
         contract_id=contract_id,
         reason=data.reason,
+        changed_by_id=current_user.id,
     )
 
 
@@ -390,3 +399,95 @@ async def get_reconciliation(
         date_from=date_from,
         date_to=date_to,
     )
+
+
+@contracts_router.get(
+    "/{contract_id}/history",
+    response_model=list[ContractStatusLogResponse],
+    summary="История переходов статуса договора",
+)
+async def get_status_history(
+    current_user: Annotated[
+        User, Security(get_current_user, scopes=[Scope.CONTRACTS_READ])
+    ],
+    contract_id: Annotated[uuid.UUID, Path()],
+    service: Annotated[ContractService, Depends(get_contract_service)],
+):
+    return await service.list_status_history(contract_id=contract_id)
+
+
+@contracts_router.post(
+    "/{contract_id}/amendments",
+    response_model=AmendmentResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Создать доп. соглашение к договору",
+)
+async def create_amendment(
+    current_user: Annotated[
+        User, Security(get_current_user, scopes=[Scope.CONTRACTS_MANAGE])
+    ],
+    contract_id: Annotated[uuid.UUID, Path()],
+    data: AmendmentCreate,
+    service: Annotated[ContractService, Depends(get_contract_service)],
+):
+    return await service.create_amendment(
+        contract_id=contract_id,
+        dto=data,
+        created_by_id=current_user.id,
+    )
+
+
+@contracts_router.get(
+    "/{contract_id}/amendments",
+    response_model=list[AmendmentResponse],
+    summary="Список доп. соглашений по договору",
+)
+async def list_amendments(
+    current_user: Annotated[
+        User, Security(get_current_user, scopes=[Scope.CONTRACTS_READ])
+    ],
+    contract_id: Annotated[uuid.UUID, Path()],
+    service: Annotated[ContractService, Depends(get_contract_service)],
+):
+    return await service.list_amendments(contract_id=contract_id)
+
+
+# ─── JOB ENDPOINTS ───────────────────────────────────────────────
+
+
+@contracts_router.post(
+    "/jobs/mark-overdue",
+    response_model=JobResponse,
+    summary="Перевести просроченные инвойсы в OVERDUE",
+    description=(
+        "Переводит ISSUED инвойсы с истёкшим due_date в статус OVERDUE. "
+        "Идемпотентен: повторный вызов = {updated: 0}."
+    ),
+)
+async def run_mark_overdue_job(
+    current_user: Annotated[
+        User, Security(get_current_user, scopes=[Scope.CONTRACTS_MANAGE])
+    ],
+    service: Annotated[ContractService, Depends(get_contract_service)],
+):
+    updated = await service.run_overdue_job()
+    return JobResponse(updated=updated)
+
+
+@contracts_router.post(
+    "/jobs/expire-contracts",
+    response_model=JobResponse,
+    summary="Перевести истёкшие договоры в EXPIRED",
+    description=(
+        "Переводит ACTIVE договоры с истёкшим end_date в статус EXPIRED. "
+        "Логирует каждый переход в аудит. Идемпотентен."
+    ),
+)
+async def run_expire_contracts_job(
+    current_user: Annotated[
+        User, Security(get_current_user, scopes=[Scope.CONTRACTS_MANAGE])
+    ],
+    service: Annotated[ContractService, Depends(get_contract_service)],
+):
+    updated = await service.run_expire_job()
+    return JobResponse(updated=updated)

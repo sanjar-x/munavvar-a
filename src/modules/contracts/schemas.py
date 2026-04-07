@@ -157,3 +157,55 @@ class ReconciliationResponse(BaseModel):
     payments: list[ReconciliationPaymentItem]
     total_paid: int
     balance: int  # = total_billed - total_paid
+
+
+# ─── STATUS LOG SCHEMAS ───────────────────────────────────────────
+
+
+class ContractStatusLogResponse(BaseModel):
+    id: uuid.UUID
+    contract_id: uuid.UUID
+    from_status: ContractStatus | None
+    to_status: ContractStatus
+    changed_by_id: uuid.UUID | None
+    reason: str | None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+# ─── AMENDMENT SCHEMAS ────────────────────────────────────────────
+
+
+class AmendmentCreate(BaseModel):
+    number: str = Field(
+        min_length=1,
+        max_length=50,
+        description="Номер ДС (ДС-001, ДС-002...)",
+    )
+    description: str = Field(
+        min_length=3,
+        max_length=2000,
+        description="Описание изменений",
+    )
+    effective_date: date
+
+
+class AmendmentResponse(BaseModel):
+    id: uuid.UUID
+    contract_id: uuid.UUID
+    number: str
+    description: str
+    effective_date: date
+    created_by_id: uuid.UUID | None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+# ─── JOB RESPONSE ────────────────────────────────────────────────
+
+
+class JobResponse(BaseModel):
+    updated: int

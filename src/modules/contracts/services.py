@@ -9,12 +9,20 @@ from src.modules.contracts.exceptions import (
     ContractNotFoundError,
     ContractPriceItemNotFoundError,
     ContractStatusTransitionError,
+    DuplicateAmendmentNumberError,
     DuplicateInvoicePeriodError,
     InvalidInvoiceTransitionError,
     InvoiceNotFoundError,
 )
-from src.modules.contracts.models import Contract, ContractPriceItem, Invoice
+from src.modules.contracts.models import (
+    Contract,
+    ContractAmendment,
+    ContractPriceItem,
+    ContractStatusLog,
+    Invoice,
+)
 from src.modules.contracts.schemas import (
+    AmendmentCreate,
     ContractCreate,
     ContractUpdate,
     ReconciliationOrderItem,
@@ -106,6 +114,7 @@ class ContractService:
                     existing_contract_id=existing.id,
                 )
 
+            old_status = contract.status
             updated = await self.uow.contracts.update(
                 contract_id,
                 {
@@ -114,6 +123,15 @@ class ContractService:
                     "signed_by_id": signed_by_id,
                 },
             )
+            await self.uow.status_logs.add(
+                {
+                    "contract_id": contract_id,
+                    "from_status": old_status,
+                    "to_status": ContractStatus.ACTIVE,
+                    "changed_by_id": signed_by_id,
+                    "reason": None,
+                }
+            )
             await self.uow.commit()
             return updated
 
@@ -121,6 +139,7 @@ class ContractService:
         self,
         contract_id: uuid.UUID,
         reason: str,
+        changed_by_id: uuid.UUID | None = None,
     ) -> Contract:
         """ACTIVE → SUSPENDED."""
         async with self.uow:
@@ -135,6 +154,7 @@ class ContractService:
                     current=contract.status,
                     target=ContractStatus.SUSPENDED,
                 )
+            old_status = contract.status
             updated = await self.uow.contracts.update(
                 contract_id,
                 {
@@ -143,10 +163,23 @@ class ContractService:
                     "suspension_reason": reason,
                 },
             )
+            await self.uow.status_logs.add(
+                {
+                    "contract_id": contract_id,
+                    "from_status": old_status,
+                    "to_status": ContractStatus.SUSPENDED,
+                    "changed_by_id": changed_by_id,
+                    "reason": reason,
+                }
+            )
             await self.uow.commit()
             return updated
 
-    async def reinstate_contract(self, contract_id: uuid.UUID) -> Contract:
+    async def reinstate_contract(
+        self,
+        contract_id: uuid.UUID,
+        changed_by_id: uuid.UUID | None = None,
+    ) -> Contract:
         """SUSPENDED → ACTIVE."""
         async with self.uow:
             contract = await self.uow.contracts.get(
@@ -169,6 +202,7 @@ class ContractService:
                     client_id=contract.client_id,
                     existing_contract_id=existing.id,
                 )
+            old_status = contract.status
             updated = await self.uow.contracts.update(
                 contract_id,
                 {
@@ -177,6 +211,15 @@ class ContractService:
                     "suspension_reason": None,
                 },
             )
+            await self.uow.status_logs.add(
+                {
+                    "contract_id": contract_id,
+                    "from_status": old_status,
+                    "to_status": ContractStatus.ACTIVE,
+                    "changed_by_id": changed_by_id,
+                    "reason": None,
+                }
+            )
             await self.uow.commit()
             return updated
 
@@ -184,6 +227,7 @@ class ContractService:
         self,
         contract_id: uuid.UUID,
         reason: str,
+        changed_by_id: uuid.UUID | None = None,
     ) -> Contract:
         """ACTIVE/SUSPENDED → TERMINATED."""
         async with self.uow:
@@ -201,6 +245,7 @@ class ContractService:
                     current=contract.status,
                     target=ContractStatus.TERMINATED,
                 )
+            old_status = contract.status
             updated = await self.uow.contracts.update(
                 contract_id,
                 {
@@ -208,6 +253,15 @@ class ContractService:
                     "terminated_at": datetime.now(tz=UTC),
                     "termination_reason": reason,
                 },
+            )
+            await self.uow.status_logs.add(
+                {
+                    "contract_id": contract_id,
+                    "from_status": old_status,
+                    "to_status": ContractStatus.TERMINATED,
+                    "changed_by_id": changed_by_id,
+                    "reason": reason,
+                }
             )
             await self.uow.commit()
             return updated
@@ -377,12 +431,10 @@ class ContractService:
                     period_to=period_to,
                 )
 
-            delivered_orders = (
-                await self.uow.orders.get_delivered_by_contract(
-                    contract_id=contract_id,
-                    date_from=period_from,
-                    date_to=period_to,
-                )
+            delivered_orders = await self.uow.orders.get_delivered_by_contract(
+                contract_id=contract_id,
+                date_from=period_from,
+                date_to=period_to,
             )
             total_amount = sum(o.total_amount for o in delivered_orders)
 
@@ -396,9 +448,7 @@ class ContractService:
                 f"-{sequence:03d}"
             )
 
-            due_date = period_to + timedelta(
-                days=contract.payment_due_days
-            )
+            due_date = period_to + timedelta(days=contract.payment_due_days)
             invoice = await self.uow.invoices.add(
                 {
                     "contract_id": contract_id,
@@ -527,19 +577,17 @@ class ContractService:
                 raise ContractNotFoundError(contract_id)
 
             # Временные границы (включающий диапазон)
-            from_dt = datetime.combine(
-                date_from, datetime.min.time()
-            ).replace(tzinfo=UTC)
+            from_dt = datetime.combine(date_from, datetime.min.time()).replace(
+                tzinfo=UTC
+            )
             to_dt = datetime.combine(
                 date_to + timedelta(days=1), datetime.min.time()
             ).replace(tzinfo=UTC)
 
-            delivered_orders = (
-                await self.uow.orders.get_delivered_by_contract(
-                    contract_id=contract_id,
-                    date_from=date_from,
-                    date_to=date_to,
-                )
+            delivered_orders = await self.uow.orders.get_delivered_by_contract(
+                contract_id=contract_id,
+                date_from=date_from,
+                date_to=date_to,
             )
             order_items = [
                 ReconciliationOrderItem(
@@ -581,3 +629,112 @@ class ContractService:
                 total_paid=total_paid,
                 balance=total_billed - total_paid,
             )
+
+    # ─── АУДИТ СТАТУСОВ ──────────────────────────────────────────
+
+    async def list_status_history(
+        self,
+        contract_id: uuid.UUID,
+    ) -> Sequence[ContractStatusLog]:
+        """История переходов статуса договора (хронологически)."""
+        async with self.uow:
+            contract = await self.uow.contracts.get(contract_id)
+            if not contract:
+                raise ContractNotFoundError(contract_id)
+            return await self.uow.status_logs.get_by_contract(contract_id)
+
+    # ─── ДОППСОГЛАШЕНИЯ ──────────────────────────────────────────
+
+    async def create_amendment(
+        self,
+        contract_id: uuid.UUID,
+        dto: AmendmentCreate,
+        created_by_id: uuid.UUID | None = None,
+    ) -> ContractAmendment:
+        """Создать доп. соглашение к договору.
+
+        Бизнес-правила:
+        - Договор должен существовать.
+        - Номер ДС уникален в рамках договора.
+        """
+        async with self.uow:
+            contract = await self.uow.contracts.get(contract_id)
+            if not contract:
+                raise ContractNotFoundError(contract_id)
+
+            existing = await self.uow.amendments.get_by_number(
+                contract_id=contract_id,
+                number=dto.number,
+            )
+            if existing:
+                raise DuplicateAmendmentNumberError(
+                    contract_id=contract_id,
+                    number=dto.number,
+                )
+
+            amendment = await self.uow.amendments.add(
+                {
+                    "contract_id": contract_id,
+                    "number": dto.number,
+                    "description": dto.description,
+                    "effective_date": dto.effective_date,
+                    "created_by_id": created_by_id,
+                }
+            )
+            await self.uow.commit()
+            return amendment
+
+    async def list_amendments(
+        self,
+        contract_id: uuid.UUID,
+    ) -> Sequence[ContractAmendment]:
+        """Все ДС по договору (от ранних к поздним)."""
+        async with self.uow:
+            contract = await self.uow.contracts.get(contract_id)
+            if not contract:
+                raise ContractNotFoundError(contract_id)
+            return await self.uow.amendments.get_by_contract(contract_id)
+
+    # ─── JOB-МЕТОДЫ (авто-статусы) ───────────────────────────────
+
+    async def run_overdue_job(self) -> int:
+        """Переводит ISSUED → OVERDUE инвойсы с истёкшим due_date.
+
+        Идемпотентен: повторный вызов = 0 обновлений.
+        Возвращает количество обновлённых записей.
+        """
+        async with self.uow:
+            candidates = await self.uow.invoices.get_overdue_candidates()
+            for invoice in candidates:
+                await self.uow.invoices.update(
+                    invoice.id,
+                    {"status": InvoiceStatus.OVERDUE},
+                )
+            await self.uow.commit()
+            return len(candidates)
+
+    async def run_expire_job(self) -> int:
+        """Переводит ACTIVE → EXPIRED договоры с истёкшим end_date.
+
+        Логирует каждый переход в ContractStatusLog.
+        Идемпотентен: повторный вызов = 0 обновлений.
+        Возвращает количество обновлённых договоров.
+        """
+        async with self.uow:
+            candidates = await self.uow.contracts.get_expirable()
+            for contract in candidates:
+                await self.uow.contracts.update(
+                    contract.id,
+                    {"status": ContractStatus.EXPIRED},
+                )
+                await self.uow.status_logs.add(
+                    {
+                        "contract_id": contract.id,
+                        "from_status": ContractStatus.ACTIVE,
+                        "to_status": ContractStatus.EXPIRED,
+                        "changed_by_id": None,  # системное действие
+                        "reason": "Истёк срок действия договора",
+                    }
+                )
+            await self.uow.commit()
+            return len(candidates)

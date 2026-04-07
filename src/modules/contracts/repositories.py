@@ -1,7 +1,7 @@
 # src/modules/contracts/repositories.py
 import uuid
 from collections.abc import Sequence
-from datetime import date
+from datetime import UTC, date, datetime
 from typing import Any
 
 import sqlalchemy as sa
@@ -12,7 +12,9 @@ from src.common.repository import BaseRepository
 from src.modules.contracts.enums import ContractStatus, InvoiceStatus
 from src.modules.contracts.models import (
     Contract,
+    ContractAmendment,
     ContractPriceItem,
+    ContractStatusLog,
     Invoice,
 )
 
@@ -155,6 +157,22 @@ class ContractRepository(BaseRepository[Contract]):
         )
         await self.session.execute(stmt)
 
+    async def get_expirable(self) -> Sequence[Contract]:
+        """ACTIVE договоры с истёкшим end_date (кандидаты → EXPIRED).
+
+        Выбирает только договоры с явно указанным end_date
+        (NULL = бессрочный договор, не истекает).
+        """
+        today = datetime.now(tz=UTC).date()
+        query = select(Contract).where(
+            Contract.status == ContractStatus.ACTIVE,
+            Contract.is_active.is_(True),
+            Contract.end_date.is_not(None),
+            Contract.end_date < today,
+        )
+        result = await self.session.execute(query)
+        return result.scalars().all()
+
 
 class ContractPriceItemRepository(BaseRepository[ContractPriceItem]):
     def __init__(self, session: Any):
@@ -204,6 +222,67 @@ class InvoiceRepository(BaseRepository[Invoice]):
             Invoice.period_to == period_to,
             Invoice.status != InvoiceStatus.CANCELLED,
             Invoice.is_active.is_(True),
+        )
+        result = await self.session.execute(query)
+        return result.scalar_one_or_none()
+
+    async def get_overdue_candidates(self) -> Sequence[Invoice]:
+        """ISSUED инвойсы с истёкшим due_date (кандидаты → OVERDUE)."""
+        today = datetime.now(tz=UTC).date()
+        query = select(Invoice).where(
+            Invoice.status == InvoiceStatus.ISSUED,
+            Invoice.is_active.is_(True),
+            Invoice.due_date.is_not(None),
+            Invoice.due_date < today,
+        )
+        result = await self.session.execute(query)
+        return result.scalars().all()
+
+
+class ContractStatusLogRepository(BaseRepository[ContractStatusLog]):
+    def __init__(self, session: Any):
+        super().__init__(model=ContractStatusLog, session=session)
+
+    async def get_by_contract(
+        self,
+        contract_id: uuid.UUID,
+    ) -> Sequence[ContractStatusLog]:
+        """История переходов статуса по договору (хронологически)."""
+        query = (
+            select(ContractStatusLog)
+            .where(ContractStatusLog.contract_id == contract_id)
+            .order_by(ContractStatusLog.created_at.asc())
+        )
+        result = await self.session.execute(query)
+        return result.scalars().all()
+
+
+class ContractAmendmentRepository(BaseRepository[ContractAmendment]):
+    def __init__(self, session: Any):
+        super().__init__(model=ContractAmendment, session=session)
+
+    async def get_by_contract(
+        self,
+        contract_id: uuid.UUID,
+    ) -> Sequence[ContractAmendment]:
+        """Все ДС по договору (от ранних к поздним)."""
+        query = (
+            select(ContractAmendment)
+            .where(ContractAmendment.contract_id == contract_id)
+            .order_by(ContractAmendment.effective_date.asc())
+        )
+        result = await self.session.execute(query)
+        return result.scalars().all()
+
+    async def get_by_number(
+        self,
+        contract_id: uuid.UUID,
+        number: str,
+    ) -> ContractAmendment | None:
+        """Проверка уникальности номера ДС в рамках договора."""
+        query = select(ContractAmendment).where(
+            ContractAmendment.contract_id == contract_id,
+            ContractAmendment.number == number,
         )
         result = await self.session.execute(query)
         return result.scalar_one_or_none()

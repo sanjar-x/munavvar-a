@@ -16,11 +16,13 @@ from src.modules.contracts.exceptions import (
     ContractNotFoundError,
     ContractPriceItemNotFoundError,
     ContractStatusTransitionError,
+    DuplicateAmendmentNumberError,
     DuplicateInvoicePeriodError,
     InvalidInvoiceTransitionError,
     InvoiceNotFoundError,
 )
 from src.modules.contracts.schemas import (
+    AmendmentCreate,
     ContractCreate,
     ContractUpdate,
 )
@@ -72,10 +74,16 @@ class FakeContractRepo:
         self.delete = AsyncMock()
         self.get_active_for_client = AsyncMock(return_value=None)
         self.get_with_price_items = AsyncMock(return_value=None)
-        self.get_multi_with_client = AsyncMock(return_value=(0, []))
+        self.get_with_client = AsyncMock(return_value=None)
+        self.get_multi_with_client = AsyncMock(
+            return_value=(0, [])
+        )
         self.increment_credit_used = AsyncMock()
         self.decrement_credit_used = AsyncMock()
-        self.get_price_map_for_products = AsyncMock(return_value={})
+        self.get_price_map_for_products = AsyncMock(
+            return_value={}
+        )
+        self.get_expirable = AsyncMock(return_value=[])
 
 
 class FakePriceItemRepo:
@@ -95,6 +103,7 @@ class FakeInvoiceRepo:
         self.get_multi = AsyncMock(return_value=[])
         self.get_by_contract = AsyncMock(return_value=[])
         self.get_for_period = AsyncMock(return_value=None)
+        self.get_overdue_candidates = AsyncMock(return_value=[])
 
 
 class FakeOrderRepo:
@@ -103,11 +112,26 @@ class FakeOrderRepo:
         self.get_delivered_by_contract = AsyncMock(return_value=[])
 
 
+class FakeStatusLogRepo:
+    def __init__(self):
+        self.add = AsyncMock()
+        self.get_by_contract = AsyncMock(return_value=[])
+
+
+class FakeAmendmentRepo:
+    def __init__(self):
+        self.add = AsyncMock()
+        self.get_by_contract = AsyncMock(return_value=[])
+        self.get_by_number = AsyncMock(return_value=None)
+
+
 def make_uow(
     contracts: FakeContractRepo | None = None,
     price_items: FakePriceItemRepo | None = None,
     invoices: FakeInvoiceRepo | None = None,
     orders: FakeOrderRepo | None = None,
+    status_logs: FakeStatusLogRepo | None = None,
+    amendments: FakeAmendmentRepo | None = None,
 ) -> MagicMock:
     """Build a fake IContractUnitOfWork."""
     uow = MagicMock()
@@ -117,6 +141,8 @@ def make_uow(
     uow.orders = orders or FakeOrderRepo()
     uow.accounts = MagicMock()
     uow.transactions = MagicMock()
+    uow.status_logs = status_logs or FakeStatusLogRepo()
+    uow.amendments = amendments or FakeAmendmentRepo()
     uow.commit = AsyncMock()
     uow.rollback = AsyncMock()
     uow.flush = AsyncMock()
@@ -890,3 +916,379 @@ class TestInvoiceLifecycle:
                 contract_id=contract_id,
                 invoice_id=invoice_id,
             )
+
+
+# ─── Tests: Status Log (Audit Trail) ─────────────────────
+
+
+class TestContractStatusLog:
+    @pytest.mark.asyncio
+    async def test_activate_writes_status_log(self):
+        """activate_contract() must create a ContractStatusLog entry."""
+        contract_id = uuid.uuid4()
+        admin_id = uuid.uuid4()
+        contract = make_contract(
+            contract_id=contract_id,
+            status=ContractStatus.DRAFT,
+        )
+        activated = make_contract(
+            contract_id=contract_id,
+            status=ContractStatus.ACTIVE,
+        )
+        contracts_repo = FakeContractRepo()
+        contracts_repo.get.return_value = contract
+        contracts_repo.get_active_for_client.return_value = None
+        contracts_repo.update.return_value = activated
+        status_log_repo = FakeStatusLogRepo()
+
+        uow = make_uow(
+            contracts=contracts_repo,
+            status_logs=status_log_repo,
+        )
+        service = ContractService(uow=uow)
+
+        await service.activate_contract(
+            contract_id=contract_id,
+            signed_by_id=admin_id,
+        )
+
+        status_log_repo.add.assert_awaited_once()
+        log_data = status_log_repo.add.call_args[0][0]
+        assert log_data["from_status"] == ContractStatus.DRAFT
+        assert log_data["to_status"] == ContractStatus.ACTIVE
+        assert log_data["changed_by_id"] == admin_id
+
+    @pytest.mark.asyncio
+    async def test_suspend_writes_status_log_with_reason(self):
+        contract_id = uuid.uuid4()
+        admin_id = uuid.uuid4()
+        contract = make_contract(
+            contract_id=contract_id,
+            status=ContractStatus.ACTIVE,
+        )
+        suspended = make_contract(
+            contract_id=contract_id,
+            status=ContractStatus.SUSPENDED,
+        )
+        contracts_repo = FakeContractRepo()
+        contracts_repo.get.return_value = contract
+        contracts_repo.update.return_value = suspended
+        status_log_repo = FakeStatusLogRepo()
+
+        uow = make_uow(
+            contracts=contracts_repo,
+            status_logs=status_log_repo,
+        )
+        service = ContractService(uow=uow)
+
+        await service.suspend_contract(
+            contract_id=contract_id,
+            reason="Просрочка платежа",
+            changed_by_id=admin_id,
+        )
+
+        log_data = status_log_repo.add.call_args[0][0]
+        assert log_data["from_status"] == ContractStatus.ACTIVE
+        assert log_data["to_status"] == ContractStatus.SUSPENDED
+        assert log_data["reason"] == "Просрочка платежа"
+        assert log_data["changed_by_id"] == admin_id
+
+    @pytest.mark.asyncio
+    async def test_terminate_writes_status_log(self):
+        contract_id = uuid.uuid4()
+        contract = make_contract(
+            contract_id=contract_id,
+            status=ContractStatus.ACTIVE,
+        )
+        terminated = make_contract(
+            contract_id=contract_id,
+            status=ContractStatus.TERMINATED,
+        )
+        contracts_repo = FakeContractRepo()
+        contracts_repo.get.return_value = contract
+        contracts_repo.update.return_value = terminated
+        status_log_repo = FakeStatusLogRepo()
+
+        uow = make_uow(
+            contracts=contracts_repo,
+            status_logs=status_log_repo,
+        )
+        service = ContractService(uow=uow)
+
+        await service.terminate_contract(
+            contract_id=contract_id,
+            reason="Нарушение условий",
+        )
+
+        log_data = status_log_repo.add.call_args[0][0]
+        assert log_data["from_status"] == ContractStatus.ACTIVE
+        assert log_data["to_status"] == ContractStatus.TERMINATED
+        assert log_data["reason"] == "Нарушение условий"
+
+    @pytest.mark.asyncio
+    async def test_list_status_history_not_found(self):
+        contracts_repo = FakeContractRepo()
+        contracts_repo.get.return_value = None
+
+        uow = make_uow(contracts=contracts_repo)
+        service = ContractService(uow=uow)
+
+        with pytest.raises(ContractNotFoundError):
+            await service.list_status_history(uuid.uuid4())
+
+    @pytest.mark.asyncio
+    async def test_list_status_history_returns_logs(self):
+        contract_id = uuid.uuid4()
+        contract = make_contract(contract_id=contract_id)
+        log_entry = SimpleNamespace(
+            id=uuid.uuid4(),
+            contract_id=contract_id,
+            from_status=ContractStatus.DRAFT,
+            to_status=ContractStatus.ACTIVE,
+            changed_by_id=uuid.uuid4(),
+            reason=None,
+        )
+        contracts_repo = FakeContractRepo()
+        contracts_repo.get.return_value = contract
+        status_log_repo = FakeStatusLogRepo()
+        status_log_repo.get_by_contract.return_value = [log_entry]
+
+        uow = make_uow(
+            contracts=contracts_repo,
+            status_logs=status_log_repo,
+        )
+        service = ContractService(uow=uow)
+
+        result = await service.list_status_history(contract_id)
+
+        assert result == [log_entry]
+
+
+# ─── Tests: Amendments ────────────────────────────────────
+
+
+class TestContractAmendments:
+    @pytest.mark.asyncio
+    async def test_create_amendment_success(self):
+        contract_id = uuid.uuid4()
+        admin_id = uuid.uuid4()
+        contract = make_contract(contract_id=contract_id)
+        expected = SimpleNamespace(
+            id=uuid.uuid4(),
+            contract_id=contract_id,
+            number="ДС-001",
+            description="Изменение прайса",
+            effective_date=date.today(),
+            created_by_id=admin_id,
+        )
+        contracts_repo = FakeContractRepo()
+        contracts_repo.get.return_value = contract
+        amendments_repo = FakeAmendmentRepo()
+        amendments_repo.get_by_number.return_value = None
+        amendments_repo.add.return_value = expected
+
+        uow = make_uow(
+            contracts=contracts_repo,
+            amendments=amendments_repo,
+        )
+        service = ContractService(uow=uow)
+
+        dto = AmendmentCreate(
+            number="ДС-001",
+            description="Изменение прайса",
+            effective_date=date.today(),
+        )
+        result = await service.create_amendment(
+            contract_id=contract_id,
+            dto=dto,
+            created_by_id=admin_id,
+        )
+
+        amendments_repo.add.assert_awaited_once()
+        call_data = amendments_repo.add.call_args[0][0]
+        assert call_data["number"] == "ДС-001"
+        assert call_data["created_by_id"] == admin_id
+        assert result is expected
+
+    @pytest.mark.asyncio
+    async def test_create_amendment_duplicate_number_raises(self):
+        contract_id = uuid.uuid4()
+        contract = make_contract(contract_id=contract_id)
+        existing = SimpleNamespace(
+            id=uuid.uuid4(),
+            contract_id=contract_id,
+            number="ДС-001",
+        )
+        contracts_repo = FakeContractRepo()
+        contracts_repo.get.return_value = contract
+        amendments_repo = FakeAmendmentRepo()
+        amendments_repo.get_by_number.return_value = existing
+
+        uow = make_uow(
+            contracts=contracts_repo,
+            amendments=amendments_repo,
+        )
+        service = ContractService(uow=uow)
+
+        dto = AmendmentCreate(
+            number="ДС-001",
+            description="Дубликат",
+            effective_date=date.today(),
+        )
+        with pytest.raises(DuplicateAmendmentNumberError):
+            await service.create_amendment(
+                contract_id=contract_id, dto=dto
+            )
+
+    @pytest.mark.asyncio
+    async def test_create_amendment_contract_not_found_raises(self):
+        contracts_repo = FakeContractRepo()
+        contracts_repo.get.return_value = None
+
+        uow = make_uow(contracts=contracts_repo)
+        service = ContractService(uow=uow)
+
+        dto = AmendmentCreate(
+            number="ДС-001",
+            description="Test",
+            effective_date=date.today(),
+        )
+        with pytest.raises(ContractNotFoundError):
+            await service.create_amendment(
+                contract_id=uuid.uuid4(), dto=dto
+            )
+
+    @pytest.mark.asyncio
+    async def test_list_amendments_returns_sorted(self):
+        contract_id = uuid.uuid4()
+        contract = make_contract(contract_id=contract_id)
+        am1 = SimpleNamespace(
+            id=uuid.uuid4(),
+            contract_id=contract_id,
+            number="ДС-001",
+            effective_date=date(2025, 1, 1),
+        )
+        am2 = SimpleNamespace(
+            id=uuid.uuid4(),
+            contract_id=contract_id,
+            number="ДС-002",
+            effective_date=date(2025, 3, 1),
+        )
+        contracts_repo = FakeContractRepo()
+        contracts_repo.get.return_value = contract
+        amendments_repo = FakeAmendmentRepo()
+        amendments_repo.get_by_contract.return_value = [am1, am2]
+
+        uow = make_uow(
+            contracts=contracts_repo,
+            amendments=amendments_repo,
+        )
+        service = ContractService(uow=uow)
+
+        result = await service.list_amendments(contract_id)
+        assert result == [am1, am2]
+
+
+# ─── Tests: Automation Jobs ───────────────────────────────
+
+
+class TestAutomationJobs:
+    @pytest.mark.asyncio
+    async def test_run_overdue_job_updates_all_candidates(self):
+        invoice_id1 = uuid.uuid4()
+        invoice_id2 = uuid.uuid4()
+        contract_id = uuid.uuid4()
+        overdue1 = make_invoice(
+            contract_id=contract_id,
+            status=InvoiceStatus.ISSUED,
+            invoice_id=invoice_id1,
+        )
+        overdue2 = make_invoice(
+            contract_id=contract_id,
+            status=InvoiceStatus.ISSUED,
+            invoice_id=invoice_id2,
+        )
+        invoice_repo = FakeInvoiceRepo()
+        invoice_repo.get_overdue_candidates.return_value = [
+            overdue1,
+            overdue2,
+        ]
+
+        uow = make_uow(invoices=invoice_repo)
+        service = ContractService(uow=uow)
+
+        count = await service.run_overdue_job()
+
+        assert count == 2
+        assert invoice_repo.update.await_count == 2
+        # Both calls set OVERDUE
+        for call in invoice_repo.update.call_args_list:
+            assert call[0][1]["status"] == InvoiceStatus.OVERDUE
+
+    @pytest.mark.asyncio
+    async def test_run_overdue_job_idempotent_when_none(self):
+        invoice_repo = FakeInvoiceRepo()
+        invoice_repo.get_overdue_candidates.return_value = []
+
+        uow = make_uow(invoices=invoice_repo)
+        service = ContractService(uow=uow)
+
+        count = await service.run_overdue_job()
+
+        assert count == 0
+        invoice_repo.update.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_run_expire_job_updates_contracts_and_logs(self):
+        contract_id1 = uuid.uuid4()
+        contract_id2 = uuid.uuid4()
+        expired1 = make_contract(
+            contract_id=contract_id1,
+            status=ContractStatus.ACTIVE,
+            end_date=date.today() - timedelta(days=1),
+        )
+        expired2 = make_contract(
+            contract_id=contract_id2,
+            status=ContractStatus.ACTIVE,
+            end_date=date.today() - timedelta(days=5),
+        )
+        contracts_repo = FakeContractRepo()
+        contracts_repo.get_expirable.return_value = [
+            expired1,
+            expired2,
+        ]
+        status_log_repo = FakeStatusLogRepo()
+
+        uow = make_uow(
+            contracts=contracts_repo,
+            status_logs=status_log_repo,
+        )
+        service = ContractService(uow=uow)
+
+        count = await service.run_expire_job()
+
+        assert count == 2
+        assert contracts_repo.update.await_count == 2
+        assert status_log_repo.add.await_count == 2
+        # All updates should set EXPIRED
+        for call in contracts_repo.update.call_args_list:
+            assert call[0][1]["status"] == ContractStatus.EXPIRED
+        # All logs should show ACTIVE → EXPIRED
+        for call in status_log_repo.add.call_args_list:
+            log_data = call[0][0]
+            assert log_data["from_status"] == ContractStatus.ACTIVE
+            assert log_data["to_status"] == ContractStatus.EXPIRED
+            assert log_data["changed_by_id"] is None
+
+    @pytest.mark.asyncio
+    async def test_run_expire_job_idempotent_when_none(self):
+        contracts_repo = FakeContractRepo()
+        contracts_repo.get_expirable.return_value = []
+
+        uow = make_uow(contracts=contracts_repo)
+        service = ContractService(uow=uow)
+
+        count = await service.run_expire_job()
+
+        assert count == 0
+        contracts_repo.update.assert_not_awaited()

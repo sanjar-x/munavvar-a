@@ -157,6 +157,18 @@ class Contract(BaseModel):
         foreign_keys="[Order.contract_id]",
         lazy="raise",
     )
+    status_logs: Mapped[list["ContractStatusLog"]] = relationship(
+        back_populates="contract",
+        cascade="all, delete-orphan",
+        lazy="raise",
+        order_by="ContractStatusLog.created_at",
+    )
+    amendments: Mapped[list["ContractAmendment"]] = relationship(
+        back_populates="contract",
+        cascade="all, delete-orphan",
+        lazy="raise",
+        order_by="ContractAmendment.effective_date",
+    )
 
     __table_args__ = (
         CheckConstraint(
@@ -314,4 +326,114 @@ class Invoice(BaseModel):
                 "Счета-фактуры, выставляемые по биллинговому циклу договора"
             )
         },
+    )
+
+
+class ContractStatusLog(BaseModel):
+    """Аудит-лог переходов статуса договора.
+
+    Append-only — никогда не обновляется и не удаляется.
+    changed_at = created_at из BaseModel.
+    """
+
+    # __tablename__ = "contract_status_logs"  ← авто из BaseModel
+
+    contract_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("contracts.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    from_status: Mapped[ContractStatus | None] = mapped_column(
+        Enum(
+            ContractStatus,
+            name="contract_status_enum",
+            native_enum=True,
+            create_type=False,  # тип уже создан Contract
+            values_callable=lambda e: [m.value for m in e],
+        ),
+        nullable=True,
+        comment="NULL = запись при создании договора",
+    )
+    to_status: Mapped[ContractStatus] = mapped_column(
+        Enum(
+            ContractStatus,
+            name="contract_status_enum",
+            native_enum=True,
+            create_type=False,
+            values_callable=lambda e: [m.value for m in e],
+        ),
+        nullable=False,
+    )
+    changed_by_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        comment="Кто изменил статус (admin); NULL = системное действие",
+    )
+    reason: Mapped[str | None] = mapped_column(
+        String(512),
+        nullable=True,
+        comment="Причина приостановки / расторжения / истечения",
+    )
+
+    contract: Mapped["Contract"] = relationship(
+        back_populates="status_logs",
+        lazy="raise",
+    )
+
+    __table_args__ = (
+        Index("idx_contract_status_log_contract", "contract_id"),
+        {"comment": "Append-only аудит переходов статуса договора"},
+    )
+
+
+class ContractAmendment(BaseModel):
+    """Дополнительные соглашения к договору.
+
+    Формализует изменения условий договора без замены основного документа.
+    """
+
+    # __tablename__ = "contract_amendments"  ← авто из BaseModel
+
+    contract_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("contracts.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    number: Mapped[str] = mapped_column(
+        String(50),
+        nullable=False,
+        comment="Номер ДС в рамках договора (ДС-001, ДС-002...)",
+    )
+    description: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+        comment="Описание изменений (что и почему изменилось)",
+    )
+    effective_date: Mapped[date] = mapped_column(
+        Date,
+        nullable=False,
+        comment="Дата вступления в силу доп. соглашения",
+    )
+    created_by_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        comment="Кто создал ДС (admin)",
+    )
+
+    contract: Mapped["Contract"] = relationship(
+        back_populates="amendments",
+        lazy="raise",
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "contract_id",
+            "number",
+            name="uq_contract_amendment_number",
+        ),
+        {"comment": "Дополнительные соглашения к договорам"},
     )
