@@ -78,7 +78,8 @@ class CatalogService(
     ) -> Sequence[ProductDTO]:
         """
         Продвинутый поиск для UI.
-        Позволяет найти все кулеры цвета "white" или компрессорного типа охлаждения.
+        Позволяет найти все кулеры цвета "white"
+        или компрессорного типа охлаждения.
         """
         async with self.uow:
             products = await self._repo.get_by_json_attribute(
@@ -97,15 +98,22 @@ class CatalogService(
         """
         Создание нового товара с жесткой бизнес-валидацией.
         """
-        # Бизнес-правило 1: Только у воды (WATER) может быть привязана возвратная тара
+        # Бизнес-правило 1: Только у воды (WATER)
+        # может быть привязана возвратная тара
         if dto.returnable_item_id and dto.type != ProductType.WATER:
             raise InvalidReturnableItemError(
-                message="Возвратная тара может быть привязана только к товарам типа WATER"
+                message=(
+                    "Возвратная тара может быть привязана"
+                    " только к товарам типа WATER"
+                )
             )
 
         if dto.type == ProductType.WATER and not dto.returnable_item_id:
             raise InvalidReturnableItemError(
-                message="Товар типа WATER не может быть создан без привязки к возвратной таре (CONTAINER)"
+                message=(
+                    "Товар типа WATER не может быть создан"
+                    " без привязки к возвратной таре (CONTAINER)"
+                )
             )
 
         async with self.uow:
@@ -119,7 +127,10 @@ class CatalogService(
 
                 if bottle.type != ProductType.CONTAINER:
                     raise InvalidReturnableItemError(
-                        message="В качестве возвратной тары можно указать только товар типа CONTAINER"
+                        message=(
+                            "В качестве возвратной тары"
+                            " можно указать только товар типа CONTAINER"
+                        )
                     )
 
             data = dto.model_dump(exclude_unset=True)

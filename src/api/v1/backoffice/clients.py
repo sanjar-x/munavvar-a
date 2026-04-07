@@ -34,7 +34,8 @@ clients_router = APIRouter()
     status_code=status.HTTP_201_CREATED,
     summary="Единое окно: Быстрый онбординг клиента",
     description=(
-        "Создает клиента, оприходует начальную тару и создает первый заказ за один запрос."
+        "Создает клиента, оприходует начальную тару"
+        " и создает первый заказ за один запрос."
     ),
 )
 async def onboard_client(
@@ -71,7 +72,11 @@ async def create_client(
     status_code=status.HTTP_201_CREATED,
     response_model=ClientResponse,
     summary="Добавить новый адрес (инвентарь) клиенту",
-    description="Создает дополнительный адрес доставки/склад для указанного клиента и возвращает обновленную карточку профиля.",
+    description=(
+        "Создает дополнительный адрес доставки/склад"
+        " для указанного клиента"
+        " и возвращает обновленную карточку профиля."
+    ),
 )
 async def create_client_inventory(
     client_id: uuid.UUID,
@@ -90,7 +95,10 @@ async def create_client_inventory(
     "/",
     response_model=ClientsResponse,
     summary="Получить список клиентов",
-    description="Возвращает список клиентов с пагинацией.  Поиск по ФИО/телефон.",
+    description=(
+        "Возвращает список клиентов с пагинацией."
+        "  Поиск по ФИО/телефон."
+    ),
 )
 async def get_clients(
     current_admin: Annotated[
@@ -112,7 +120,11 @@ async def get_clients(
     "/{client_id}",
     response_model=ClientResponse,
     summary="Получить карточку клиента",
-    description="Возвращает полную информацию о клиенте: профиль, баланс счета, остатки на адресах и историю заказов.",
+    description=(
+        "Возвращает полную информацию о клиенте:"
+        " профиль, баланс счета, остатки на адресах"
+        " и историю заказов."
+    ),
 )
 async def get_client(
     client_id: uuid.UUID,

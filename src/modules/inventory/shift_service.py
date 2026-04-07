@@ -70,7 +70,8 @@ class ShiftService:
                 for item in request.returned_inventory
             }
 
-            # Проверяем, что курьер сдает ровно столько, сколько на нем числится
+            # Проверяем, что курьер сдает ровно столько,
+            # сколько на нем числится
             all_product_ids = set(current_balances.keys()) | set(
                 returned_map.keys()
             )
@@ -126,7 +127,8 @@ class ShiftService:
                         }
                     )
 
-            # 4. Инкассация: перевод наличных с кассы курьера в центральную кассу
+            # 4. Инкассация: перевод наличных с кассы
+            # курьера в центральную кассу
             if request.cash_collected > 0:
                 cash_amount = int(request.cash_collected)
                 courier_account = (

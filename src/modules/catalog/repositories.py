@@ -62,7 +62,8 @@ class ProductRepository(BaseRepository[Product]):
         return (result.scalar() or 0) > 0
 
     async def has_associated_products(self, product_id: uuid.UUID) -> bool:
-        """Проверяет, ссылаются ли другие товары на этот через returnable_item_id."""
+        """Проверяет, ссылаются ли другие товары
+        на этот через returnable_item_id."""
         query = select(func.count()).where(
             self.model.returnable_item_id == product_id
         )

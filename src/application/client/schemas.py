@@ -24,7 +24,8 @@ class ClientCreate(BaseModel):
     role: ClientRole = Field(
         default=ClientRole.CLIENT_B2C,
         description=(
-            "Тип клиента: физическое (client_b2c) или юридическое лицо (client_b2b)"
+            "Тип клиента: физическое (client_b2c)"
+            " или юридическое лицо (client_b2b)"
         ),
     )
     address_name: str | None = Field(

@@ -40,14 +40,18 @@ class ProductHasStockError(BadRequestError):
         error_details = details or {}
         error_details["product_id"] = str(product_id)
         super().__init__(
-            message="Невозможно удалить товар: на складах или в транспортах есть остатки",
+            message=(
+                "Невозможно удалить товар:"
+                " на складах или в транспортах есть остатки"
+            ),
             error_code="PRODUCT_HAS_STOCK",
             details=error_details,
         )
 
 
 class ProductHasAssociatedProductsError(BadRequestError):
-    """Нельзя удалить товар, если другие товары ссылаются на него как на возвратную тару."""
+    """Нельзя удалить товар, если другие товары ссылаются
+    на него как на возвратную тару."""
 
     def __init__(
         self,
@@ -57,7 +61,11 @@ class ProductHasAssociatedProductsError(BadRequestError):
         error_details = details or {}
         error_details["product_id"] = str(product_id)
         super().__init__(
-            message="Невозможно удалить товар: другие товары ссылаются на него как на возвратную тару",
+            message=(
+                "Невозможно удалить товар:"
+                " другие товары ссылаются на него"
+                " как на возвратную тару"
+            ),
             error_code="PRODUCT_HAS_ASSOCIATED_PRODUCTS",
             details=error_details,
         )

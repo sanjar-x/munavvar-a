@@ -101,5 +101,6 @@ async def delete_product(
     ],
     catalog_service: Annotated[CatalogService, Depends(get_catalog_service)],
 ):
-    """Полное удаление товара. Невозможно если есть остатки на складах/транспортах."""
+    """Полное удаление товара.
+    Невозможно если есть остатки на складах/транспортах."""
     await catalog_service.hard_delete(product_id=product_id)

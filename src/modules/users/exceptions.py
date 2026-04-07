@@ -26,7 +26,10 @@ class UserAlreadyExistsError(ConflictError):
         # super().__init__ передает данные в базовый класс ConflictError,
         # который уже сам решит, как превратить их в HTTP 409
         super().__init__(
-            message=f"Пользователь с идентификатором '{identity_id}' уже зарегистрирован.",
+            message=(
+                f"Пользователь с идентификатором"
+                f" '{identity_id}' уже зарегистрирован."
+            ),
             error_code="USER_ALREADY_EXISTS",
             details={"identity_id": identity_id},
         )
@@ -73,7 +76,10 @@ class UserUpdateConflictError(ConflictError):
             details["reason"] = reason
 
         super().__init__(
-            message=f"Не удалось обновить данные пользователя {user_id} из-за конфликта состояний.",
+            message=(
+                f"Не удалось обновить данные пользователя"
+                f" {user_id} из-за конфликта состояний."
+            ),
             error_code="USER_UPDATE_CONFLICT",
             details=details,
         )
@@ -86,7 +92,11 @@ class UserDeleteConflictError(ConflictError):
             details["reason"] = reason
 
         super().__init__(
-            message=f"Отказ физического удаления. Пользователь {user_id} имеет жесткие связи в базе данных.",
+            message=(
+                "Отказ физического удаления."
+                f" Пользователь {user_id}"
+                " имеет жесткие связи в базе данных."
+            ),
             error_code="USER_DELETE_CONFLICT",
             details=details,
         )

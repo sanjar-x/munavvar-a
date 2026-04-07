@@ -124,8 +124,9 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
                 raise InvalidPickupOperationError(
                     order_id=order.id,
                     reason=(
-                        f"Заказ самовывоза не может перейти в статус {new_status}. "
-                        "Используйте complete-pickup."
+                        f"Заказ самовывоза не может перейти"
+                        f" в статус {new_status}."
+                        " Используйте complete-pickup."
                     ),
                 )
 
@@ -229,7 +230,8 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
                 )
 
             if exchange_items:
-                # Получаем баланс пустой тары клиента (с блокировкой от Race Condition)
+                # Получаем баланс пустой тары клиента
+                # (с блокировкой от Race Condition)
                 inventory = (
                     await self.uow.inventories.get_inventory_with_balances(
                         dto.client_inventory_id,
@@ -316,7 +318,8 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
             # 7. Единый коммит: оприходование + заказ атомарно
             await self.uow.commit()
 
-            # 8. Перечитываем с eager-loaded relationships для корректной сериализации
+            # 8. Перечитываем с eager-loaded relationships
+            # для корректной сериализации
             result = await self.uow.orders.get_with_details(new_order.id)
             if not result:
                 raise OrderNotFoundError(order_id=new_order.id)
@@ -650,7 +653,8 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
             if not existing_item:
                 return order
 
-            # Защита: запрет удаления последнего товара (пустой заказ недопустим)
+            # Защита: запрет удаления последнего товара
+            # (пустой заказ недопустим)
             if len(order.items) <= 1:
                 raise CannotRemoveLastItemError()
 
@@ -750,7 +754,8 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
         requesting_user_id: uuid.UUID | None = None,
     ) -> Order:
         async with self.uow:
-            # Блокируем заказ для обновления статуса и возможных движений товаров
+            # Блокируем заказ для обновления статуса
+            # и возможных движений товаров
             order = await self.uow.orders.get_with_details(
                 order_id, with_for_update=True
             )
@@ -873,7 +878,8 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
     def _build_returnable_items(
         order_items: list,
     ) -> list[dict[str, uuid.UUID | int]]:
-        """Aggregates container quantities paired with delivered water items."""
+        """Aggregates container quantities paired
+        with delivered water items."""
         returnable_map: dict[uuid.UUID, int] = {}
         for item in order_items:
             if item.product.returnable_item_id and item.quantity > 0:

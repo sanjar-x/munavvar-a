@@ -100,7 +100,8 @@ async def init_data() -> None:
             else:
                 logger.info(f"Виртуальный склад '{inv_name}' уже существует.")
 
-        # --- 3.5 СОЗДАНИЕ WALK-IN ПОЛЬЗОВАТЕЛЯ (АНОНИМНЫЕ ПРОДАЖИ СО СКЛАДА) ---
+        # --- 3.5 СОЗДАНИЕ WALK-IN ПОЛЬЗОВАТЕЛЯ ---
+        # (АНОНИМНЫЕ ПРОДАЖИ СО СКЛАДА)
         query_walkin = select(User).where(User.id == WALKIN_USER_ID)
         walkin_user = (
             await session.execute(query_walkin)
@@ -156,8 +157,9 @@ async def init_data() -> None:
 
         if not admin_phone or not admin_password:
             logger.warning(
-                "ADMIN_PHONE или ADMIN_PASSWORD не заданы в переменных окружения. "
-                "Пропуск создания стартового администратора."
+                "ADMIN_PHONE или ADMIN_PASSWORD не заданы"
+                " в переменных окружения."
+                " Пропуск создания стартового администратора."
             )
         else:
             query_admin_identity = select(Identity).where(

@@ -39,7 +39,10 @@ class Identity(BaseModel):
     provider_identity_id: Mapped[str] = mapped_column(
         String(255),
         nullable=False,
-        comment="Уникальный ID у провайдера: номер телефона, email или субъект (sub) из OAuth",
+        comment=(
+            "Уникальный ID у провайдера:"
+            " номер телефона, email или субъект (sub) из OAuth"
+        ),
     )
     password_hash: Mapped[str | None] = mapped_column(
         String(255),
@@ -55,7 +58,10 @@ class Identity(BaseModel):
             name="uq_identities_provider_identity_id",
         ),
         {
-            "comment": "Учетные данные пользователей и привязки к соцсетям (OAuth)"
+            "comment": (
+                "Учетные данные пользователей"
+                " и привязки к соцсетям (OAuth)"
+            ),
         },
     )
 

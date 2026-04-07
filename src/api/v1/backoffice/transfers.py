@@ -33,7 +33,8 @@ async def get_transfers(
     size: int = Query(20, ge=1, le=100),
 ):
     skip = (page - 1) * size
-    # Storekeeper sees only transfers touching their warehouse(s); admin sees all
+    # Storekeeper sees only transfers touching their
+    # warehouse(s); admin sees all
     warehouse_owner_id = (
         current_admin.id if current_admin.role == Role.STOREKEEPER else None
     )

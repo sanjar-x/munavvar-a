@@ -23,6 +23,10 @@ fix = true
 select = ["E", "W", "F", "I", "B", "C4", "UP", "SIM"]
 ignore = ["UP037"]
 
+[tool.ruff.lint.per-file-ignores]
+"alembic/**" = ["E501"]
+"triggers__backup.py" = ["E501"]
+
 [dependency-groups]
 dev = [
     "httpx>=0.28.1",

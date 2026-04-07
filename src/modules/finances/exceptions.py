@@ -42,7 +42,8 @@ class TransactionNotFoundError(NotFoundError):
 
 
 class InsufficientFundsError(ConflictError):
-    """Выбрасывается при попытке списания суммы, превышающей баланс (если мы запрещаем минусовой баланс)."""
+    """Выбрасывается при попытке списания суммы,
+    превышающей баланс (если мы запрещаем минусовой баланс)."""
 
     def __init__(
         self, account_id: uuid.UUID, required_amount: int, actual_balance: int
@@ -63,7 +64,10 @@ class InvalidTransactionAmountError(BadRequestError):
 
     def __init__(self, amount: int):
         super().__init__(
-            message=f"Недопустимая сумма транзакции: {amount}. Сумма должна быть больше нуля.",
+            message=(
+                f"Недопустимая сумма транзакции: {amount}."
+                " Сумма должна быть больше нуля."
+            ),
             error_code="INVALID_TRANSACTION_AMOUNT",
             details={"amount": amount},
         )
@@ -81,11 +85,15 @@ class SelfTransferError(ConflictError):
 
 
 class InvalidTransactionStatusError(ConflictError):
-    """Выбрасывается при попытке подтвердить/отменить транзакцию в неверном статусе."""
+    """Выбрасывается при попытке подтвердить/отменить
+    транзакцию в неверном статусе."""
 
     def __init__(self, transaction_id: uuid.UUID, current_status: Any):
         super().__init__(
-            message=f"Невозможно изменить статус транзакции. Текущий статус: {current_status}.",
+            message=(
+                "Невозможно изменить статус транзакции."
+                f" Текущий статус: {current_status}."
+            ),
             error_code="INVALID_TRANSACTION_STATUS",
             details={
                 "transaction_id": str(transaction_id),

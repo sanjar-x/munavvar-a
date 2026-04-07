@@ -429,5 +429,8 @@ class UserRepository(BaseRepository[User]):
         except IntegrityError as e:
             raise UserDeleteConflictError(
                 user_id=id,
-                reason="Невозможно удалить пользователя из-за связанных финансовых или системных данных",
+                reason=(
+                    "Невозможно удалить пользователя"
+                    " из-за связанных финансовых или системных данных"
+                ),
             ) from e

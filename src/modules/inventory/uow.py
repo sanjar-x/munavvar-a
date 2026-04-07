@@ -26,10 +26,12 @@ class IInventoryUnitOfWork(IUnitOfWork):
 # 2. Доменная реализация (DomainSQLAlchemyUoW)
 class InventoryUnitOfWork(BaseSQLAlchemyUoW, IInventoryUnitOfWork):
     async def __aenter__(self) -> "InventoryUnitOfWork":
-        # Вызываем __aenter__ базового класса, чтобы инициализировать self.session
+        # Вызываем __aenter__ базового класса,
+        # чтобы инициализировать self.session
         await super().__aenter__()
 
-        # Инициализируем репозитории домена, прокидывая в них единую транзакционную сессию
+        # Инициализируем репозитории домена, прокидывая в них
+        # единую транзакционную сессию
         self.inventories = InventoryRepository(session=self.session)
         self.transfers = StockTransferRepository(session=self.session)
         self.transfer_items = StockTransferItemRepository(session=self.session)

@@ -122,7 +122,8 @@ class AuthService:
         if user.id == WALKIN_USER_ID:
             raise ForbiddenError(
                 message=(
-                    "Системный walk-in пользователь не может входить в систему."
+                    "Системный walk-in пользователь"
+                    " не может входить в систему."
                 ),
                 error_code="WALKIN_LOGIN_FORBIDDEN",
             )

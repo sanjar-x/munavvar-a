@@ -137,7 +137,8 @@ class ClientService:
         self, data: ClientOnboardingRequest, creator_id: uuid.UUID
     ) -> ClientResponse:
         """
-        Единое окно: Создание клиента + Оприходование тары + (опционально) Заказ.
+        Единое окно: Создание клиента + Оприходование тары
+        + (опционально) Заказ.
         """
         async with self.uow:
             # 1. Проверка дубликата телефона (Identity)

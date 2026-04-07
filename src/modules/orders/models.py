@@ -38,7 +38,10 @@ class Order(BaseModel):
         UUID(as_uuid=True),
         ForeignKey("users.id", ondelete="SET NULL"),
         index=True,
-        comment="Назначенный курьер (может быть пустым, пока заказ не взят в работу)",
+        comment=(
+            "Назначенный курьер"
+            " (может быть пустым, пока заказ не взят в работу)"
+        ),
     )
     payment_method: Mapped[PaymentMethod] = mapped_column(
         Enum(

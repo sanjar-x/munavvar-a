@@ -63,7 +63,10 @@ async def get_staff_users(
     roles: Annotated[
         list[Role] | None,
         Query(
-            description="Фильтр по staff-ролям. Можно передать несколько roles.",
+            description=(
+                "Фильтр по staff-ролям."
+                " Можно передать несколько roles."
+            ),
         ),
     ] = None,
 ):

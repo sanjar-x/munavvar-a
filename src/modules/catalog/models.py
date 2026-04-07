@@ -26,7 +26,10 @@ class Product(BaseModel):
         ForeignKey("products.id", ondelete="RESTRICT"),
         nullable=True,
         index=True,
-        comment="Ссылка на оборотную тару (например, пустая бутыль 19л, привязанная к воде)",
+        comment=(
+            "Ссылка на оборотную тару"
+            " (например, пустая бутыль 19л, привязанная к воде)"
+        ),
     )
 
     type: Mapped[ProductType] = mapped_column(

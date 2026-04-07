@@ -2,7 +2,8 @@ from pwdlib import PasswordHash
 from pwdlib.hashers.bcrypt import BcryptHasher
 
 # Создаем объект для хеширования, используя Bcrypt.
-# pwdlib автоматически обрабатывает параметры безопасности и генерацию соли (salt).
+# pwdlib автоматически обрабатывает параметры
+# безопасности и генерацию соли (salt).
 password_hash = PasswordHash((BcryptHasher(),))
 
 

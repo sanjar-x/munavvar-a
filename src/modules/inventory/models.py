@@ -36,7 +36,10 @@ class Inventory(BaseModel):
         UUID(as_uuid=True),
         ForeignKey("users.id", ondelete="RESTRICT"),
         nullable=False,
-        comment="Кто материально ответственен за эту точку (курьер, клиент, кладовщик)?",
+        comment=(
+            "Кто материально ответственен за эту точку"
+            " (курьер, клиент, кладовщик)?"
+        ),
     )
     type: Mapped[InventoryType] = mapped_column(
         Enum(
@@ -81,7 +84,10 @@ class Inventory(BaseModel):
         ),
         Index("idx_inventory_user_type", "user_id", "type"),
         {
-            "comment": "Реестр всех физических и виртуальных мест хранения (склады, машины, клиенты)"
+            "comment": (
+                "Реестр всех физических и виртуальных мест хранения"
+                " (склады, машины, клиенты)"
+            ),
         },
     )
 
@@ -184,7 +190,10 @@ class StockTransfer(BaseModel):
             "id", "from_id", "to_id", name="uq_stock_transfer_route"
         ),
         {
-            "comment": "Документы (накладные) на перемещение товаров между складами/клиентами"
+            "comment": (
+                "Документы (накладные) на перемещение товаров"
+                " между складами/клиентами"
+            ),
         },
     )
 
@@ -216,7 +225,10 @@ class StockTransferItem(BaseModel):
             "quantity > 0", name="ck_stock_transfer_item_quantity_pos"
         ),
         {
-            "comment": "Черновик строк накладной (не влияет на остатки, пока статус DRAFT)"
+            "comment": (
+                "Черновик строк накладной"
+                " (не влияет на остатки, пока статус DRAFT)"
+            ),
         },
     )
 
@@ -253,7 +265,10 @@ class Balance(BaseModel):
             name="ck_inventory_balances_quantity_non_negative",
         ),
         {
-            "comment": "Материализованные (закэшированные) остатки. Обновляется триггером базы данных"
+            "comment": (
+                "Материализованные (закэшированные) остатки."
+                " Обновляется триггером базы данных"
+            ),
         },
     )
 
@@ -323,6 +338,9 @@ class StockTransaction(BaseModel):
         Index("idx_st_product_from", "product_id", "from_id"),
         Index("idx_st_product_to", "product_id", "to_id"),
         {
-            "comment": "Строгий леджер движения товаров (Event Sourcing). Истина в последней инстанции"
+            "comment": (
+                "Строгий леджер движения товаров (Event Sourcing)."
+                " Истина в последней инстанции"
+            ),
         },
     )

@@ -129,7 +129,10 @@ class CreateTransferRequest(BaseModel):
     type: TransferType
     from_id: uuid.UUID | None = Field(
         None,
-        description="ID склада-отправителя (авто для INVENTORY_FINDING, INITIAL_BALANCE)",
+        description=(
+            "ID склада-отправителя"
+            " (авто для INVENTORY_FINDING, INITIAL_BALANCE)"
+        ),
     )
     to_id: uuid.UUID | None = Field(
         None, description="ID склада-получателя (авто для LOSS_WRITE_OFF)"

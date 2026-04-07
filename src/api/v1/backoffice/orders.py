@@ -189,7 +189,8 @@ async def capitalize_tara_for_sale(
         ),
     ] = None,
 ):
-    """Оприходование тары, принесённой покупателем на склад перед самовывозом."""
+    """Оприходование тары, принесённой покупателем
+    на склад перед самовывозом."""
     effective_client_id = client_id or WALKIN_USER_ID
 
     async with capitalize_service.uow:

@@ -200,13 +200,17 @@ class CannotRemoveLastItemError(ConflictError):
 
     def __init__(self):
         super().__init__(
-            message="Нельзя удалить последний товар. Используйте отмену заказа.",
+            message=(
+                "Нельзя удалить последний товар."
+                " Используйте отмену заказа."
+            ),
             error_code="CANNOT_REMOVE_LAST_ITEM",
         )
 
 
 class InvalidPickupOperationError(ConflictError):
-    """Выбрасывается при попытке выполнить pickup-операцию на обычном заказе."""
+    """Выбрасывается при попытке выполнить
+    pickup-операцию на обычном заказе."""
 
     def __init__(
         self,

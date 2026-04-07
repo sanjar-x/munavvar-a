@@ -296,7 +296,8 @@ class StockTransferRepository(BaseRepository[StockTransfer]):
             query = query.where(self.model.created_at >= date_from)
         if date_to:
             query = query.where(self.model.created_at <= date_to)
-        # Storekeeper scoping: show only transfers that touch their warehouse(s)
+        # Storekeeper scoping: show only transfers
+        # that touch their warehouse(s)
         if warehouse_owner_id is not None:
             owner_inv_ids = (
                 select(Inventory.id)

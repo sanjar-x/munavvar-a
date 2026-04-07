@@ -21,14 +21,18 @@ from src.core.exceptions import (
 class VirtualInventoryConfigurationError(AppException):
     """
     Критическая системная ошибка.
-    Выбрасывается, когда сервис пытается получить виртуальный склад (например, VIRTUAL_LOSS),
+    Выбрасывается, когда сервис пытается получить
+    виртуальный склад (например, VIRTUAL_LOSS),
     но он не был создан при инициализации БД (отсутствует сидирование).
     """
 
     def __init__(
         self,
         v_type: str | Any,
-        message: str = "Критическая ошибка: Системный виртуальный склад не сконфигурирован",
+        message: str = (
+            "Критическая ошибка:"
+            " Системный виртуальный склад не сконфигурирован"
+        ),
     ):
         v_type_val = v_type.value if hasattr(v_type, "value") else str(v_type)
         super().__init__(
@@ -80,7 +84,8 @@ class TransferNotFoundError(NotFoundError):
 
 
 class RouteLoopError(BadRequestError):
-    """Предотвращает создание бессмысленных накладных (отправка на тот же склад)."""
+    """Предотвращает создание бессмысленных накладных
+    (отправка на тот же склад)."""
 
     def __init__(
         self,
@@ -95,7 +100,8 @@ class RouteLoopError(BadRequestError):
 
 
 class EmptyTransferError(UnprocessableEntityError):
-    """Попытка перевести накладную без товаров в статус IN_TRANSIT или COMPLETED."""
+    """Попытка перевести накладную без товаров
+    в статус IN_TRANSIT или COMPLETED."""
 
     def __init__(
         self,
@@ -134,7 +140,8 @@ class InvalidQuantityError(UnprocessableEntityError):
 
 
 class InsufficientStockError(ConflictError):
-    """Не хватает остатков для проведения накладной. Передает shortages на фронтенд."""
+    """Не хватает остатков для проведения накладной.
+    Передает shortages на фронтенд."""
 
     def __init__(
         self,
@@ -150,13 +157,17 @@ class InsufficientStockError(ConflictError):
 
 
 class InvalidTransferStatusError(ConflictError):
-    """Попытка провести накладную с неверным статусом (например, принять DRAFT)."""
+    """Попытка провести накладную с неверным статусом
+    (например, принять DRAFT)."""
 
     def __init__(
         self,
         current_status: str | Any,
         expected_status: str | list[str] | Any,
-        message: str = "Недопустимый статус накладной для данной бизнес-операции",
+        message: str = (
+            "Недопустимый статус накладной"
+            " для данной бизнес-операции"
+        ),
     ):
         curr_val = (
             current_status.value
@@ -187,13 +198,17 @@ class InvalidTransferStatusError(ConflictError):
 
 
 class TransferTypeMismatchError(ConflictError):
-    """Несоответствие типа накладной процессу (например, отгрузка клиента вместо закупки)."""
+    """Несоответствие типа накладной процессу
+    (например, отгрузка клиента вместо закупки)."""
 
     def __init__(
         self,
         expected_type: str | Any,
         actual_type: str | Any,
-        message: str = "Несоответствие типа накладной для данной бизнес-операции",
+        message: str = (
+            "Несоответствие типа накладной"
+            " для данной бизнес-операции"
+        ),
     ):
         exp_val = (
             expected_type.value
@@ -252,12 +267,16 @@ class InventoryTypeMismatchError(ConflictError):
 
 
 class ProductMismatchInTransitError(ConflictError):
-    """Фаза 2 (Приемка): попытка принять товар, которого не было в исходной накладной отгрузки."""
+    """Фаза 2 (Приемка): попытка принять товар,
+    которого не было в исходной накладной отгрузки."""
 
     def __init__(
         self,
         invalid_product_ids: list[uuid.UUID],
-        message: str = "Попытка принять товар, который не был отгружен в данной накладной",
+        message: str = (
+            "Попытка принять товар,"
+            " который не был отгружен в данной накладной"
+        ),
     ):
         stringified_ids = [str(p_id) for p_id in invalid_product_ids]
         super().__init__(
@@ -274,7 +293,10 @@ class CourierAlreadyAssignedError(ConflictError):
         self,
         courier_id: uuid.UUID | str,
         existing_transport_id: uuid.UUID | str,
-        message: str = "Курьер уже привязан к другому активному транспорту. Сначала снимите назначение.",
+        message: str = (
+            "Курьер уже привязан к другому активному транспорту."
+            " Сначала снимите назначение."
+        ),
     ):
         super().__init__(
             message=message,
@@ -287,7 +309,8 @@ class CourierAlreadyAssignedError(ConflictError):
 
 
 class CourierRouteMismatchError(ConflictError):
-    """Попытка инкассации/разгрузки не своей машины или чужого маршрутного листа."""
+    """Попытка инкассации/разгрузки не своей машины
+    или чужого маршрутного листа."""
 
     def __init__(
         self,
@@ -315,7 +338,10 @@ class StrictLedgerViolationError(ForbiddenError):
 
     def __init__(
         self,
-        message: str = "Strict Ledger: Прямая мутация проводок запрещена. Используйте компенсирующую накладную (Reversal).",
+        message: str = (
+            "Strict Ledger: Прямая мутация проводок запрещена."
+            " Используйте компенсирующую накладную (Reversal)."
+        ),
     ):
         super().__init__(
             message=message,
@@ -397,13 +423,17 @@ class ArchivedProductsInTransferError(BadRequestError):
 
 
 class ReversalNotAllowedError(ForbiddenError):
-    """Попытка отменить/отреверсировать накладную, которую отменять нельзя (например, Инвентаризацию)."""
+    """Попытка отменить/отреверсировать накладную,
+    которую отменять нельзя (например, Инвентаризацию)."""
 
     def __init__(
         self,
         transfer_id: uuid.UUID | str,
         transfer_type: str | Any,
-        message: str = "Данный тип накладной не подлежит автоматической отмене (Reversal)",
+        message: str = (
+            "Данный тип накладной не подлежит"
+            " автоматической отмене (Reversal)"
+        ),
     ):
         t_type = (
             transfer_type.value

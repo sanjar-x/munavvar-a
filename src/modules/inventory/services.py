@@ -37,7 +37,8 @@ from src.modules.inventory.schemas import (
 from src.modules.inventory.uow import InventoryUnitOfWork
 
 # Допустимые маршруты для каждого типа накладной:
-# (множество разрешённых типов отправителя, множество разрешённых типов получателя)
+# (множество разрешённых типов отправителя,
+# множество разрешённых типов получателя)
 _VALID_ROUTES: dict[
     TransferType, tuple[frozenset[InventoryType], frozenset[InventoryType]]
 ] = {

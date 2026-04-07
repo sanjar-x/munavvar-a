@@ -20,11 +20,15 @@ class CourierNotFoundError(NotFoundError):
 
 
 class CourierAlreadyExistsError(ConflictError):
-    """Выбрасывается, когда мы пытаемся зарегистрировать курьера с уже занятым номером телефона."""
+    """Выбрасывается, когда мы пытаемся зарегистрировать
+    курьера с уже занятым номером телефона."""
 
     def __init__(self, phone: str):
         super().__init__(
-            message=f"Курьер с номером телефона '{phone}' уже зарегистрирован.",
+            message=(
+                f"Курьер с номером телефона '{phone}'"
+                " уже зарегистрирован."
+            ),
             error_code="COURIER_ALREADY_EXISTS",
             details={"phone": phone},
         )
@@ -43,29 +47,40 @@ class CourierInactiveError(UnauthorizedError):
             details["courier_id"] = str(courier_id)
 
         super().__init__(
-            message="Аккаунт курьера деактивирован. Обратитесь к логисту или руководству.",
+            message=(
+                "Аккаунт курьера деактивирован."
+                " Обратитесь к логисту или руководству."
+            ),
             error_code="COURIER_INACTIVE",
             details=details,
         )
 
 
 class CourierInventoryNotFoundError(NotFoundError):
-    """Выбрасывается, если запрашиваемый инвентарь (машина) не принадлежит курьеру или не найден."""
+    """Выбрасывается, если запрашиваемый инвентарь (машина)
+    не принадлежит курьеру или не найден."""
 
     def __init__(self, inventory_id: uuid.UUID):
         super().__init__(
-            message=f"Машина (инвентарь) с идентификатором {inventory_id} не найдена.",
+            message=(
+                f"Машина (инвентарь) с идентификатором"
+                f" {inventory_id} не найдена."
+            ),
             error_code="COURIER_INVENTORY_NOT_FOUND",
             details={"inventory_id": str(inventory_id)},
         )
 
 
 class CourierHasBalancesError(BadRequestError):
-    """Выбрасывается при попытке удалить курьера, у которого есть долги или невозвращенная тара в машине."""
+    """Выбрасывается при попытке удалить курьера,
+    у которого есть долги или невозвращенная тара в машине."""
 
     def __init__(
         self,
-        message: str = "Невозможно удалить курьера: в машине числится тара или на счету есть средства.",
+        message: str = (
+            "Невозможно удалить курьера:"
+            " в машине числится тара или на счету есть средства."
+        ),
     ):
         super().__init__(
             message=message,

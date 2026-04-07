@@ -217,7 +217,8 @@ class UserService(BaseService[User, UserAdminCreate, UserUnitOfWork]):
             if result:
                 raise UserAlreadyExistsError(identity_id=schema.phone)
 
-            # 2. Создаем запись User (Role.CLIENT_B2C по умолчанию, если не передано)
+            # 2. Создаем запись User (Role.CLIENT_B2C по умолчанию,
+            # если не передано)
             role = schema.role or Role.CLIENT_B2C
             user_data = {"username": schema.username, "role": role}
             user = await self.uow.users.add(user_data)

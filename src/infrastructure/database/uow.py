@@ -47,7 +47,10 @@ class BaseSQLAlchemyUoW(IUnitOfWork):
             except IntegrityError as e:
                 await self.rollback()
                 raise ConflictError(
-                    message="Конфликт! Запись уже существует или нарушает ограничения БД.",
+                    message=(
+                        "Конфликт! Запись уже существует"
+                        " или нарушает ограничения БД."
+                    ),
                     error_code="DB_INTEGRITY_ERROR",
                 ) from e
 

@@ -56,7 +56,11 @@ class OrderCreate(BaseModel):
     )
     is_initial_tara: bool = Field(
         default=False,
-        description="Флаг первичного оприходования тары (если у клиента физически есть бутыли, но их нет в базе)",
+        description=(
+            "Флаг первичного оприходования тары"
+            " (если у клиента физически есть бутыли,"
+            " но их нет в базе)"
+        ),
     )
 
 
@@ -65,7 +69,10 @@ class OrderDeliveryCompleteRequest(BaseModel):
 
     actual_returned_tara: dict[uuid.UUID, int] = Field(
         default_factory=dict,
-        description="Фактически возвращенная тара в формате {tara_id: количество}",
+        description=(
+            "Фактически возвращенная тара"
+            " в формате {tara_id: количество}"
+        ),
     )
 
 

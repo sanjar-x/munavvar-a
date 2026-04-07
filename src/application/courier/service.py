@@ -83,7 +83,10 @@ class CourierService:
                 await self.uow.rollback()
                 if "uq_user_single_courier_inventory" in str(e.orig):
                     raise ConflictError(
-                        message="У данного курьера уже зарегистрирована машина.",
+                        message=(
+                            "У данного курьера"
+                            " уже зарегистрирована машина."
+                        ),
                         error_code="COURIER_INVENTORY_ALREADY_EXISTS",
                     ) from None
                 raise

@@ -55,7 +55,10 @@ class Account(BaseModel):
         default=0,
         server_default=text("0"),
         nullable=False,
-        comment="Текущий баланс. Обновляется строго через SQL-триггер транзакций!",
+        comment=(
+            "Текущий баланс."
+            " Обновляется строго через SQL-триггер транзакций!"
+        ),
     )
 
     user: Mapped[User] = relationship(back_populates="accounts")
@@ -73,7 +76,10 @@ class Account(BaseModel):
     __table_args__ = (
         Index("idx_account_user_type", "user_id", "type"),
         {
-            "comment": "Счета для хранения денег (наличные, безнал, долги клиентов)"
+            "comment": (
+                "Счета для хранения денег"
+                " (наличные, безнал, долги клиентов)"
+            ),
         },
     )
 
@@ -117,12 +123,18 @@ class Transaction(BaseModel):
         transaction_status_enum,
         nullable=False,
         default=TransactionStatus.PENDING,
-        comment="Статус (PENDING - ожидание, COMPLETED - исполнено, REJECTED - отмена)",
+        comment=(
+            "Статус (PENDING - ожидание,"
+            " COMPLETED - исполнено, REJECTED - отмена)"
+        ),
     )
     reason: Mapped[str] = mapped_column(
         String(length=255),
         nullable=False,
-        comment="Основание/Комментарий (например: 'Оплата картой по заказу #123')",
+        comment=(
+            "Основание/Комментарий"
+            " (например: 'Оплата картой по заказу #123')"
+        ),
     )
 
     # --- Relationships ---
@@ -146,6 +158,9 @@ class Transaction(BaseModel):
         Index("idx_transaction_from_status", "from_id", "status"),
         Index("idx_transaction_to_status", "to_id", "status"),
         {
-            "comment": "Финансовый леджер (Event Sourcing). Строго только добавление (Append-only)"
+            "comment": (
+                "Финансовый леджер (Event Sourcing)."
+                " Строго только добавление (Append-only)"
+            ),
         },
     )

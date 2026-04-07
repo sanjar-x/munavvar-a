@@ -19,11 +19,15 @@ class ClientNotFoundError(NotFoundError):
 
 
 class ClientAlreadyExistsError(ConflictError):
-    """Выбрасывается, когда мы пытаемся создать клиента с уже занятым номером телефона."""
+    """Выбрасывается, когда мы пытаемся создать клиента
+    с уже занятым номером телефона."""
 
     def __init__(self, phone: str):
         super().__init__(
-            message=f"Клиент с номером телефона '{phone}' уже зарегистрирован.",
+            message=(
+                f"Клиент с номером телефона '{phone}'"
+                " уже зарегистрирован."
+            ),
             error_code="CLIENT_ALREADY_EXISTS",
             details={"phone": phone},
         )
@@ -49,11 +53,15 @@ class ClientInactiveError(UnauthorizedError):
 
 
 class ClientAddressNotFoundError(NotFoundError):
-    """Выбрасывается, если запрашиваемый инвентарь (адрес) не принадлежит клиенту или не найден."""
+    """Выбрасывается, если запрашиваемый инвентарь (адрес)
+    не принадлежит клиенту или не найден."""
 
     def __init__(self, inventory_id: uuid.UUID):
         super().__init__(
-            message=f"Адрес (инвентарь) с идентификатором {inventory_id} не найден.",
+            message=(
+                f"Адрес (инвентарь) с идентификатором"
+                f" {inventory_id} не найден."
+            ),
             error_code="CLIENT_ADDRESS_NOT_FOUND",
             details={"inventory_id": str(inventory_id)},
         )
