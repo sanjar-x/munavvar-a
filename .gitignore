@@ -35,9 +35,10 @@ env/
 !.env.example
 
 # --- IDE & Editors ---
-.vscode/
+.vscode/*
 !.vscode/extensions.json
 !.vscode/launch.json
+!.vscode/settings.json
 .idea/
 *.swp
 *.swo
@@ -59,7 +60,7 @@ coverage.xml
 *.db
 *.sqlite3
 
-# ВАЖНО: Мы НЕ игнорируем alembic/versions/*.py! 
+# ВАЖНО: Мы НЕ игнорируем alembic/versions/*.py!
 # Они должны быть в Git, чтобы база данных на сервере знала, как обновляться.
 
 # --- Docker & System ---

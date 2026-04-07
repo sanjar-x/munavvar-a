@@ -1,0 +1,439 @@
+{
+  // ══════════════════════════════════════════════════════════
+  //  🎨  ULTIMATE VS CODE UI — Python Edition
+  //  Источники: VS Code Docs, Pylance Docs, Theme Color API
+  // ══════════════════════════════════════════════════════════
+
+  // ── Тема и иконки ─────────────────────────────────────
+  "workbench.colorTheme": "One Dark Pro Night Flat",
+
+  // ── Шрифт ──────────────────────────────────────────────
+  "editor.fontFamily": "'JetBrains Mono', 'Cascadia Code', 'Fira Code', monospace",
+  "editor.fontSize": 15,
+  "editor.lineHeight": 1.7,
+  "editor.fontVariations": true,
+  "editor.fontLigatures": true,
+  "editor.letterSpacing": 0.3,
+
+  // ── Курсор & анимации ──────────────────────────────────
+  "editor.cursorStyle": "line",
+  "editor.cursorWidth": 2,
+  "editor.cursorBlinking": "expand",
+  "editor.cursorSmoothCaretAnimation": "on",
+  "editor.smoothScrolling": true,
+  "workbench.list.smoothScrolling": true,
+  "terminal.integrated.smoothScrolling": true,
+
+  // ── Визуал редактора ───────────────────────────────────
+  "editor.minimap.enabled": false,
+  "editor.stickyScroll.enabled": true,
+  "editor.inlineSuggest.enabled": true,
+  "editor.bracketPairColorization.enabled": true,
+  "editor.guides.bracketPairs": "active",
+  "editor.guides.indentation": true,
+  "editor.guides.highlightActiveIndentation": true,
+  "editor.renderWhitespace": "trailing",
+  "editor.renderLineHighlight": "all",
+  "editor.overviewRulerBorder": false,
+  "editor.padding.top": 20,
+  "editor.padding.bottom": 20,
+  "editor.scrollBeyondLastLine": false,
+  "editor.linkedEditing": true,
+  "editor.roundedSelection": true,
+  "editor.occurrencesHighlight": "multiFile",
+  "editor.inlayHints.enabled": "onUnlessPressed",
+  "editor.hover.delay": 300,
+  "editor.hover.sticky": true,
+
+  // ── Suggest / Autocomplete ─────────────────────────────
+  "editor.suggest.insertMode": "replace",
+  "editor.acceptSuggestionOnEnter": "smart",
+  "editor.quickSuggestionsDelay": 0,
+  "editor.tabCompletion": "onlySnippets",
+  "editor.multiCursorModifier": "ctrlCmd",
+  "editor.find.seedSearchStringFromSelection": "selection",
+
+  // ── Workbench / UI ─────────────────────────────────────
+  "workbench.startupEditor": "none",
+  "workbench.editor.tabSizing": "shrink",
+  "workbench.activityBar.location": "top",
+  "workbench.layoutControl.enabled": false,
+  "workbench.tree.indent": 16,
+  "workbench.tree.renderIndentGuides": "always",
+  "workbench.tips.enabled": false,
+  "breadcrumbs.enabled": false,
+
+  // ── Explorer ──────────────────────────────────────────
+  "explorer.confirmDelete": false,
+  "explorer.confirmDragAndDrop": false,
+  "explorer.sortOrder": "type",
+
+  // ── Search ────────────────────────────────────────────
+  "search.exclude": {
+    "**/__pycache__": true,
+    "**/.pytest_cache": true,
+    "**/.mypy_cache": true,
+    "**/.ruff_cache": true,
+    "**/.venv": true,
+    "**/*.pyc": true,
+    "uv.lock": true
+  },
+  "search.smartCase": true,
+
+  // ── Git ───────────────────────────────────────────────
+  "git.autofetch": true,
+  "git.autofetchPeriod": 180,
+  "git.blame.enabled": true,
+  "git.branchProtection": ["main"],
+  "git.confirmSync": false,
+  "git.enableSmartCommit": true,
+  "scm.defaultViewMode": "tree",
+  "scm.inputFontSize": 13,
+
+  // ══════════════════════════════════════════════════════════
+  //  🔤  СЕМАНТИЧЕСКАЯ ПОДСВЕТКА PYTHON (Pylance)
+  //  Формат: "tokenType.modifier:language" → цвет/стиль
+  //  Проверить токены: Ctrl+Shift+P → "Inspect Editor Tokens and Scopes"
+  // ══════════════════════════════════════════════════════════
+  "editor.semanticHighlighting.enabled": true,
+  "editor.semanticTokenColorCustomizations": {
+    "enabled": true,
+    "rules": {
+      // ── Классы ───────────────────────────────────────
+      "class:python": { "foreground": "#E5C07B", "bold": true },
+      "class.declaration:python": {
+        "foreground": "#E5C07B",
+        "bold": true,
+        "underline": true
+      },
+
+      // ── Функции ──────────────────────────────────────
+      "function:python": "#61AFEF",
+      "function.declaration:python": { "foreground": "#61AFEF", "bold": true },
+      "magicFunction:python": { "foreground": "#C678DD", "italic": true },
+
+      // ── Методы ───────────────────────────────────────
+      "method:python": "#61AFEF",
+      "method.declaration:python": { "foreground": "#61AFEF", "bold": true },
+
+      // ── Переменные ───────────────────────────────────
+      "variable:python": "#E06C75",
+      "variable.readonly:python": { "foreground": "#D19A66", "bold": true },
+      "variable.defaultLibrary:python": {
+        "foreground": "#E5C07B",
+        "italic": true
+      },
+
+      // ── Параметры ────────────────────────────────────
+      "parameter:python": { "foreground": "#ABB2BF", "italic": true },
+      "selfParameter:python": {
+        "foreground": "#E06C75",
+        "italic": true,
+        "bold": true
+      },
+      "clsParameter:python": {
+        "foreground": "#E06C75",
+        "italic": true,
+        "bold": true
+      },
+
+      // ── Свойства (атрибуты) ──────────────────────────
+      "property:python": "#E06C75",
+      "property.readonly:python": { "foreground": "#D19A66", "bold": true },
+
+      // ── Типы и аннотации ─────────────────────────────
+      "type:python": "#E5C07B",
+      "typeParameter:python": { "foreground": "#E5C07B", "italic": true },
+      "*.typeHint:python": { "foreground": "#56B6C2", "italic": true },
+      "*.typeHintComment:python": { "foreground": "#5C6370", "italic": true },
+
+      // ── Декораторы ───────────────────────────────────
+      "*.decorator:python": { "foreground": "#C678DD", "italic": true },
+
+      // ── Enum ─────────────────────────────────────────
+      "enum:python": "#E5C07B",
+      "enumMember:python": { "foreground": "#56B6C2", "bold": true },
+
+      // ── Namespace (модули/пакеты) ────────────────────
+      "namespace:python": "#E06C75",
+
+      // ── Общие модификаторы ───────────────────────────
+      "*.declaration:python": { "bold": true },
+      "*.builtin:python": { "italic": true },
+      "*.defaultLibrary:python": { "italic": true }
+    }
+  },
+
+  // ══════════════════════════════════════════════════════════
+  //  🖌️  TEXTMATE ПОДСВЕТКА PYTHON (базовый уровень)
+  //  Работает сразу, до загрузки Pylance
+  // ══════════════════════════════════════════════════════════
+  "editor.tokenColorCustomizations": {
+    "comments": "#5C6370",
+    "functions": "#61AFEF",
+    "keywords": "#C678DD",
+    "numbers": "#D19A66",
+    "strings": "#98C379",
+    "types": "#E5C07B",
+    "variables": "#E06C75",
+    "textMateRules": [
+      // ── def / class / lambda ─────────────────────────
+      {
+        "scope": "storage.type.function.python",
+        "settings": { "foreground": "#C678DD" }
+      },
+      {
+        "scope": "storage.type.class.python",
+        "settings": { "foreground": "#C678DD" }
+      },
+      // ── Имя класса ───────────────────────────────────
+      {
+        "scope": "entity.name.type.class.python",
+        "settings": { "foreground": "#E5C07B", "fontStyle": "bold" }
+      },
+      // ── Наследуемый класс ────────────────────────────
+      {
+        "scope": "entity.other.inherited-class.python",
+        "settings": { "foreground": "#E5C07B", "fontStyle": "italic" }
+      },
+      // ── Имя функции/метода ───────────────────────────
+      {
+        "scope": "entity.name.function.python",
+        "settings": { "foreground": "#61AFEF", "fontStyle": "bold" }
+      },
+      // ── Вызов функции ────────────────────────────────
+      {
+        "scope": "meta.function-call.generic.python",
+        "settings": { "foreground": "#61AFEF" }
+      },
+      // ── Декоратор (@) ────────────────────────────────
+      {
+        "scope": [
+          "entity.name.function.decorator.python",
+          "meta.function.decorator.python"
+        ],
+        "settings": { "foreground": "#C678DD", "fontStyle": "italic" }
+      },
+      // ── self / cls ───────────────────────────────────
+      {
+        "scope": "variable.parameter.function.language.special.self.python",
+        "settings": { "foreground": "#E06C75", "fontStyle": "bold italic" }
+      },
+      {
+        "scope": "variable.parameter.function.language.special.cls.python",
+        "settings": { "foreground": "#E06C75", "fontStyle": "bold italic" }
+      },
+      // ── Параметры функции ────────────────────────────
+      {
+        "scope": "variable.parameter.function.language.python",
+        "settings": { "foreground": "#ABB2BF", "fontStyle": "italic" }
+      },
+      // ── True / False / None ──────────────────────────
+      {
+        "scope": "constant.language.python",
+        "settings": { "foreground": "#D19A66", "fontStyle": "bold" }
+      },
+      // ── Встроенные функции (print, len, range...) ────
+      {
+        "scope": "support.function.builtin.python",
+        "settings": { "foreground": "#56B6C2" }
+      },
+      // ── Магические методы (__init__, __str__...) ──────
+      {
+        "scope": "support.function.magic.python",
+        "settings": { "foreground": "#C678DD", "fontStyle": "italic" }
+      },
+      // ── Docstring ────────────────────────────────────
+      {
+        "scope": "string.quoted.docstring.multi.python",
+        "settings": { "foreground": "#5C6370", "fontStyle": "italic" }
+      },
+      // ── f-string выражения ───────────────────────────
+      {
+        "scope": "meta.fstring.python",
+        "settings": { "foreground": "#98C379" }
+      },
+      // ── Операторы (=, +, -, *, ==, !=...) ────────────
+      {
+        "scope": "keyword.operator.python",
+        "settings": { "foreground": "#56B6C2" }
+      },
+      // ── import / from ────────────────────────────────
+      {
+        "scope": "keyword.control.import.python",
+        "settings": { "foreground": "#C678DD" }
+      },
+      // ── return / yield / raise ───────────────────────
+      {
+        "scope": "keyword.control.flow.python",
+        "settings": { "foreground": "#C678DD" }
+      },
+      // ── Аннотации типов ──────────────────────────────
+      {
+        "scope": "support.type.python",
+        "settings": { "foreground": "#56B6C2", "fontStyle": "italic" }
+      },
+      // ── Пунктуация (скобки, двоеточия, запятые) ──────
+      {
+        "scope": "punctuation.python",
+        "settings": { "foreground": "#ABB2BF" }
+      },
+      // ── Escape-символы в строках ─────────────────────
+      {
+        "scope": "constant.character.escape.python",
+        "settings": { "foreground": "#56B6C2", "fontStyle": "bold" }
+      }
+    ]
+  },
+
+  // ══════════════════════════════════════════════════════════
+  //  🎨  ЦВЕТА UI (workbench.colorCustomizations)
+  // ══════════════════════════════════════════════════════════
+  "workbench.colorCustomizations": {
+    "editor.lineHighlightBackground": "#2c313c",
+    "editor.lineHighlightBorder": "#00000000",
+    "editor.selectionBackground": "#3E4451",
+    "editor.selectionHighlightBackground": "#3E445180",
+    "editorCursor.foreground": "#61AFEF",
+    "editor.findMatchBackground": "#D19A6644",
+    "editor.findMatchHighlightBackground": "#E5C07B33",
+    "editor.findMatchBorder": "#D19A66",
+    "editor.wordHighlightBackground": "#61AFEF22",
+
+    "editorBracketHighlight.foreground1": "#61AFEF",
+    "editorBracketHighlight.foreground2": "#C678DD",
+    "editorBracketHighlight.foreground3": "#E5C07B",
+    "editorBracketHighlight.foreground4": "#56B6C2",
+
+    "editorIndentGuide.activeBackground1": "#61AFEF44",
+    "editorIndentGuide.background1": "#3B4048",
+
+    "sideBar.background": "#21252B",
+    "sideBar.border": "#00000000",
+    "sideBarTitle.foreground": "#ABB2BF",
+
+    "activityBar.background": "#21252B",
+    "activityBar.foreground": "#D7DAE0",
+    "activityBar.activeBorder": "#61AFEF",
+    "activityBarBadge.background": "#61AFEF",
+
+    "tab.activeBorderTop": "#61AFEF",
+    "tab.activeBorder": "#00000000",
+    "tab.activeBackground": "#282C34",
+    "tab.inactiveBackground": "#21252B",
+    "tab.hoverBackground": "#2C313C",
+    "editorGroupHeader.tabsBackground": "#21252B",
+    "editorGroupHeader.tabsBorder": "#00000000",
+
+    "titleBar.activeBackground": "#21252B",
+    "titleBar.activeForeground": "#9DA5B4",
+    "titleBar.border": "#00000000",
+
+    "statusBar.background": "#21252B",
+    "statusBar.foreground": "#9DA5B4",
+    "statusBar.border": "#00000000",
+    "statusBar.debuggingBackground": "#E06C75",
+    "statusBar.noFolderBackground": "#21252B",
+
+    "terminal.background": "#1E2127",
+    "terminal.foreground": "#ABB2BF",
+    "terminalCursor.foreground": "#61AFEF",
+
+    "scrollbarSlider.background": "#4E566680",
+    "scrollbarSlider.hoverBackground": "#5A637580",
+    "scrollbarSlider.activeBackground": "#747D9180",
+
+    "panel.background": "#21252B",
+    "panel.border": "#00000000",
+    "widget.shadow": "#00000044",
+    "focusBorder": "#61AFEF44",
+
+    "list.activeSelectionBackground": "#2C313C",
+    "list.hoverBackground": "#2C313C80",
+    "list.focusHighlightForeground": "#61AFEF"
+  },
+
+  // ── Чистый интерфейс ──────────────────────────────────
+  "window.commandCenter": false,
+  "window.title": "${rootName} ${separator} ${activeEditorShort}",
+  "window.density.editorTabHeight": "compact",
+
+  // ── Терминал ───────────────────────────────────────────
+  "terminal.integrated.fontFamily": "'JetBrains Mono', monospace",
+  "terminal.integrated.fontSize": 14,
+  "terminal.integrated.lineHeight": 1.4,
+  "terminal.integrated.cursorStyle": "line",
+  "terminal.integrated.cursorBlinking": true,
+  "terminal.integrated.persistentSessionReviveProcess": "onExitAndWindowClose",
+
+  // ── Файлы ─────────────────────────────────────────────
+  "files.trimTrailingWhitespace": true,
+  "files.insertFinalNewline": true,
+  "files.exclude": {
+    "**/__pycache__": true,
+    "**/.pytest_cache": true,
+    "**/.mypy_cache": true,
+    "**/.ruff_cache": true,
+    "**/*.pyc": true
+  },
+  "files.watcherExclude": {
+    "**/.git/objects/**": true,
+    "**/.git/subtree-cache/**": true,
+    "**/__pycache__/**": true,
+    "**/.venv/**": true,
+    "**/.pytest_cache/**": true,
+    "**/.ruff_cache/**": true
+  },
+
+  // ── Форматирование ────────────────────────────────────
+  "editor.formatOnSave": true,
+  "editor.formatOnSaveMode": "file",
+
+  // ══════════════════════════════════════════════════════════
+  //  🐍  PYTHON TOOLING — Ruff (lint + format) + ty (type check)
+  //  configurationPreference = "filesystemFirst"
+  //  → pyproject.toml главный: line-length, select, ignore, preview
+  //  → settings.json — только IDE-поведение (enable, server, strategy)
+  //  Docs: docs.astral.sh/ruff/editors/settings
+  //        docs.astral.sh/ty/reference/editor-settings
+  // ══════════════════════════════════════════════════════════
+
+  // ── ty — Type Checker ─────────────────────────────────
+  "ty.diagnosticMode": "workspace",
+  "ty.showSyntaxErrors": true,
+  "ty.inlayHints.variableTypes": true,
+  "ty.inlayHints.callArgumentNames": true,
+  "ty.completions.autoImport": true,
+
+  "ty.configuration": {
+    "rules": {
+      "unresolved-reference": "error",
+      "invalid-type-form": "error",
+      "invalid-assignment": "warn",
+      "possibly-unbound": "warn"
+    }
+  },
+
+  // ── Ruff — Linter + Formatter ─────────────────────────
+  // pyproject.toml (filesystemFirst) управляет: select, ignore,
+  // line-length, preview. Здесь только поведение расширения.
+  "ruff.enable": true,
+  "ruff.nativeServer": "on",
+  "ruff.configurationPreference": "filesystemFirst",
+  "ruff.importStrategy": "fromEnvironment",
+  "ruff.showSyntaxErrors": true,
+
+  // ── Editor — Python ───────────────────────────────────
+  "[python]": {
+    "editor.formatOnSave": true,
+    "editor.defaultFormatter": "charliermarsh.ruff",
+    "editor.codeActionsOnSave": {
+      "source.fixAll.ruff": "explicit",
+      "source.organizeImports.ruff": "explicit"
+    },
+    "editor.guides.bracketPairs": true,
+    "editor.rulers": [79] // matches pyproject.toml line-length = 79
+  },
+
+  "python-envs.defaultEnvManager": "ms-python.python:venv"
+}
