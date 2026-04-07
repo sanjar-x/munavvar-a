@@ -67,7 +67,7 @@ async def get_current_user(
     user_id_str = payload.get("sub")
     try:
         user_id = uuid.UUID(user_id_str)
-    except ValueError, TypeError:
+    except (ValueError, TypeError):
         raise UnauthorizedError(  # noqa: B904
             message="Некорректный формат ID пользователя в токене.",
             error_code="INVALID_USER_ID",

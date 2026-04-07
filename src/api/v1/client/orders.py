@@ -62,7 +62,10 @@ async def get_order_details(
     ],
 ):
     """Детальная информация по конкретному заказу."""
-    return await base_order_service.get_order_with_details(order_id=order_id)
+    return await base_order_service.get_order_with_details(
+        order_id=order_id,
+        requesting_user_id=client.id,
+    )
 
 
 @orders_router.post("/{order_id}/items", response_model=OrderResponse)

@@ -244,7 +244,7 @@ class Balance(BaseModel):
     )
     product_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("products.id", ondelete="CASCADE"),
+        ForeignKey("products.id", ondelete="RESTRICT"),
         nullable=False,
         index=True,
     )

@@ -135,12 +135,18 @@ class Order(BaseModel):
     stock_transfers: Mapped[list["StockTransfer"]] = relationship(
         "StockTransfer",
         back_populates="order",
-        cascade="all, delete-orphan",
+        # No cascade: StockTransfer.order_id is RESTRICT — stock ledger
+        # records must persist after order cancellation for audit.
+        passive_deletes=True,
+        lazy="raise",
     )
     transactions: Mapped[list["Transaction"]] = relationship(
         "Transaction",
         back_populates="order",
-        cascade="all, delete-orphan",
+        # No cascade: financial ledger is append-only; transactions
+        # must never be deleted by ORM cascade.
+        passive_deletes=True,
+        lazy="raise",
     )
     contract: Mapped["Contract | None"] = relationship(
         foreign_keys=[contract_id],
