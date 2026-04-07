@@ -7,7 +7,7 @@ from sqlalchemy.exc import IntegrityError
 from src.common.service import BaseService
 from src.core.exceptions import BadRequestError
 from src.core.security.password import get_password_hash
-from src.infrastructure.database.models import User
+from src.infrastructure.database.models import Identity, User
 from src.modules.finances.enums import AccountType
 from src.modules.inventory.enums import (
     InventoryType,
@@ -68,6 +68,71 @@ class UserService(BaseService[User, UserAdminCreate, UserUnitOfWork]):
             courier_name=user.username,
         )
         return True
+
+    def _validate_staff_update(
+        self,
+        next_role: Role,
+        local_identity: Identity | None,
+        phone: str | None,
+        password: str | None,
+        user_id: uuid.UUID,
+    ) -> None:
+        if next_role not in STAFF_ROLES:
+            return
+        if local_identity is None and phone is None:
+            raise BadRequestError(
+                message=(
+                    "Для локального staff-входа требуется номер телефона."
+                ),
+                error_code="STAFF_PHONE_REQUIRED",
+                details={"user_id": user_id, "role": next_role.value},
+            )
+        if (
+            local_identity is None or not local_identity.password_hash
+        ) and not password:
+            raise StaffPasswordRequiredError(
+                user_id=user_id,
+                role=next_role.value,
+            )
+
+    async def _apply_identity_changes(
+        self,
+        user_id: uuid.UUID,
+        local_identity: Identity | None,
+        phone: str | None,
+        password: str | None,
+    ) -> None:
+        identity_data: dict[str, str] = {}
+        if phone is not None:
+            identity_data["provider_identity_id"] = phone
+        if password is not None:
+            identity_data["password_hash"] = get_password_hash(password)
+        try:
+            if local_identity is None:
+                if phone is None:
+                    raise BadRequestError(
+                        message=(
+                            "Нельзя создать локальный вход без номера"
+                            " телефона."
+                        ),
+                        error_code="PHONE_REQUIRED_FOR_LOCAL_IDENTITY",
+                        details={"user_id": user_id},
+                    )
+                await self._identity_repo.add_local(
+                    user_id=user_id,
+                    provider_identity_id=phone,
+                    password_hash=identity_data.get("password_hash"),
+                )
+            else:
+                await self._identity_repo.update(
+                    local_identity.id,
+                    identity_data,
+                )
+        except IntegrityError as exc:
+            raise UserUpdateConflictError(
+                user_id=user_id,
+                reason="Номер телефона уже используется другим user'ом.",
+            ) from exc
 
     async def get_system_user(self) -> User:
         async with self.uow:
@@ -286,23 +351,9 @@ class UserService(BaseService[User, UserAdminCreate, UserUnitOfWork]):
                 await self._identity_repo.get_local_by_user_or_none(user_id=id)
             )
             next_role = user_data.get("role", user.role)
-
-            if next_role in STAFF_ROLES:
-                if local_identity is None and phone is None:
-                    raise BadRequestError(
-                        message=(
-                            "Для локального staff-входа требуется номер телефона."
-                        ),
-                        error_code="STAFF_PHONE_REQUIRED",
-                        details={"user_id": id, "role": next_role.value},
-                    )
-                if (
-                    local_identity is None or not local_identity.password_hash
-                ) and not password:
-                    raise StaffPasswordRequiredError(
-                        user_id=id,
-                        role=next_role.value,
-                    )
+            self._validate_staff_update(
+                next_role, local_identity, phone, password, id
+            )
 
             changed = False
 
@@ -313,40 +364,9 @@ class UserService(BaseService[User, UserAdminCreate, UserUnitOfWork]):
                 changed = True
 
             if phone is not None or password is not None:
-                identity_data: dict[str, str] = {}
-                if phone is not None:
-                    identity_data["provider_identity_id"] = phone
-                if password is not None:
-                    identity_data["password_hash"] = get_password_hash(
-                        password
-                    )
-
-                try:
-                    if local_identity is None:
-                        if phone is None:
-                            raise BadRequestError(
-                                message=(
-                                    "Нельзя создать локальный вход без номера телефона."
-                                ),
-                                error_code="PHONE_REQUIRED_FOR_LOCAL_IDENTITY",
-                                details={"user_id": id},
-                            )
-                        local_identity = await self._identity_repo.add_local(
-                            user_id=id,
-                            provider_identity_id=phone,
-                            password_hash=identity_data.get("password_hash"),
-                        )
-                    else:
-                        local_identity = await self._identity_repo.update(
-                            local_identity.id,
-                            identity_data,
-                        )
-                except IntegrityError as exc:
-                    raise UserUpdateConflictError(
-                        user_id=id,
-                        reason="Номер телефона уже используется другим user'ом.",
-                    ) from exc
-
+                await self._apply_identity_changes(
+                    id, local_identity, phone, password
+                )
                 changed = True
 
             changed = await self._ensure_courier_account(user) or changed
