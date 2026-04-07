@@ -1,5 +1,6 @@
 # src/api/v1/backoffice/contracts.py
 import uuid
+from datetime import date
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Path, Query, Security, status
@@ -20,6 +21,7 @@ from src.modules.contracts.schemas import (
     InvoiceResponse,
     PriceItemCreate,
     PriceItemResponse,
+    ReconciliationResponse,
 )
 from src.modules.contracts.services import ContractService
 from src.modules.orders.schemas import OrderResponse
@@ -257,7 +259,7 @@ async def get_contract_orders(
     "/{contract_id}/invoices",
     response_model=InvoiceResponse,
     status_code=status.HTTP_201_CREATED,
-    summary="Сформировать счёт-фактуру за период",
+    summary="Сформировать черновик счёта-фактуры за период",
 )
 async def generate_invoice(
     current_user: Annotated[
@@ -271,4 +273,120 @@ async def generate_invoice(
         contract_id=contract_id,
         period_from=data.period_from,
         period_to=data.period_to,
+    )
+
+
+@contracts_router.get(
+    "/{contract_id}/invoices",
+    response_model=list[InvoiceResponse],
+    summary="Список счетов-фактур по договору",
+)
+async def list_invoices(
+    current_user: Annotated[
+        User, Security(get_current_user, scopes=[Scope.CONTRACTS_READ])
+    ],
+    contract_id: Annotated[uuid.UUID, Path()],
+    service: Annotated[ContractService, Depends(get_contract_service)],
+):
+    return await service.list_invoices(contract_id=contract_id)
+
+
+@contracts_router.get(
+    "/{contract_id}/invoices/{invoice_id}",
+    response_model=InvoiceResponse,
+    summary="Получить счёт-фактуру",
+)
+async def get_invoice(
+    current_user: Annotated[
+        User, Security(get_current_user, scopes=[Scope.CONTRACTS_READ])
+    ],
+    contract_id: Annotated[uuid.UUID, Path()],
+    invoice_id: Annotated[uuid.UUID, Path()],
+    service: Annotated[ContractService, Depends(get_contract_service)],
+):
+    return await service.get_invoice(
+        contract_id=contract_id,
+        invoice_id=invoice_id,
+    )
+
+
+@contracts_router.post(
+    "/{contract_id}/invoices/{invoice_id}/issue",
+    response_model=InvoiceResponse,
+    summary="Выставить счёт-фактуру (DRAFT → ISSUED)",
+)
+async def issue_invoice(
+    current_user: Annotated[
+        User, Security(get_current_user, scopes=[Scope.CONTRACTS_MANAGE])
+    ],
+    contract_id: Annotated[uuid.UUID, Path()],
+    invoice_id: Annotated[uuid.UUID, Path()],
+    service: Annotated[ContractService, Depends(get_contract_service)],
+):
+    return await service.issue_invoice(
+        contract_id=contract_id,
+        invoice_id=invoice_id,
+    )
+
+
+@contracts_router.post(
+    "/{contract_id}/invoices/{invoice_id}/mark-paid",
+    response_model=InvoiceResponse,
+    summary="Отметить счёт-фактуру как оплаченный",
+)
+async def mark_invoice_paid(
+    current_user: Annotated[
+        User, Security(get_current_user, scopes=[Scope.CONTRACTS_MANAGE])
+    ],
+    contract_id: Annotated[uuid.UUID, Path()],
+    invoice_id: Annotated[uuid.UUID, Path()],
+    service: Annotated[ContractService, Depends(get_contract_service)],
+):
+    return await service.mark_invoice_paid(
+        contract_id=contract_id,
+        invoice_id=invoice_id,
+    )
+
+
+@contracts_router.delete(
+    "/{contract_id}/invoices/{invoice_id}",
+    response_model=InvoiceResponse,
+    summary="Аннулировать счёт-фактуру (DRAFT/ISSUED → CANCELLED)",
+)
+async def cancel_invoice(
+    current_user: Annotated[
+        User, Security(get_current_user, scopes=[Scope.CONTRACTS_MANAGE])
+    ],
+    contract_id: Annotated[uuid.UUID, Path()],
+    invoice_id: Annotated[uuid.UUID, Path()],
+    service: Annotated[ContractService, Depends(get_contract_service)],
+):
+    return await service.cancel_invoice(
+        contract_id=contract_id,
+        invoice_id=invoice_id,
+    )
+
+
+@contracts_router.get(
+    "/{contract_id}/reconciliation",
+    response_model=ReconciliationResponse,
+    summary="Акт сверки по договору за период",
+)
+async def get_reconciliation(
+    current_user: Annotated[
+        User, Security(get_current_user, scopes=[Scope.CONTRACTS_READ])
+    ],
+    contract_id: Annotated[uuid.UUID, Path()],
+    date_from: Annotated[
+        date, Query(alias="dateFrom", description="Начало периода")
+    ],
+    date_to: Annotated[
+        date, Query(alias="dateTo", description="Конец периода")
+    ],
+    service: Annotated[ContractService, Depends(get_contract_service)],
+):
+    return await service.get_reconciliation(
+        contract_id=contract_id,
+        date_from=date_from,
+        date_to=date_to,
     )

@@ -4,7 +4,7 @@ from datetime import datetime
 
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import aliased, joinedload
 
 from src.common.repository import BaseRepository
 from src.core.config import settings
@@ -568,3 +568,34 @@ class TransactionRepository(BaseRepository[Transaction]):
         )
         result = await self.session.execute(query)
         return result.scalars().unique().all()
+
+    async def get_bank_payments_for_client(
+        self,
+        client_id: uuid.UUID,
+        from_dt: datetime,
+        to_dt: datetime,
+    ) -> Sequence[Transaction]:
+        """COMPLETED платежи клиента на банковский счёт за период.
+
+        Используется в акте сверки (reconciliation).
+        CLIENT-счёт → BANK-счёт системы.
+        """
+        from_acc = aliased(Account)
+        to_acc = aliased(Account)
+        query = (
+            select(Transaction)
+            .join(from_acc, Transaction.from_id == from_acc.id)
+            .join(to_acc, Transaction.to_id == to_acc.id)
+            .where(
+                from_acc.user_id == client_id,
+                from_acc.type == AccountType.CLIENT,
+                to_acc.type == AccountType.BANK,
+                Transaction.status == TransactionStatus.COMPLETED,
+                Transaction.created_at >= from_dt,
+                Transaction.created_at < to_dt,
+                Transaction.is_active.is_(True),
+            )
+            .order_by(Transaction.created_at)
+        )
+        result = await self.session.execute(query)
+        return result.scalars().all()

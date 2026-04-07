@@ -6,6 +6,10 @@ from src.modules.contracts.repositories import (
     ContractRepository,
     InvoiceRepository,
 )
+from src.modules.finances.repositories import (
+    AccountRepository,
+    TransactionRepository,
+)
 from src.modules.orders.repositories import OrderRepository
 
 
@@ -13,7 +17,9 @@ class IContractUnitOfWork(IUnitOfWork):
     contracts: ContractRepository
     price_items: ContractPriceItemRepository
     invoices: InvoiceRepository
-    orders: OrderRepository  # нужен для generate_invoice()
+    orders: OrderRepository
+    accounts: AccountRepository       # для актов сверки
+    transactions: TransactionRepository  # для платёжных записей
 
 
 class ContractUnitOfWork(BaseSQLAlchemyUoW, IContractUnitOfWork):
@@ -23,4 +29,6 @@ class ContractUnitOfWork(BaseSQLAlchemyUoW, IContractUnitOfWork):
         self.price_items = ContractPriceItemRepository(session=self.session)
         self.invoices = InvoiceRepository(session=self.session)
         self.orders = OrderRepository(session=self.session)
+        self.accounts = AccountRepository(session=self.session)
+        self.transactions = TransactionRepository(session=self.session)
         return self

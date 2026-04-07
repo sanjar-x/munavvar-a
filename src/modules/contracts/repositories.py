@@ -1,6 +1,7 @@
 # src/modules/contracts/repositories.py
 import uuid
 from collections.abc import Sequence
+from datetime import date
 from typing import Any
 
 import sqlalchemy as sa
@@ -8,7 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import joinedload, selectinload
 
 from src.common.repository import BaseRepository
-from src.modules.contracts.enums import ContractStatus
+from src.modules.contracts.enums import ContractStatus, InvoiceStatus
 from src.modules.contracts.models import (
     Contract,
     ContractPriceItem,
@@ -74,6 +75,22 @@ class ContractRepository(BaseRepository[Contract]):
         result = await self.session.execute(query)
         items = result.scalars().all()
         return {item.product_id: item.price for item in items}
+
+    async def get_with_client(
+        self,
+        contract_id: uuid.UUID,
+    ) -> Contract | None:
+        """Договор с eager-loaded client (для актов сверки)."""
+        query = (
+            select(Contract)
+            .options(joinedload(Contract.client))
+            .where(
+                Contract.id == contract_id,
+                Contract.is_active.is_(True),
+            )
+        )
+        result = await self.session.execute(query)
+        return result.scalar_one_or_none()
 
     async def get_multi_with_client(
         self,
@@ -157,3 +174,36 @@ class ContractPriceItemRepository(BaseRepository[ContractPriceItem]):
 class InvoiceRepository(BaseRepository[Invoice]):
     def __init__(self, session: Any):
         super().__init__(model=Invoice, session=session)
+
+    async def get_by_contract(
+        self,
+        contract_id: uuid.UUID,
+    ) -> Sequence[Invoice]:
+        """Все инвойсы по договору, от новых к старым."""
+        query = (
+            select(Invoice)
+            .where(
+                Invoice.contract_id == contract_id,
+                Invoice.is_active.is_(True),
+            )
+            .order_by(Invoice.created_at.desc())
+        )
+        result = await self.session.execute(query)
+        return result.scalars().all()
+
+    async def get_for_period(
+        self,
+        contract_id: uuid.UUID,
+        period_from: date,
+        period_to: date,
+    ) -> Invoice | None:
+        """Проверка дубля: уже есть не-CANCELLED инвойс за этот период?"""
+        query = select(Invoice).where(
+            Invoice.contract_id == contract_id,
+            Invoice.period_from == period_from,
+            Invoice.period_to == period_to,
+            Invoice.status != InvoiceStatus.CANCELLED,
+            Invoice.is_active.is_(True),
+        )
+        result = await self.session.execute(query)
+        return result.scalar_one_or_none()

@@ -3,18 +3,21 @@
 Uses AsyncMock/MagicMock — no database required.
 """
 import uuid
-from datetime import date
+from datetime import date, timedelta
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from src.modules.contracts.enums import ContractStatus
+from src.modules.contracts.enums import ContractStatus, InvoiceStatus
 from src.modules.contracts.exceptions import (
     ContractAlreadyActiveError,
     ContractNotFoundError,
     ContractPriceItemNotFoundError,
     ContractStatusTransitionError,
+    DuplicateInvoicePeriodError,
+    InvalidInvoiceTransitionError,
+    InvoiceNotFoundError,
 )
 from src.modules.contracts.schemas import (
     ContractCreate,
@@ -92,7 +95,11 @@ class FakePriceItemRepo:
 class FakeInvoiceRepo:
     def __init__(self):
         self.add = AsyncMock()
+        self.get = AsyncMock(return_value=None)
+        self.update = AsyncMock()
         self.get_multi = AsyncMock(return_value=[])
+        self.get_by_contract = AsyncMock(return_value=[])
+        self.get_for_period = AsyncMock(return_value=None)
 
 
 class FakeOrderRepo:
@@ -115,6 +122,8 @@ def make_uow(
     uow.price_items = price_items or FakePriceItemRepo()
     uow.invoices = invoices or FakeInvoiceRepo()
     uow.orders = orders or FakeOrderRepo()
+    uow.accounts = MagicMock()
+    uow.transactions = MagicMock()
     uow.commit = AsyncMock()
     uow.rollback = AsyncMock()
     uow.flush = AsyncMock()
@@ -622,3 +631,299 @@ class TestContractPriceItems:
         )
 
         price_items_repo.delete.assert_awaited_once_with(item.id)
+
+
+# ─── Tests: Invoice lifecycle ─────────────────────────────
+
+
+def make_invoice(
+    contract_id: uuid.UUID,
+    status: InvoiceStatus = InvoiceStatus.DRAFT,
+    period_from: date | None = None,
+    period_to: date | None = None,
+    invoice_id: uuid.UUID | None = None,
+    payment_due_days: int = 30,
+) -> SimpleNamespace:
+    pf = period_from or date(2025, 1, 1)
+    pt = period_to or date(2025, 1, 31)
+    return SimpleNamespace(
+        id=invoice_id or uuid.uuid4(),
+        contract_id=contract_id,
+        status=status,
+        period_from=pf,
+        period_to=pt,
+        amount=100_000,
+        due_date=pt + timedelta(days=payment_due_days),
+        issued_at=None,
+        paid_at=None,
+    )
+
+
+def make_contract_with_payment_days(
+    contract_id: uuid.UUID | None = None,
+    payment_due_days: int = 30,
+    status: ContractStatus = ContractStatus.ACTIVE,
+) -> SimpleNamespace:
+    c = make_contract(
+        contract_id=contract_id or uuid.uuid4(),
+        status=status,
+    )
+    c.payment_due_days = payment_due_days
+    return c
+
+
+class TestInvoiceLifecycle:
+    @pytest.mark.asyncio
+    async def test_generate_invoice_creates_draft(self):
+        contract_id = uuid.uuid4()
+        contract = make_contract_with_payment_days(
+            contract_id=contract_id
+        )
+        invoice_repo = FakeInvoiceRepo()
+        invoice_repo.get_for_period.return_value = None
+        invoice_repo.get_by_contract.return_value = []
+        expected_invoice = make_invoice(
+            contract_id=contract_id,
+            status=InvoiceStatus.DRAFT,
+        )
+        invoice_repo.add.return_value = expected_invoice
+        contracts_repo = FakeContractRepo()
+        contracts_repo.get.return_value = contract
+        order_repo = FakeOrderRepo()
+        order_repo.get_delivered_by_contract.return_value = []
+
+        uow = make_uow(
+            contracts=contracts_repo,
+            invoices=invoice_repo,
+            orders=order_repo,
+        )
+        service = ContractService(uow=uow)
+
+        result = await service.generate_invoice(
+            contract_id=contract_id,
+            period_from=date(2025, 1, 1),
+            period_to=date(2025, 1, 31),
+        )
+
+        invoice_repo.add.assert_awaited_once()
+        call_data = invoice_repo.add.call_args[0][0]
+        assert call_data["status"] == InvoiceStatus.DRAFT
+        assert result is expected_invoice
+
+    @pytest.mark.asyncio
+    async def test_generate_invoice_calculates_due_date(self):
+        contract_id = uuid.uuid4()
+        period_to = date(2025, 1, 31)
+        contract = make_contract_with_payment_days(
+            contract_id=contract_id, payment_due_days=14
+        )
+        invoice_repo = FakeInvoiceRepo()
+        invoice_repo.get_for_period.return_value = None
+        invoice_repo.get_by_contract.return_value = []
+        invoice_repo.add.return_value = make_invoice(
+            contract_id=contract_id
+        )
+        contracts_repo = FakeContractRepo()
+        contracts_repo.get.return_value = contract
+        order_repo = FakeOrderRepo()
+        order_repo.get_delivered_by_contract.return_value = []
+
+        uow = make_uow(
+            contracts=contracts_repo,
+            invoices=invoice_repo,
+            orders=order_repo,
+        )
+        service = ContractService(uow=uow)
+
+        await service.generate_invoice(
+            contract_id=contract_id,
+            period_from=date(2025, 1, 1),
+            period_to=period_to,
+        )
+
+        call_data = invoice_repo.add.call_args[0][0]
+        expected_due = period_to + timedelta(days=14)
+        assert call_data["due_date"] == expected_due
+
+    @pytest.mark.asyncio
+    async def test_generate_invoice_duplicate_period_rejected(self):
+        contract_id = uuid.uuid4()
+        contract = make_contract_with_payment_days(
+            contract_id=contract_id
+        )
+        existing_invoice = make_invoice(contract_id=contract_id)
+        invoice_repo = FakeInvoiceRepo()
+        # Simulate existing non-CANCELLED invoice for period
+        invoice_repo.get_for_period.return_value = existing_invoice
+        contracts_repo = FakeContractRepo()
+        contracts_repo.get.return_value = contract
+
+        uow = make_uow(
+            contracts=contracts_repo, invoices=invoice_repo
+        )
+        service = ContractService(uow=uow)
+
+        with pytest.raises(DuplicateInvoicePeriodError):
+            await service.generate_invoice(
+                contract_id=contract_id,
+                period_from=date(2025, 1, 1),
+                period_to=date(2025, 1, 31),
+            )
+
+    @pytest.mark.asyncio
+    async def test_issue_invoice_draft_to_issued(self):
+        contract_id = uuid.uuid4()
+        invoice_id = uuid.uuid4()
+        draft = make_invoice(
+            contract_id=contract_id,
+            status=InvoiceStatus.DRAFT,
+            invoice_id=invoice_id,
+        )
+        issued = make_invoice(
+            contract_id=contract_id,
+            status=InvoiceStatus.ISSUED,
+            invoice_id=invoice_id,
+        )
+        invoice_repo = FakeInvoiceRepo()
+        invoice_repo.get.return_value = draft
+        invoice_repo.update.return_value = issued
+
+        uow = make_uow(invoices=invoice_repo)
+        service = ContractService(uow=uow)
+
+        result = await service.issue_invoice(
+            contract_id=contract_id,
+            invoice_id=invoice_id,
+        )
+
+        invoice_repo.update.assert_awaited_once()
+        update_data = invoice_repo.update.call_args[0][1]
+        assert update_data["status"] == InvoiceStatus.ISSUED
+        assert update_data["issued_at"] is not None
+        assert result is issued
+
+    @pytest.mark.asyncio
+    async def test_issue_invoice_wrong_status_raises(self):
+        contract_id = uuid.uuid4()
+        invoice_id = uuid.uuid4()
+        paid_invoice = make_invoice(
+            contract_id=contract_id,
+            status=InvoiceStatus.PAID,
+            invoice_id=invoice_id,
+        )
+        invoice_repo = FakeInvoiceRepo()
+        invoice_repo.get.return_value = paid_invoice
+
+        uow = make_uow(invoices=invoice_repo)
+        service = ContractService(uow=uow)
+
+        with pytest.raises(InvalidInvoiceTransitionError):
+            await service.issue_invoice(
+                contract_id=contract_id,
+                invoice_id=invoice_id,
+            )
+
+    @pytest.mark.asyncio
+    async def test_mark_invoice_paid(self):
+        contract_id = uuid.uuid4()
+        invoice_id = uuid.uuid4()
+        issued = make_invoice(
+            contract_id=contract_id,
+            status=InvoiceStatus.ISSUED,
+            invoice_id=invoice_id,
+        )
+        paid = make_invoice(
+            contract_id=contract_id,
+            status=InvoiceStatus.PAID,
+            invoice_id=invoice_id,
+        )
+        invoice_repo = FakeInvoiceRepo()
+        invoice_repo.get.return_value = issued
+        invoice_repo.update.return_value = paid
+
+        uow = make_uow(invoices=invoice_repo)
+        service = ContractService(uow=uow)
+
+        result = await service.mark_invoice_paid(
+            contract_id=contract_id,
+            invoice_id=invoice_id,
+        )
+
+        update_data = invoice_repo.update.call_args[0][1]
+        assert update_data["status"] == InvoiceStatus.PAID
+        assert update_data["paid_at"] is not None
+        assert result is paid
+
+    @pytest.mark.asyncio
+    async def test_cancel_invoice_draft(self):
+        contract_id = uuid.uuid4()
+        invoice_id = uuid.uuid4()
+        draft = make_invoice(
+            contract_id=contract_id,
+            status=InvoiceStatus.DRAFT,
+            invoice_id=invoice_id,
+        )
+        cancelled = make_invoice(
+            contract_id=contract_id,
+            status=InvoiceStatus.CANCELLED,
+            invoice_id=invoice_id,
+        )
+        invoice_repo = FakeInvoiceRepo()
+        invoice_repo.get.return_value = draft
+        invoice_repo.update.return_value = cancelled
+
+        uow = make_uow(invoices=invoice_repo)
+        service = ContractService(uow=uow)
+
+        result = await service.cancel_invoice(
+            contract_id=contract_id,
+            invoice_id=invoice_id,
+        )
+
+        update_data = invoice_repo.update.call_args[0][1]
+        assert update_data["status"] == InvoiceStatus.CANCELLED
+        assert result is cancelled
+
+    @pytest.mark.asyncio
+    async def test_cancel_paid_invoice_rejected(self):
+        contract_id = uuid.uuid4()
+        invoice_id = uuid.uuid4()
+        paid = make_invoice(
+            contract_id=contract_id,
+            status=InvoiceStatus.PAID,
+            invoice_id=invoice_id,
+        )
+        invoice_repo = FakeInvoiceRepo()
+        invoice_repo.get.return_value = paid
+
+        uow = make_uow(invoices=invoice_repo)
+        service = ContractService(uow=uow)
+
+        with pytest.raises(InvalidInvoiceTransitionError):
+            await service.cancel_invoice(
+                contract_id=contract_id,
+                invoice_id=invoice_id,
+            )
+
+    @pytest.mark.asyncio
+    async def test_get_invoice_idor_guard(self):
+        """Invoice belonging to a different contract raises NotFound."""
+        contract_id = uuid.uuid4()
+        other_contract_id = uuid.uuid4()
+        invoice_id = uuid.uuid4()
+        # Invoice belongs to other_contract_id
+        invoice = make_invoice(
+            contract_id=other_contract_id,
+            invoice_id=invoice_id,
+        )
+        invoice_repo = FakeInvoiceRepo()
+        invoice_repo.get.return_value = invoice
+
+        uow = make_uow(invoices=invoice_repo)
+        service = ContractService(uow=uow)
+
+        with pytest.raises(InvoiceNotFoundError):
+            await service.get_invoice(
+                contract_id=contract_id,
+                invoice_id=invoice_id,
+            )

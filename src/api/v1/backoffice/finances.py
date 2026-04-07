@@ -10,7 +10,10 @@ from src.infrastructure.database.models import User
 from src.modules.auth.dependencies import get_current_user
 from src.modules.finances.dependencies import get_billing_service
 from src.modules.finances.enums import AccountType, TransactionStatus
-from src.modules.finances.schemas import TransactionCreate
+from src.modules.finances.schemas import (
+    B2BContractDebtsResponse,
+    TransactionCreate,
+)
 from src.modules.finances.services import BillingService
 
 finances_router = APIRouter()
@@ -31,6 +34,21 @@ async def get_dashboard(
 ):
     """Финансовый дашборд: системные счета, итоги, pending."""
     return await billing_service.get_dashboard()
+
+
+@finances_router.get(
+    "/b2b-debts",
+    response_model=B2BContractDebtsResponse,
+    summary="Дебиторка B2B-клиентов по активным договорам",
+)
+async def get_b2b_debts(
+    current_user: Annotated[
+        User,
+        Security(get_current_user, scopes=[Scope.CONTRACTS_READ]),
+    ],
+    billing_service: Annotated[BillingService, Depends(get_billing_service)],
+):
+    return await billing_service.get_b2b_contract_debts()
 
 
 # ---------------------------------------------------------------

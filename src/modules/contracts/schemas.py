@@ -128,3 +128,32 @@ class InvoiceResponse(BaseModel):
     updated_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+# ─── RECONCILIATION SCHEMAS ──────────────────────────────────────
+
+
+class ReconciliationOrderItem(BaseModel):
+    order_id: uuid.UUID
+    created_at: datetime
+    total_amount: int
+
+
+class ReconciliationPaymentItem(BaseModel):
+    transaction_id: uuid.UUID
+    created_at: datetime
+    amount: int
+    reason: str | None = None
+
+
+class ReconciliationResponse(BaseModel):
+    contract_id: uuid.UUID
+    contract_number: str
+    client_name: str
+    period_from: date
+    period_to: date
+    orders: list[ReconciliationOrderItem]
+    total_billed: int
+    payments: list[ReconciliationPaymentItem]
+    total_paid: int
+    balance: int  # = total_billed - total_paid

@@ -1,6 +1,7 @@
 # src/modules/contracts/services.py
 import uuid
-from datetime import UTC, date, datetime
+from collections.abc import Sequence
+from datetime import UTC, date, datetime, timedelta
 
 from src.modules.contracts.enums import ContractStatus, InvoiceStatus
 from src.modules.contracts.exceptions import (
@@ -8,9 +9,18 @@ from src.modules.contracts.exceptions import (
     ContractNotFoundError,
     ContractPriceItemNotFoundError,
     ContractStatusTransitionError,
+    DuplicateInvoicePeriodError,
+    InvalidInvoiceTransitionError,
+    InvoiceNotFoundError,
 )
-from src.modules.contracts.models import Contract, ContractPriceItem
-from src.modules.contracts.schemas import ContractCreate, ContractUpdate
+from src.modules.contracts.models import Contract, ContractPriceItem, Invoice
+from src.modules.contracts.schemas import (
+    ContractCreate,
+    ContractUpdate,
+    ReconciliationOrderItem,
+    ReconciliationPaymentItem,
+    ReconciliationResponse,
+)
 from src.modules.contracts.uow import IContractUnitOfWork
 
 
@@ -341,24 +351,43 @@ class ContractService:
         contract_id: uuid.UUID,
         period_from: date,
         period_to: date,
-    ):
-        """Сформировать счёт-фактуру за период."""
+    ) -> Invoice:
+        """Сформировать черновик счёта-фактуры за период.
+
+        Бизнес-правила:
+        - Создаётся в статусе DRAFT (не ISSUED).
+        - due_date = period_to + payment_due_days.
+        - Один не-CANCELLED инвойс за период — запрещён дубль.
+        """
         async with self.uow:
             contract = await self.uow.contracts.get(contract_id)
             if not contract:
                 raise ContractNotFoundError(contract_id)
 
-            delivered_orders = await self.uow.orders.get_delivered_by_contract(
+            # Проверка дубля
+            duplicate = await self.uow.invoices.get_for_period(
                 contract_id=contract_id,
-                date_from=period_from,
-                date_to=period_to,
+                period_from=period_from,
+                period_to=period_to,
+            )
+            if duplicate:
+                raise DuplicateInvoicePeriodError(
+                    contract_id=contract_id,
+                    period_from=period_from,
+                    period_to=period_to,
+                )
+
+            delivered_orders = (
+                await self.uow.orders.get_delivered_by_contract(
+                    contract_id=contract_id,
+                    date_from=period_from,
+                    date_to=period_to,
+                )
             )
             total_amount = sum(o.total_amount for o in delivered_orders)
 
             # Порядковый номер инвойса по договору
-            existing = await self.uow.invoices.get_multi(
-                contract_id=contract_id
-            )
+            existing = await self.uow.invoices.get_by_contract(contract_id)
             sequence = len(existing) + 1
             number = (
                 f"{contract.number}"
@@ -367,17 +396,188 @@ class ContractService:
                 f"-{sequence:03d}"
             )
 
+            due_date = period_to + timedelta(
+                days=contract.payment_due_days
+            )
             invoice = await self.uow.invoices.add(
                 {
                     "contract_id": contract_id,
                     "number": number,
-                    "status": InvoiceStatus.ISSUED,
+                    "status": InvoiceStatus.DRAFT,
                     "period_from": period_from,
                     "period_to": period_to,
                     "amount": total_amount,
-                    "due_date": None,
-                    "issued_at": datetime.now(UTC),
+                    "due_date": due_date,
+                    "issued_at": None,
                 }
             )
             await self.uow.commit()
             return invoice
+
+    async def list_invoices(
+        self,
+        contract_id: uuid.UUID,
+    ) -> Sequence[Invoice]:
+        """Список инвойсов по договору (backoffice и B2B-клиент)."""
+        async with self.uow:
+            contract = await self.uow.contracts.get(contract_id)
+            if not contract:
+                raise ContractNotFoundError(contract_id)
+            return await self.uow.invoices.get_by_contract(contract_id)
+
+    async def get_invoice(
+        self,
+        contract_id: uuid.UUID,
+        invoice_id: uuid.UUID,
+    ) -> Invoice:
+        """Один инвойс. Проверяет принадлежность договору (IDOR-guard)."""
+        async with self.uow:
+            invoice = await self.uow.invoices.get(invoice_id)
+            if not invoice or invoice.contract_id != contract_id:
+                raise InvoiceNotFoundError(invoice_id)
+            return invoice
+
+    async def issue_invoice(
+        self,
+        contract_id: uuid.UUID,
+        invoice_id: uuid.UUID,
+    ) -> Invoice:
+        """DRAFT → ISSUED. Устанавливает issued_at = now(UTC)."""
+        async with self.uow:
+            invoice = await self.uow.invoices.get(invoice_id)
+            if not invoice or invoice.contract_id != contract_id:
+                raise InvoiceNotFoundError(invoice_id)
+            if invoice.status != InvoiceStatus.DRAFT:
+                raise InvalidInvoiceTransitionError(
+                    invoice_id=invoice_id,
+                    current_status=invoice.status,
+                    expected_statuses=[InvoiceStatus.DRAFT],
+                )
+            invoice = await self.uow.invoices.update(
+                invoice_id,
+                {
+                    "status": InvoiceStatus.ISSUED,
+                    "issued_at": datetime.now(UTC),
+                },
+            )
+            await self.uow.commit()
+            return invoice
+
+    async def mark_invoice_paid(
+        self,
+        contract_id: uuid.UUID,
+        invoice_id: uuid.UUID,
+    ) -> Invoice:
+        """ISSUED | OVERDUE → PAID. Устанавливает paid_at = now(UTC)."""
+        async with self.uow:
+            invoice = await self.uow.invoices.get(invoice_id)
+            if not invoice or invoice.contract_id != contract_id:
+                raise InvoiceNotFoundError(invoice_id)
+            allowed = {InvoiceStatus.ISSUED, InvoiceStatus.OVERDUE}
+            if invoice.status not in allowed:
+                raise InvalidInvoiceTransitionError(
+                    invoice_id=invoice_id,
+                    current_status=invoice.status,
+                    expected_statuses=list(allowed),
+                )
+            invoice = await self.uow.invoices.update(
+                invoice_id,
+                {
+                    "status": InvoiceStatus.PAID,
+                    "paid_at": datetime.now(UTC),
+                },
+            )
+            await self.uow.commit()
+            return invoice
+
+    async def cancel_invoice(
+        self,
+        contract_id: uuid.UUID,
+        invoice_id: uuid.UUID,
+    ) -> Invoice:
+        """DRAFT | ISSUED → CANCELLED. PAID/OVERDUE нельзя аннулировать."""
+        async with self.uow:
+            invoice = await self.uow.invoices.get(invoice_id)
+            if not invoice or invoice.contract_id != contract_id:
+                raise InvoiceNotFoundError(invoice_id)
+            allowed = {InvoiceStatus.DRAFT, InvoiceStatus.ISSUED}
+            if invoice.status not in allowed:
+                raise InvalidInvoiceTransitionError(
+                    invoice_id=invoice_id,
+                    current_status=invoice.status,
+                    expected_statuses=list(allowed),
+                )
+            invoice = await self.uow.invoices.update(
+                invoice_id,
+                {"status": InvoiceStatus.CANCELLED},
+            )
+            await self.uow.commit()
+            return invoice
+
+    async def get_reconciliation(
+        self,
+        contract_id: uuid.UUID,
+        date_from: date,
+        date_to: date,
+    ) -> ReconciliationResponse:
+        """Акт сверки: заказы + платежи клиента за период."""
+        async with self.uow:
+            contract = await self.uow.contracts.get_with_client(contract_id)
+            if not contract:
+                raise ContractNotFoundError(contract_id)
+
+            # Временные границы (включающий диапазон)
+            from_dt = datetime.combine(
+                date_from, datetime.min.time()
+            ).replace(tzinfo=UTC)
+            to_dt = datetime.combine(
+                date_to + timedelta(days=1), datetime.min.time()
+            ).replace(tzinfo=UTC)
+
+            delivered_orders = (
+                await self.uow.orders.get_delivered_by_contract(
+                    contract_id=contract_id,
+                    date_from=date_from,
+                    date_to=date_to,
+                )
+            )
+            order_items = [
+                ReconciliationOrderItem(
+                    order_id=o.id,
+                    created_at=o.created_at,
+                    total_amount=o.total_amount,
+                )
+                for o in delivered_orders
+            ]
+            total_billed = sum(i.total_amount for i in order_items)
+
+            payments = (
+                await self.uow.transactions.get_bank_payments_for_client(
+                    client_id=contract.client_id,
+                    from_dt=from_dt,
+                    to_dt=to_dt,
+                )
+            )
+            payment_items = [
+                ReconciliationPaymentItem(
+                    transaction_id=p.id,
+                    created_at=p.created_at,
+                    amount=p.amount,
+                    reason=p.reason,
+                )
+                for p in payments
+            ]
+            total_paid = sum(i.amount for i in payment_items)
+
+            return ReconciliationResponse(
+                contract_id=contract.id,
+                contract_number=contract.number,
+                client_name=contract.client.username,
+                period_from=date_from,
+                period_to=date_to,
+                orders=order_items,
+                total_billed=total_billed,
+                payments=payment_items,
+                total_paid=total_paid,
+                balance=total_billed - total_paid,
+            )

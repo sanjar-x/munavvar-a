@@ -1,5 +1,6 @@
 # src/modules/contracts/exceptions.py
 import uuid
+from datetime import date
 
 from src.core.exceptions import (
     BadRequestError,
@@ -162,5 +163,60 @@ class ContractAccessDeniedError(ForbiddenError):
             details={
                 "client_id": str(client_id),
                 "contract_id": str(contract_id),
+            },
+        )
+
+
+class InvoiceNotFoundError(NotFoundError):
+    def __init__(self, invoice_id: uuid.UUID | str):
+        super().__init__(
+            message="Счёт-фактура не найдена",
+            error_code="INVOICE_NOT_FOUND",
+            details={"invoice_id": str(invoice_id)},
+        )
+
+
+class InvalidInvoiceTransitionError(ConflictError):
+    """Недопустимый переход статуса счёт-фактуры."""
+
+    def __init__(
+        self,
+        invoice_id: uuid.UUID | str,
+        current_status: str,
+        expected_statuses: list[str],
+    ):
+        super().__init__(
+            message=(
+                f"Переход из статуса {current_status} недопустим. "
+                f"Ожидаемые статусы: {', '.join(expected_statuses)}"
+            ),
+            error_code="INVALID_INVOICE_TRANSITION",
+            details={
+                "invoice_id": str(invoice_id),
+                "current_status": current_status,
+                "expected_statuses": expected_statuses,
+            },
+        )
+
+
+class DuplicateInvoicePeriodError(ConflictError):
+    """Инвойс за этот период уже существует (не CANCELLED)."""
+
+    def __init__(
+        self,
+        contract_id: uuid.UUID | str,
+        period_from: date,
+        period_to: date,
+    ):
+        super().__init__(
+            message=(
+                "Счёт-фактура за этот период уже существует. "
+                "Аннулируйте предыдущую, чтобы выставить новую."
+            ),
+            error_code="DUPLICATE_INVOICE_PERIOD",
+            details={
+                "contract_id": str(contract_id),
+                "period_from": str(period_from),
+                "period_to": str(period_to),
             },
         )

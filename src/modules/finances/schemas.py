@@ -161,6 +161,8 @@ class DashboardTotals(BaseModel):
     total_card_pending: int
     total_client_debt: int
     total_courier_cash: int
+    total_b2b_credit_used: int = 0   # in-flight B2B кредит
+    total_b2b_settled_debt: int = 0  # погашённый долг B2B (account.balance)
 
 
 class FinanceDashboard(BaseModel):
@@ -272,7 +274,30 @@ class ClientsDebtsResponse(BaseModel):
 
 
 # =====================================================================
-# 9. КАССА (CASHBOX)
+# 9B. B2B ДЕБИТОРКА (B2B CONTRACT DEBTS)
+# =====================================================================
+
+
+class B2BContractDebt(BaseModel):
+    client_id: uuid.UUID
+    client_name: str
+    contract_id: uuid.UUID
+    contract_number: str
+    credit_limit: int
+    credit_used: int
+    account_balance: int
+    total_exposure: int
+    limit_utilization_pct: float
+    due_date_status: str  # "ok" | "overdue" | "no_limit"
+
+
+class B2BContractDebtsResponse(BaseModel):
+    items: list[B2BContractDebt]
+    total_exposure: int
+
+
+# =====================================================================
+# 10. КАССА (CASHBOX)
 # =====================================================================
 
 
