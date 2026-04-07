@@ -59,8 +59,8 @@ class CourierService:
             except IntegrityError as e:
                 await self.uow.rollback()
                 if "uq_identities_provider_identity_id" in str(e.orig):
-                    raise CourierAlreadyExistsError(phone=data.phone)
-                raise e
+                    raise CourierAlreadyExistsError(phone=data.phone) from None
+                raise
 
     async def create_courier_inventory(
         self, courier_id: uuid.UUID, data: InventoryCreate
@@ -85,8 +85,8 @@ class CourierService:
                     raise ConflictError(
                         message="У данного курьера уже зарегистрирована машина.",
                         error_code="COURIER_INVENTORY_ALREADY_EXISTS",
-                    )
-                raise e
+                    ) from None
+                raise
 
         return await self.get_courier(courier_id=courier_id)
 

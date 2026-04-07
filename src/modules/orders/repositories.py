@@ -217,10 +217,12 @@ class OrderRepository(BaseRepository[Order]):
             select(self.model)
             .where(
                 self.model.contract_id == contract_id,
-                self.model.status.in_([
-                    OrderStatus.DELIVERED,
-                    OrderStatus.PICKUP_COMPLETED,
-                ]),
+                self.model.status.in_(
+                    [
+                        OrderStatus.DELIVERED,
+                        OrderStatus.PICKUP_COMPLETED,
+                    ]
+                ),
                 self.model.created_at >= from_dt,
                 self.model.created_at < to_dt,
                 self.model.is_active.is_(True),

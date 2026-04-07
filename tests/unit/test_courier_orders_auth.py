@@ -44,8 +44,8 @@ def make_auth_headers(user_id: uuid.UUID, scopes: list[str]) -> dict[str, str]:
 async def courier_test_client():
     app = create_app()
     app.dependency_overrides[get_user_service] = lambda: FakeUserService()
-    app.dependency_overrides[get_base_order_service] = (
-        lambda: FakeOrderService()
+    app.dependency_overrides[get_base_order_service] = lambda: (
+        FakeOrderService()
     )
 
     transport = ASGITransport(app=app, raise_app_exceptions=False)

@@ -78,9 +78,12 @@ async def get_warehouse_detail(
         warehouse_id
     )
     # Storekeeper can only view their own warehouse(s)
-    if warehouse and current_admin.role == Role.STOREKEEPER:
-        if warehouse.user_id != current_admin.id:
-            warehouse = None
+    if (
+        warehouse
+        and current_admin.role == Role.STOREKEEPER
+        and warehouse.user_id != current_admin.id
+    ):
+        warehouse = None
     if not warehouse:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

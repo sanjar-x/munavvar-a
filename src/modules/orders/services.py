@@ -317,7 +317,10 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
             await self.uow.commit()
 
             # 8. Перечитываем с eager-loaded relationships для корректной сериализации
-            return await self.uow.orders.get_with_details(new_order.id)
+            result = await self.uow.orders.get_with_details(new_order.id)
+            if not result:
+                raise OrderNotFoundError(order_id=new_order.id)
+            return result
 
     async def create_warehouse_sale(
         self,
@@ -459,7 +462,10 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
             await self.uow.order_items.add_many(order_items_data)
 
             await self.uow.commit()
-            return await self.uow.orders.get_with_details(new_order.id)
+            result = await self.uow.orders.get_with_details(new_order.id)
+            if not result:
+                raise OrderNotFoundError(order_id=new_order.id)
+            return result
 
     async def complete_pickup(
         self,
@@ -496,7 +502,10 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
             await self._handle_warehouse_pickup(order, completed_by_id)
 
             await self.uow.commit()
-            return await self.uow.orders.get_with_details(order_id)
+            result = await self.uow.orders.get_with_details(order_id)
+            if not result:
+                raise OrderNotFoundError(order_id=order_id)
+            return result
 
     async def get_order_with_details(
         self, order_id: uuid.UUID, requesting_user_id: uuid.UUID | None = None
@@ -1218,6 +1227,11 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
                 details={"client_id": str(order.client_id)},
             )
         revenue_account = await self.uow.accounts.get_system_revenue_account()
+        if not revenue_account:
+            raise NotFoundError(
+                message="Системный счет выручки не найден",
+                error_code="REVENUE_ACCOUNT_NOT_FOUND",
+            )
 
         # Долг клиенту (balance обновит триггер при INSERT)
         financial_txns: list[dict] = [
@@ -1250,6 +1264,11 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
 
         elif order.payment_method == PaymentMethod.CARD:
             card_account = await self.uow.accounts.get_system_card_account()
+            if not card_account:
+                raise NotFoundError(
+                    message="Системный счет карты не найден",
+                    error_code="CARD_ACCOUNT_NOT_FOUND",
+                )
             financial_txns.append(
                 {
                     "from_id": client_account.id,
@@ -1296,6 +1315,11 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
                 details={"client_id": str(order.client_id)},
             )
         revenue_account = await self.uow.accounts.get_system_revenue_account()
+        if not revenue_account:
+            raise NotFoundError(
+                message="Системный счет выручки не найден",
+                error_code="REVENUE_ACCOUNT_NOT_FOUND",
+            )
 
         # Долг клиенту (самовывоз)
         financial_txns: list[dict] = [
@@ -1311,6 +1335,11 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
 
         if order.payment_method == PaymentMethod.CASH:
             cash_account = await self.uow.accounts.get_system_cash_account()
+            if not cash_account:
+                raise NotFoundError(
+                    message="Системная касса не найдена",
+                    error_code="CASH_ACCOUNT_NOT_FOUND",
+                )
             financial_txns.append(
                 {
                     "from_id": client_account.id,
@@ -1324,6 +1353,11 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
 
         elif order.payment_method == PaymentMethod.CARD:
             card_account = await self.uow.accounts.get_system_card_account()
+            if not card_account:
+                raise NotFoundError(
+                    message="Системный счет карты не найден",
+                    error_code="CARD_ACCOUNT_NOT_FOUND",
+                )
             financial_txns.append(
                 {
                     "from_id": client_account.id,

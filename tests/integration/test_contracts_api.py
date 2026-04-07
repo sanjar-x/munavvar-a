@@ -92,9 +92,7 @@ async def other_b2b_user(db_session: AsyncSession):
 
 
 @pytest.fixture
-async def b2b_account(
-    db_session: AsyncSession, b2b_user, system_entities
-):
+async def b2b_account(db_session: AsyncSession, b2b_user, system_entities):
     acc = Account(
         user_id=b2b_user.id,
         type=AccountType.CLIENT,
@@ -108,9 +106,7 @@ async def b2b_account(
 
 
 @pytest.fixture
-async def b2b_inventory(
-    db_session: AsyncSession, b2b_user
-):
+async def b2b_inventory(db_session: AsyncSession, b2b_user):
     inv = Inventory(
         user_id=b2b_user.id,
         type=InventoryType.CLIENT,
@@ -123,9 +119,7 @@ async def b2b_inventory(
 
 
 @pytest.fixture
-async def draft_contract(
-    db_session: AsyncSession, b2b_user
-):
+async def draft_contract(db_session: AsyncSession, b2b_user):
     """A DRAFT contract (not yet activated)."""
     contract = Contract(
         client_id=b2b_user.id,
@@ -237,8 +231,7 @@ async def test_admin_suspend_and_reinstate_contract(
 
     # Reinstate
     resp = await client.post(
-        f"/api/v1/backoffice/contracts/"
-        f"{active_contract.id}/reinstate",
+        f"/api/v1/backoffice/contracts/{active_contract.id}/reinstate",
         headers=headers,
     )
     assert resp.status_code == 200, resp.text
@@ -262,9 +255,7 @@ async def test_admin_terminate_contract(
     assert resp.status_code == 200, resp.text
     data = resp.json()
     assert data["status"] == ContractStatus.TERMINATED
-    assert data["termination_reason"] == (
-        "Расторжение по инициативе стороны"
-    )
+    assert data["termination_reason"] == ("Расторжение по инициативе стороны")
 
 
 # ──────────────────────────────────────────────────────────────────
@@ -333,8 +324,7 @@ async def test_admin_set_price_item(
     contract_price = 15_000  # cheaper than catalog (20_000)
 
     resp = await client.put(
-        f"/api/v1/backoffice/contracts/{active_contract.id}"
-        f"/prices/{water.id}",
+        f"/api/v1/backoffice/contracts/{active_contract.id}/prices/{water.id}",
         headers=headers,
         json={"price": contract_price},
     )
@@ -345,8 +335,7 @@ async def test_admin_set_price_item(
 
     # Upsert: update the price
     resp2 = await client.put(
-        f"/api/v1/backoffice/contracts/{active_contract.id}"
-        f"/prices/{water.id}",
+        f"/api/v1/backoffice/contracts/{active_contract.id}/prices/{water.id}",
         headers=headers,
         json={"price": 12_000},
     )
@@ -384,8 +373,7 @@ async def test_b2b_order_with_contract_price_override(
     # 1. Set a contract price override (water: 15 000)
     headers = make_auth_headers(admin_user.id, Role.ADMIN)
     pi_resp = await client.put(
-        f"/api/v1/backoffice/contracts/{active_contract.id}"
-        f"/prices/{water.id}",
+        f"/api/v1/backoffice/contracts/{active_contract.id}/prices/{water.id}",
         headers=headers,
         json={"price": 15_000},
     )
@@ -416,9 +404,7 @@ async def test_b2b_order_with_contract_price_override(
 
     # 4. Verify credit_used was incremented
     result = await db_session.execute(
-        select(Contract.credit_used).where(
-            Contract.id == active_contract.id
-        )
+        select(Contract.credit_used).where(Contract.id == active_contract.id)
     )
     credit_used = result.scalar_one()
     assert credit_used == 30_000
@@ -470,9 +456,7 @@ async def test_b2b_order_cancel_decrements_credit(
 
     # Verify credit_used is back to 0
     result = await db_session.execute(
-        select(Contract.credit_used).where(
-            Contract.id == active_contract.id
-        )
+        select(Contract.credit_used).where(Contract.id == active_contract.id)
     )
     credit_used = result.scalar_one()
     assert credit_used == 0
@@ -558,9 +542,7 @@ async def test_accept_bank_payment(
     await db_session.flush()
 
     # Accept payment via bank transfer
-    cashier_headers = make_auth_headers(
-        admin_user.id, Role.ADMIN
-    )
+    cashier_headers = make_auth_headers(admin_user.id, Role.ADMIN)
     resp = await client.post(
         "/api/v1/backoffice/finances/cashbox/accept-payment",
         headers=cashier_headers,

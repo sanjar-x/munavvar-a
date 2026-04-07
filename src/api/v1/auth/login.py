@@ -24,7 +24,9 @@ async def login(
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
     auth_service: Annotated[AuthService, Depends(get_auth_service)],
 ):
-    login_data = LocalLogin(phone=form_data.username, password=form_data.password)
+    login_data = LocalLogin(
+        phone=form_data.username, password=form_data.password
+    )
 
     token_response = await auth_service.local_login(login_data)
 

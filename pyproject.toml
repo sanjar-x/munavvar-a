@@ -21,7 +21,7 @@ fix = true
 
 [tool.ruff.lint]
 select = ["E", "W", "F", "I", "B", "C4", "UP", "SIM"]
-ignore = ["UP037"]
+ignore = ["UP037", "RUF001", "RUF002", "RUF003"]
 
 [dependency-groups]
 dev = [
@@ -37,6 +37,9 @@ dev = [
     "ruff>=0.15.1",
     "ty>=0.0.17",
 ]
+[tool.ty.rules]
+invalid-return-type = "error"
+
 [tool.pytest.ini_options]
 # Автоматически запускать все async-тесты
 asyncio_mode = "auto"

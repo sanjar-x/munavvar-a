@@ -31,9 +31,11 @@ async def get_transports(
     transport_service: Annotated[
         TransportService, Depends(get_transport_service)
     ],
-    page: int = Query(1, ge=1),
-    size: int = Query(20, ge=1, le=100),
-    user_id: uuid.UUID | None = Query(None, description="Фильтр по курьеру"),
+    page: Annotated[int, Query(ge=1)] = 1,
+    size: Annotated[int, Query(ge=1, le=100)] = 20,
+    user_id: Annotated[
+        uuid.UUID | None, Query(description="Фильтр по курьеру")
+    ] = None,
 ):
     # TODO: Add specific TRANSPORT_READ permission if exists
     skip = (page - 1) * size

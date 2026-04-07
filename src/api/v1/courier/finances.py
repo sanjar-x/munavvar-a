@@ -49,12 +49,8 @@ async def get_my_balance(
                 error_code="COURIER_ACCOUNT_NOT_FOUND",
             )
 
-        txns = await (
-            uow
-            .transactions
-            .get_today_transactions_for_account(
-                account_id=account.id,
-            )
+        txns = await uow.transactions.get_today_transactions_for_account(
+            account_id=account.id,
         )
 
     today_collected = 0

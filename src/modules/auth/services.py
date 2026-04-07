@@ -10,13 +10,15 @@ from src.modules.auth.schemas import LocalLogin, TokenResponse
 from src.modules.users.enums import Role
 from src.modules.users.services import UserService
 
-STAFF_ROLES: frozenset[Role] = frozenset({
-    Role.ADMIN,
-    Role.ACCOUNTANT,
-    Role.STOREKEEPER,
-    Role.CASHIER,
-    Role.COURIER,
-})
+STAFF_ROLES: frozenset[Role] = frozenset(
+    {
+        Role.ADMIN,
+        Role.ACCOUNTANT,
+        Role.STOREKEEPER,
+        Role.CASHIER,
+        Role.COURIER,
+    }
+)
 CLIENT_ROLES: frozenset[Role] = frozenset({Role.CLIENT_B2B, Role.CLIENT_B2C})
 
 
@@ -54,7 +56,9 @@ class AuthService:
             )
 
         try:
-            is_valid_password = verify_password(data.password, identity.password_hash)
+            is_valid_password = verify_password(
+                data.password, identity.password_hash
+            )
         except UnknownHashError as exc:
             raise UnauthorizedError(
                 message="Неверный номер телефона или пароль",
@@ -117,7 +121,9 @@ class AuthService:
 
         if user.id == WALKIN_USER_ID:
             raise ForbiddenError(
-                message=("Системный walk-in пользователь не может входить в систему."),
+                message=(
+                    "Системный walk-in пользователь не может входить в систему."
+                ),
                 error_code="WALKIN_LOGIN_FORBIDDEN",
             )
 

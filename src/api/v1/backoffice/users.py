@@ -49,15 +49,23 @@ async def get_staff_users(
         User, Security(get_current_user, scopes=[Scope.USERS_READ])
     ],
     user_service: Annotated[UserService, Depends(get_user_service)],
-    skip: int = Query(0, ge=0, description="Сколько записей пропустить"),
-    limit: int = Query(
-        50, ge=1, le=100, description="Сколько записей вернуть"
-    ),
-    search: str | None = Query(None, description="Поиск по ФИО или телефону"),
-    roles: list[Role] | None = Query(
-        None,
-        description="Фильтр по staff-ролям. Можно передать несколько roles.",
-    ),
+    skip: Annotated[
+        int, Query(ge=0, description="Сколько записей пропустить")
+    ] = 0,
+    limit: Annotated[
+        int,
+        Query(ge=1, le=100, description="Сколько записей вернуть"),
+    ] = 50,
+    search: Annotated[
+        str | None,
+        Query(description="Поиск по ФИО или телефону"),
+    ] = None,
+    roles: Annotated[
+        list[Role] | None,
+        Query(
+            description="Фильтр по staff-ролям. Можно передать несколько roles.",
+        ),
+    ] = None,
 ):
     return await user_service.get_staff(
         skip=skip,

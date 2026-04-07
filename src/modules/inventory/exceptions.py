@@ -49,7 +49,7 @@ class InventoryNotFoundError(NotFoundError):
 
     def __init__(
         self,
-        inventory_id: uuid.UUID | str,
+        inventory_id: uuid.UUID | None,
         message: str = "Локация (склад/клиент/машина) не найдена",
     ):
         super().__init__(
@@ -359,8 +359,7 @@ class InventoryReconciliationError(ConflictError):
         system_qty: int,
         returned_qty: int,
         message: str = (
-            "Рассинхрон остатков. "
-            "Оформите акт списания перед закрытием смены."
+            "Рассинхрон остатков. Оформите акт списания перед закрытием смены."
         ),
     ):
         super().__init__(
@@ -384,9 +383,7 @@ class ArchivedProductsInTransferError(BadRequestError):
     def __init__(
         self,
         archived_product_ids: list[uuid.UUID],
-        message: str = (
-            "Нельзя создать накладную с архивированными товарами"
-        ),
+        message: str = ("Нельзя создать накладную с архивированными товарами"),
     ):
         super().__init__(
             message=message,

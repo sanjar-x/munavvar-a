@@ -112,20 +112,12 @@ async def system_entities(db_session: AsyncSession):
     settings.SYSTEM_USER_ID (which may differ).
     """
     system_user = (
-        await db_session.execute(
-            select(User).where(
-                User.role == Role.SYSTEM
-            )
-        )
+        await db_session.execute(select(User).where(User.role == Role.SYSTEM))
     ).scalar_one()
     sys_uid = system_user.id
 
     walkin_user = (
-        await db_session.execute(
-            select(User).where(
-                User.id == WALKIN_USER_ID
-            )
-        )
+        await db_session.execute(select(User).where(User.id == WALKIN_USER_ID))
     ).scalar_one()
 
     revenue_account = (
@@ -159,8 +151,7 @@ async def system_entities(db_session: AsyncSession):
         await db_session.execute(
             select(Inventory).where(
                 Inventory.user_id == sys_uid,
-                Inventory.type
-                == InventoryType.VIRTUAL_VENDOR,
+                Inventory.type == InventoryType.VIRTUAL_VENDOR,
             )
         )
     ).scalar_one()
@@ -169,8 +160,7 @@ async def system_entities(db_session: AsyncSession):
         await db_session.execute(
             select(Inventory).where(
                 Inventory.user_id == sys_uid,
-                Inventory.type
-                == InventoryType.VIRTUAL_LOSS,
+                Inventory.type == InventoryType.VIRTUAL_LOSS,
             )
         )
     ).scalar_one()
@@ -311,9 +301,7 @@ async def client_user(db_session: AsyncSession):
 # Fixture: warehouse inventory
 # ---------------------------------------------------------
 @pytest.fixture
-async def warehouse_inventory(
-    db_session: AsyncSession, system_entities
-):
+async def warehouse_inventory(db_session: AsyncSession, system_entities):
     inv = Inventory(
         user_id=system_entities["system_user"].id,
         type=InventoryType.WAREHOUSE,
@@ -329,9 +317,7 @@ async def warehouse_inventory(
 # Fixture: courier inventory
 # ---------------------------------------------------------
 @pytest.fixture
-async def courier_inventory(
-    db_session: AsyncSession, courier_user
-):
+async def courier_inventory(db_session: AsyncSession, courier_user):
     inv = Inventory(
         user_id=courier_user.id,
         type=InventoryType.COURIER,
@@ -347,9 +333,7 @@ async def courier_inventory(
 # Fixture: client inventory
 # ---------------------------------------------------------
 @pytest.fixture
-async def client_inventory(
-    db_session: AsyncSession, client_user
-):
+async def client_inventory(db_session: AsyncSession, client_user):
     inv = Inventory(
         user_id=client_user.id,
         type=InventoryType.CLIENT,
@@ -365,9 +349,7 @@ async def client_inventory(
 # Fixture: courier account
 # ---------------------------------------------------------
 @pytest.fixture
-async def courier_account(
-    db_session: AsyncSession, courier_user
-):
+async def courier_account(db_session: AsyncSession, courier_user):
     acc = Account(
         user_id=courier_user.id,
         type=AccountType.COURIER,
@@ -384,9 +366,7 @@ async def courier_account(
 # Fixture: client account
 # ---------------------------------------------------------
 @pytest.fixture
-async def client_account(
-    db_session: AsyncSession, client_user
-):
+async def client_account(db_session: AsyncSession, client_user):
     acc = Account(
         user_id=client_user.id,
         type=AccountType.CLIENT,

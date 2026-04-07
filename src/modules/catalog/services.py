@@ -133,9 +133,7 @@ class CatalogService(
         Запрещено если на складах/транспортах есть остатки.
         """
         async with self.uow:
-            product = await self._repo.get(
-                product_id, active_only=False
-            )
+            product = await self._repo.get(product_id, active_only=False)
             if not product:
                 raise ProductNotFoundError(product_id=product_id)
 
@@ -143,9 +141,7 @@ class CatalogService(
                 raise ProductHasStockError(product_id=product_id)
 
             if await self._repo.has_associated_products(product_id):
-                raise ProductHasAssociatedProductsError(
-                    product_id=product_id
-                )
+                raise ProductHasAssociatedProductsError(product_id=product_id)
 
             await self._repo.delete(product_id)
             await self.uow.commit()

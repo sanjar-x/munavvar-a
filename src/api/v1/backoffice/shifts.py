@@ -35,9 +35,7 @@ async def close_shift(
             scopes=[Scope.INVENTORY_WRITE],
         ),
     ],
-    shift_service: Annotated[
-        ShiftService, Depends(get_shift_service)
-    ],
+    shift_service: Annotated[ShiftService, Depends(get_shift_service)],
 ):
     """Закрытие смены курьера и инкассация."""
     return await shift_service.close_shift(request)

@@ -5,6 +5,7 @@ Revision ID: a1b2c3d4e5f6
 Revises: 9a9cbfcda833
 Create Date: 2025-01-01 00:00:00.000000
 """
+
 from collections.abc import Sequence
 
 import sqlalchemy as sa
@@ -36,9 +37,7 @@ def upgrade() -> None:
     op.create_table(
         "contracts",
         sa.Column("id", UUID(as_uuid=True), primary_key=True),
-        sa.Column(
-            "number", sa.String(50), nullable=False, unique=True
-        ),
+        sa.Column("number", sa.String(50), nullable=False, unique=True),
         sa.Column(
             "client_id",
             UUID(as_uuid=True),
@@ -82,14 +81,10 @@ def upgrade() -> None:
         sa.Column("legal_name", sa.String(255), nullable=False),
         sa.Column("inn", sa.String(14), nullable=False),
         sa.Column("legal_address", sa.Text, nullable=True),
-        sa.Column(
-            "bank_account_number", sa.String(25), nullable=True
-        ),
+        sa.Column("bank_account_number", sa.String(25), nullable=True),
         sa.Column("bank_name", sa.String(255), nullable=True),
         sa.Column("notes", sa.Text, nullable=True),
-        sa.Column(
-            "signed_at", sa.TIMESTAMP(timezone=True), nullable=True
-        ),
+        sa.Column("signed_at", sa.TIMESTAMP(timezone=True), nullable=True),
         sa.Column(
             "signed_by_id",
             UUID(as_uuid=True),
@@ -101,17 +96,13 @@ def upgrade() -> None:
             sa.TIMESTAMP(timezone=True),
             nullable=True,
         ),
-        sa.Column(
-            "suspension_reason", sa.String(512), nullable=True
-        ),
+        sa.Column("suspension_reason", sa.String(512), nullable=True),
         sa.Column(
             "terminated_at",
             sa.TIMESTAMP(timezone=True),
             nullable=True,
         ),
-        sa.Column(
-            "termination_reason", sa.String(512), nullable=True
-        ),
+        sa.Column("termination_reason", sa.String(512), nullable=True),
         sa.Column(
             "is_active",
             sa.Boolean,
@@ -152,12 +143,8 @@ def upgrade() -> None:
         comment="Договоры с юридическими лицами (B2B)",
     )
     # Индексы на contracts
-    op.create_index(
-        "idx_contract_client_id", "contracts", ["client_id"]
-    )
-    op.create_index(
-        "idx_contract_status", "contracts", ["status"]
-    )
+    op.create_index("idx_contract_client_id", "contracts", ["client_id"])
+    op.create_index("idx_contract_status", "contracts", ["status"])
     op.create_index(
         "idx_contract_client_status",
         "contracts",
@@ -286,12 +273,8 @@ def upgrade() -> None:
             server_default="0",
         ),
         sa.Column("due_date", sa.Date, nullable=True),
-        sa.Column(
-            "issued_at", sa.TIMESTAMP(timezone=True), nullable=True
-        ),
-        sa.Column(
-            "paid_at", sa.TIMESTAMP(timezone=True), nullable=True
-        ),
+        sa.Column("issued_at", sa.TIMESTAMP(timezone=True), nullable=True),
+        sa.Column("paid_at", sa.TIMESTAMP(timezone=True), nullable=True),
         sa.Column(
             "is_active",
             sa.Boolean,
@@ -321,28 +304,18 @@ def upgrade() -> None:
             "amount >= 0",
             name="ck_invoice_amount_non_neg",
         ),
-        comment=(
-            "Счета-фактуры, выставляемые по биллинговому циклу договора"
-        ),
+        comment=("Счета-фактуры, выставляемые по биллинговому циклу договора"),
     )
-    op.create_index(
-        "idx_invoices_contract_id", "invoices", ["contract_id"]
-    )
-    op.create_index(
-        "idx_invoices_status", "invoices", ["status"]
-    )
+    op.create_index("idx_invoices_contract_id", "invoices", ["contract_id"])
+    op.create_index("idx_invoices_status", "invoices", ["status"])
 
 
 def downgrade() -> None:
     op.drop_index("idx_invoices_status", table_name="invoices")
-    op.drop_index(
-        "idx_invoices_contract_id", table_name="invoices"
-    )
+    op.drop_index("idx_invoices_contract_id", table_name="invoices")
     op.drop_table("invoices")
 
-    op.execute(
-        "DROP INDEX IF EXISTS idx_orders_contract_id"
-    )
+    op.execute("DROP INDEX IF EXISTS idx_orders_contract_id")
     op.drop_column("orders", "contract_id")
 
     op.drop_index(
@@ -355,12 +328,8 @@ def downgrade() -> None:
     )
     op.drop_table("contract_price_items")
 
-    op.execute(
-        "DROP INDEX IF EXISTS uq_one_active_contract_per_client"
-    )
-    op.drop_index(
-        "idx_contract_client_status", table_name="contracts"
-    )
+    op.execute("DROP INDEX IF EXISTS uq_one_active_contract_per_client")
+    op.drop_index("idx_contract_client_status", table_name="contracts")
     op.drop_index("idx_contract_status", table_name="contracts")
     op.drop_index("idx_contract_client_id", table_name="contracts")
     op.drop_table("contracts")

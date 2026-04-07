@@ -6,6 +6,7 @@ Tests the B2B contract integration in BaseOrderService.create_order():
 - Price override from contract price items
 - Credit decrement on cancel/delivery
 """
+
 import uuid
 from datetime import date
 from types import SimpleNamespace
@@ -92,9 +93,7 @@ def _make_fake_uow(
     uow = MagicMock()
 
     # Contracts repo
-    uow.contracts.get_active_for_client = AsyncMock(
-        return_value=contract
-    )
+    uow.contracts.get_active_for_client = AsyncMock(return_value=contract)
     uow.contracts.get_price_map_for_products = AsyncMock(
         return_value=price_map or {}
     )

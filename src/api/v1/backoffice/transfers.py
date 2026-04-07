@@ -35,9 +35,7 @@ async def get_transfers(
     skip = (page - 1) * size
     # Storekeeper sees only transfers touching their warehouse(s); admin sees all
     warehouse_owner_id = (
-        current_admin.id
-        if current_admin.role == Role.STOREKEEPER
-        else None
+        current_admin.id if current_admin.role == Role.STOREKEEPER else None
     )
     return await transfer_service.search_transfers(
         skip=skip,

@@ -55,15 +55,13 @@ class ProductRepository(BaseRepository[Product]):
 
     async def has_stock(self, product_id: uuid.UUID) -> bool:
         """Проверяет наличие товара на складах/транспортах."""
-        query = select(
-            func.coalesce(func.sum(Balance.quantity), 0)
-        ).where(Balance.product_id == product_id)
+        query = select(func.coalesce(func.sum(Balance.quantity), 0)).where(
+            Balance.product_id == product_id
+        )
         result = await self.session.execute(query)
         return (result.scalar() or 0) > 0
 
-    async def has_associated_products(
-        self, product_id: uuid.UUID
-    ) -> bool:
+    async def has_associated_products(self, product_id: uuid.UUID) -> bool:
         """Проверяет, ссылаются ли другие товары на этот через returnable_item_id."""
         query = select(func.count()).where(
             self.model.returnable_item_id == product_id

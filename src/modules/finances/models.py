@@ -58,13 +58,13 @@ class Account(BaseModel):
         comment="Текущий баланс. Обновляется строго через SQL-триггер транзакций!",
     )
 
-    user: Mapped["User"] = relationship(back_populates="accounts")
+    user: Mapped[User] = relationship(back_populates="accounts")
 
-    outgoing_transactions: Mapped[list["Transaction"]] = relationship(
+    outgoing_transactions: Mapped[list[Transaction]] = relationship(
         foreign_keys="[Transaction.from_id]",
         back_populates="from_account",
     )
-    incoming_transactions: Mapped[list["Transaction"]] = relationship(
+    incoming_transactions: Mapped[list[Transaction]] = relationship(
         foreign_keys="[Transaction.to_id]",
         back_populates="to_account",
     )
@@ -126,14 +126,14 @@ class Transaction(BaseModel):
     )
 
     # --- Relationships ---
-    from_account: Mapped["Account"] = relationship(
+    from_account: Mapped[Account] = relationship(
         foreign_keys=[from_id], back_populates="outgoing_transactions"
     )
-    to_account: Mapped["Account"] = relationship(
+    to_account: Mapped[Account] = relationship(
         foreign_keys=[to_id], back_populates="incoming_transactions"
     )
-    order: Mapped["Order | None"] = relationship(back_populates="transactions")
-    verified_by: Mapped["User | None"] = relationship(
+    order: Mapped[Order | None] = relationship(back_populates="transactions")
+    verified_by: Mapped[User | None] = relationship(
         foreign_keys=[verified_by_id]
     )
 

@@ -1,4 +1,4 @@
-from scripts.bootstrap_alembic import (
+from scripts.bootstrap_alembic import (  # ty:ignore[unresolved-import]
     HEAD_REVISION,
     INIT_REVISION,
     INIT_TABLES,
@@ -21,40 +21,34 @@ def test_returns_none_when_alembic_state_already_exists() -> None:
 
 
 def test_stamps_init_revision_when_tables_exist_without_triggers() -> None:
-    assert (
-        choose_bootstrap_plan(set(), INIT_TABLES, set())
-        == BootstrapPlan(revision=INIT_REVISION)
+    assert choose_bootstrap_plan(set(), INIT_TABLES, set()) == BootstrapPlan(
+        revision=INIT_REVISION
     )
 
 
 def test_stamps_head_when_tables_and_triggers_exist() -> None:
-    assert (
-        choose_bootstrap_plan(set(), INIT_TABLES, TRIGGER_NAMES)
-        == BootstrapPlan(revision=HEAD_REVISION)
-    )
+    assert choose_bootstrap_plan(
+        set(), INIT_TABLES, TRIGGER_NAMES
+    ) == BootstrapPlan(revision=HEAD_REVISION)
 
 
 def test_repairs_legacy_only_version_state_without_triggers() -> None:
-    assert (
-        choose_bootstrap_plan({LEGACY_REVISION}, INIT_TABLES, set())
-        == BootstrapPlan(
-            revision=INIT_REVISION,
-            purge_existing_versions=True,
-        )
+    assert choose_bootstrap_plan(
+        {LEGACY_REVISION}, INIT_TABLES, set()
+    ) == BootstrapPlan(
+        revision=INIT_REVISION,
+        purge_existing_versions=True,
     )
 
 
 def test_repairs_legacy_only_version_state_with_triggers() -> None:
-    assert (
-        choose_bootstrap_plan(
-            {LEGACY_REVISION},
-            INIT_TABLES,
-            TRIGGER_NAMES,
-        )
-        == BootstrapPlan(
-            revision=HEAD_REVISION,
-            purge_existing_versions=True,
-        )
+    assert choose_bootstrap_plan(
+        {LEGACY_REVISION},
+        INIT_TABLES,
+        TRIGGER_NAMES,
+    ) == BootstrapPlan(
+        revision=HEAD_REVISION,
+        purge_existing_versions=True,
     )
 
 

@@ -29,9 +29,7 @@ _SESSION_FACTORY_MODULES = [
 ]
 
 
-def make_auth_headers(
-    user_id: uuid.UUID, role: Role
-) -> dict[str, str]:
+def make_auth_headers(user_id: uuid.UUID, role: Role) -> dict[str, str]:
     scopes = ROLE_SCOPES.get(role, [])
     token = create_access_token(
         payload_data={
@@ -117,18 +115,14 @@ async def client(session_factory):
         mod = sys.modules.get(mod_path)
         if mod and hasattr(mod, "async_session_maker"):
             originals[mod_path] = mod.async_session_maker
-            mod.async_session_maker = session_factory
+            mod.async_session_maker = session_factory  # ty:ignore[invalid-assignment]
 
     app = create_app()
-    transport = ASGITransport(
-        app=app, raise_app_exceptions=False
-    )
-    async with AsyncClient(
-        transport=transport, base_url="http://test"
-    ) as ac:
+    transport = ASGITransport(app=app, raise_app_exceptions=False)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
 
     for mod_path, original in originals.items():
         mod = sys.modules.get(mod_path)
         if mod:
-            mod.async_session_maker = original
+            mod.async_session_maker = original  # ty:ignore[invalid-assignment]

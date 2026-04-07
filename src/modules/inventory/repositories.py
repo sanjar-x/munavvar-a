@@ -37,9 +37,7 @@ class InventoryRepository(BaseRepository[Inventory]):
         query = (
             select(self.model)
             .where(self.model.id == inventory_id)
-            .options(
-                joinedload(self.model.user).selectinload(User.identities)
-            )
+            .options(joinedload(self.model.user).selectinload(User.identities))
         )
         if active_only:
             query = query.where(self.model.is_active.is_(True))
@@ -178,9 +176,7 @@ class InventoryRepository(BaseRepository[Inventory]):
             query = query.with_for_update()
 
         query = query.options(
-            selectinload(self.model.balances).joinedload(
-                Balance.product
-            ),
+            selectinload(self.model.balances).joinedload(Balance.product),
         )
         result = await self.session.execute(query)
         return result.unique().scalar_one_or_none()
@@ -202,9 +198,7 @@ class InventoryRepository(BaseRepository[Inventory]):
                 self.model.is_active.is_(True),
             )
             .options(
-                selectinload(self.model.balances).joinedload(
-                    Balance.product
-                ),
+                selectinload(self.model.balances).joinedload(Balance.product),
             )
         )
         if owner_id is not None:

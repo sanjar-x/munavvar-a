@@ -5,6 +5,7 @@ Covers the warehouse pickup flow:
 and verifies both HTTP responses AND final balance state
 (inventory_balances + accounts.balance).
 """
+
 from sqlalchemy import select
 
 from src.infrastructure.database.models import Account, Balance
@@ -29,29 +30,20 @@ class TestWarehousePickup:
         # -- Setup: load warehouse with 10 water ------
         await load_stock(
             session=db_session,
-            from_inv_id=(
-                system_entities["virtual_vendor"].id
-            ),
+            from_inv_id=(system_entities["virtual_vendor"].id),
             to_inv_id=warehouse_inventory.id,
             product_id=products["water"].id,
             quantity=10,
-            created_by_id=(
-                system_entities["system_user"].id
-            ),
+            created_by_id=(system_entities["system_user"].id),
         )
 
-        headers = make_auth_headers(
-            admin_user.id, Role.ADMIN
-        )
+        headers = make_auth_headers(admin_user.id, Role.ADMIN)
 
         # -- Record pre-state for system accounts -----
         rev_before = (
             await db_session.execute(
                 select(Account.balance).where(
-                    Account.id
-                    == system_entities[
-                        "revenue_account"
-                    ].id
+                    Account.id == system_entities["revenue_account"].id
                 )
             )
         ).scalar_one()
@@ -59,10 +51,7 @@ class TestWarehousePickup:
         cash_before = (
             await db_session.execute(
                 select(Account.balance).where(
-                    Account.id
-                    == system_entities[
-                        "cash_account"
-                    ].id
+                    Account.id == system_entities["cash_account"].id
                 )
             )
         ).scalar_one()
@@ -72,14 +61,10 @@ class TestWarehousePickup:
             "/api/v1/backoffice/orders/warehouse-sale"
             f"?clientId={client_user.id}",
             json={
-                "warehouse_id": str(
-                    warehouse_inventory.id
-                ),
+                "warehouse_id": str(warehouse_inventory.id),
                 "items": [
                     {
-                        "product_id": str(
-                            products["water"].id
-                        ),
+                        "product_id": str(products["water"].id),
                         "quantity": 2,
                     }
                 ],
@@ -90,15 +75,11 @@ class TestWarehousePickup:
         assert resp.status_code == 201, resp.text
         order_data = resp.json()
         order_id = order_data["id"]
-        assert (
-            order_data["sale_type"]
-            == "warehouse_pickup"
-        )
+        assert order_data["sale_type"] == "warehouse_pickup"
 
         # == Step 2: Complete pickup ===================
         resp = await client.patch(
-            "/api/v1/backoffice/orders/"
-            f"{order_id}/complete-pickup",
+            f"/api/v1/backoffice/orders/{order_id}/complete-pickup",
             headers=headers,
         )
         assert resp.status_code == 200, resp.text
@@ -112,10 +93,8 @@ class TestWarehousePickup:
         # 3a. Warehouse water: 10 - 2 = 8
         result = await db_session.execute(
             select(Balance.quantity).where(
-                Balance.inventory_id
-                == warehouse_inventory.id,
-                Balance.product_id
-                == products["water"].id,
+                Balance.inventory_id == warehouse_inventory.id,
+                Balance.product_id == products["water"].id,
             )
         )
         assert result.scalar_one() == 8
@@ -123,10 +102,8 @@ class TestWarehousePickup:
         # 3b. Client water: 0 + 2 = 2
         result = await db_session.execute(
             select(Balance.quantity).where(
-                Balance.inventory_id
-                == client_inventory.id,
-                Balance.product_id
-                == products["water"].id,
+                Balance.inventory_id == client_inventory.id,
+                Balance.product_id == products["water"].id,
             )
         )
         assert result.scalar_one() == 2
@@ -134,10 +111,8 @@ class TestWarehousePickup:
         # 3c. Warehouse tara: 0 + 2 returned = 2
         result = await db_session.execute(
             select(Balance.quantity).where(
-                Balance.inventory_id
-                == warehouse_inventory.id,
-                Balance.product_id
-                == products["tara"].id,
+                Balance.inventory_id == warehouse_inventory.id,
+                Balance.product_id == products["tara"].id,
             )
         )
         assert result.scalar_one() == 2
@@ -145,10 +120,8 @@ class TestWarehousePickup:
         # 3d. Client tara: +2 capitalized + 2 issued - 2 returned = 2
         result = await db_session.execute(
             select(Balance.quantity).where(
-                Balance.inventory_id
-                == client_inventory.id,
-                Balance.product_id
-                == products["tara"].id,
+                Balance.inventory_id == client_inventory.id,
+                Balance.product_id == products["tara"].id,
             )
         )
         assert result.scalar_one() == 2
@@ -157,10 +130,7 @@ class TestWarehousePickup:
         rev_after = (
             await db_session.execute(
                 select(Account.balance).where(
-                    Account.id
-                    == system_entities[
-                        "revenue_account"
-                    ].id
+                    Account.id == system_entities["revenue_account"].id
                 )
             )
         ).scalar_one()
@@ -170,10 +140,7 @@ class TestWarehousePickup:
         cash_after = (
             await db_session.execute(
                 select(Account.balance).where(
-                    Account.id
-                    == system_entities[
-                        "cash_account"
-                    ].id
+                    Account.id == system_entities["cash_account"].id
                 )
             )
         ).scalar_one()
@@ -181,8 +148,6 @@ class TestWarehousePickup:
 
         # 3g. Client account: net 0 (debt + payment)
         result = await db_session.execute(
-            select(Account.balance).where(
-                Account.id == client_account.id
-            )
+            select(Account.balance).where(Account.id == client_account.id)
         )
         assert result.scalar_one() == 0

@@ -24,7 +24,7 @@ class TestProductDTO:
             updated_at=datetime.now(UTC),
         )
         with pytest.raises(FrozenInstanceError):
-            dto.name = "Modified"
+            dto.name = "Modified"  # ty:ignore[invalid-assignment]
 
     def test_dto_has_slots(self):
         assert hasattr(ProductDTO, "__slots__")

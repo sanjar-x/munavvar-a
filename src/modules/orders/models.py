@@ -90,8 +90,7 @@ class Order(BaseModel):
         nullable=False,
         index=True,
         comment=(
-            "Тип продажи: delivery (доставка) или "
-            "warehouse_pickup (самовывоз)"
+            "Тип продажи: delivery (доставка) или warehouse_pickup (самовывоз)"
         ),
     )
     warehouse_id: Mapped[uuid.UUID | None] = mapped_column(

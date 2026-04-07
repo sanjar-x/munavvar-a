@@ -120,8 +120,8 @@ async def test_courier_orders_list_rejects_non_courier_role():
     app.dependency_overrides[get_user_service] = lambda: FakeUserService(
         Role.ADMIN
     )
-    app.dependency_overrides[get_base_order_service] = (
-        lambda: FakeCourierOrderService()
+    app.dependency_overrides[get_base_order_service] = lambda: (
+        FakeCourierOrderService()
     )
 
     transport = ASGITransport(app=app, raise_app_exceptions=False)

@@ -221,9 +221,7 @@ class BillingService:
             accounts = []
             for acc in items:
                 resp = AccountResponse.model_validate(acc)
-                resp.user_name = (
-                    acc.user.username if acc.user else None
-                )
+                resp.user_name = acc.user.username if acc.user else None
                 accounts.append(resp)
             return {
                 "total_count": total,

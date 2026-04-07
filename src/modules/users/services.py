@@ -224,7 +224,10 @@ class UserService(BaseService[User, UserAdminCreate, UserUnitOfWork]):
                 )
 
             await self.uow.commit()
-            return await self._repo.get(user.id, active_only=False)
+            result = await self._repo.get(user.id, active_only=False)
+            if not result:
+                raise UserNotFoundError(user_id=user.id)
+            return result
 
     async def register_local_user(self, schema: UserAdminCreate) -> User:
         """Регистрация пользователя по номеру телефона и паролю"""
@@ -259,7 +262,10 @@ class UserService(BaseService[User, UserAdminCreate, UserUnitOfWork]):
             # 4. Фиксируем транзакцию
             await self.uow.commit()
 
-            return await self._repo.get(user.id, active_only=False)
+            result = await self._repo.get(user.id, active_only=False)
+            if not result:
+                raise UserNotFoundError(user_id=user.id)
+            return result
 
     async def update(self, id: uuid.UUID, schema: UserAdminUpdate) -> User:
         data = schema.model_dump(exclude_unset=True)
@@ -276,8 +282,8 @@ class UserService(BaseService[User, UserAdminCreate, UserUnitOfWork]):
             if not user:
                 raise UserNotFoundError(user_id=id)
 
-            local_identity = await self._identity_repo.get_local_by_user_or_none(
-                user_id=id
+            local_identity = (
+                await self._identity_repo.get_local_by_user_or_none(user_id=id)
             )
             next_role = user_data.get("role", user.role)
 
@@ -301,7 +307,9 @@ class UserService(BaseService[User, UserAdminCreate, UserUnitOfWork]):
             changed = False
 
             if user_data:
-                user = await self._repo.update(id, user_data, active_only=False)
+                user = await self._repo.update(
+                    id, user_data, active_only=False
+                )
                 changed = True
 
             if phone is not None or password is not None:
@@ -309,7 +317,9 @@ class UserService(BaseService[User, UserAdminCreate, UserUnitOfWork]):
                 if phone is not None:
                     identity_data["provider_identity_id"] = phone
                 if password is not None:
-                    identity_data["password_hash"] = get_password_hash(password)
+                    identity_data["password_hash"] = get_password_hash(
+                        password
+                    )
 
                 try:
                     if local_identity is None:
@@ -334,7 +344,7 @@ class UserService(BaseService[User, UserAdminCreate, UserUnitOfWork]):
                 except IntegrityError as exc:
                     raise UserUpdateConflictError(
                         user_id=id,
-                        reason="Номер телефона уже используется другим пользователем.",
+                        reason="Номер телефона уже используется другим user'ом.",
                     ) from exc
 
                 changed = True
@@ -344,7 +354,10 @@ class UserService(BaseService[User, UserAdminCreate, UserUnitOfWork]):
             if changed:
                 await self.uow.commit()
 
-            return await self._repo.get(id, active_only=False)
+            result = await self._repo.get(id, active_only=False)
+            if not result:
+                raise UserNotFoundError(user_id=id)
+            return result
 
     async def delete_staff(self, id: uuid.UUID) -> None:
         async with self.uow:

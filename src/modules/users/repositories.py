@@ -75,7 +75,9 @@ class IdentityRepository(BaseRepository[Identity]):
     async def get_local_by_user(self, user_id: UUID) -> Identity:
         return await self.get_by_user_and_provider(user_id, AuthProvider.LOCAL)
 
-    async def get_local_by_user_or_none(self, user_id: UUID) -> Identity | None:
+    async def get_local_by_user_or_none(
+        self, user_id: UUID
+    ) -> Identity | None:
         query = select(self.model).where(
             self.model.user_id == user_id,
             self.model.provider == AuthProvider.LOCAL,
@@ -139,8 +141,10 @@ class UserRepository(BaseRepository[User]):
         active_only: bool = True,
         with_for_update: bool = False,
     ) -> User | None:
-        query = select(self.model).where(self.model.id == id).options(
-            selectinload(self.model.identities)
+        query = (
+            select(self.model)
+            .where(self.model.id == id)
+            .options(selectinload(self.model.identities))
         )
         if active_only:
             query = query.where(self.model.is_active.is_(True))

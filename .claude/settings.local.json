@@ -1,23 +1,87 @@
 {
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
   "env": {
-    "ANTHROPIC_DEFAULT_OPUS_MODEL": "claude-opus-4-6[1m]",
-    "CLAUDE_CODE_FILE_READ_MAX_OUTPUT_TOKENS": "100000",
-    "CLAUDE_CODE_SUBAGENT_MODEL": "claude-opus-4-6[1m]",
+    "CLAUDE_CODE_MAX_OUTPUT_TOKENS": "128000",
+    "CLAUDE_CODE_MAX_THINKING_TOKENS": "500000",
+    "CLAUDE_CODE_BUDGET_TOKENS": "10000000",
     "CLAUDE_CODE_EFFORT_LEVEL": "high",
-    "CLAUDE_CODE_MAX_OUTPUT_TOKENS": "127999",
-    "CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY": "50",
+    "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE": "80",
+    "CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY": "15",
+    "ANTHROPIC_DEFAULT_OPUS_MODEL": "claude-opus-4-6[1m]",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL": "claude-sonnet-4-6[1m]",
+    "CLAUDE_AUTO_BACKGROUND_TASKS": "1",
+    "CLAUDE_CODE_RESUME_INTERRUPTED_TURN": "1",
+    "API_TIMEOUT_MS": "600000",
+    "BASH_DEFAULT_TIMEOUT_MS": "300000",
+    "BASH_MAX_TIMEOUT_MS": "600000",
+    "CLAUDE_CODE_FILE_READ_MAX_OUTPUT_TOKENS": "250000",
+    "CLAUDE_CODE_SUBAGENT_MODEL": "claude-opus-4-6",
     "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",
-    "CLAUDE_CODE_ENABLE_FINE_GRAINED_TOOL_STREAMING": "1",
-    "CLAUDE_CODE_DISABLE_ADAPTIVE_THINKING": "1",
-    "CLAUDE_CODE_DISABLE_COMMAND_INJECTION_CHECK": "1",
-    "MAX_THINKING_TOKENS": "127999",
-    "BASH_MAX_OUTPUT_LENGTH": "150000",
-    "MAX_MCP_OUTPUT_TOKENS": "1000000",
-    "TASK_MAX_OUTPUT_LENGTH": "160000"
+    "BASH_MAX_OUTPUT_LENGTH": "500000",
+    "MAX_MCP_OUTPUT_TOKENS": "250000",
+    "TASK_MAX_OUTPUT_LENGTH": "65536",
+    "CLAUDE_ENABLE_STREAM_WATCHDOG": "1",
+    "CLAUDE_STREAM_IDLE_TIMEOUT_MS": "120000",
+    "CLAUDE_CODE_MAX_RETRIES": "15",
+    "CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR": "1",
+    "CLAUDE_CODE_GLOB_TIMEOUT_SECONDS": "60",
+    "PATH": "/home/sanjar/.nvm/versions/node/v24.14.1/bin:/home/sanjar/.local/bin:/usr/local/bin:/usr/bin:/bin"
   },
   "permissions": {
-    "allow": [
-      "Bash(npx vite:*)"
+    "defaultMode": "bypassPermissions"
+  },
+  "model": "opus",
+  "enableAllProjectMcpServers": true,
+  "hooks": {
+    "Notification": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "notify-send -a 'Claude Code' 'Claude Code' 'Требуется ваше внимание' --icon=dialog-information"
+          }
+        ]
+      }
     ]
-  }
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "bash /home/sanjar/.claude/statusline-command.sh"
+  },
+  "enabledPlugins": {
+    "github@claude-plugins-official": true,
+    "superpowers@claude-plugins-official": true,
+    "code-review@claude-plugins-official": true,
+    "claude-md-management@claude-plugins-official": true,
+    "claude-code-setup@claude-plugins-official": true,
+    "pyright-lsp@claude-plugins-official": true,
+    "frontend-design@claude-plugins-official": true,
+    "railway@claude-plugins-official": true,
+    "feature-dev@claude-plugins-official": true,
+    "commit-commands@claude-plugins-official": true,
+    "pr-review-toolkit@claude-plugins-official": true,
+    "plugin-dev@claude-plugins-official": true,
+    "telegram@claude-plugins-official": true,
+    "data-engineering@claude-plugins-official": true,
+    "context7@claude-plugins-official": true,
+    "playwright@claude-plugins-official": true,
+    "typescript-lsp@claude-plugins-official": true,
+    "agent-sdk-dev@claude-plugins-official": true,
+    "chrome-devtools-mcp@claude-plugins-official": true,
+    "code-simplifier@claude-plugins-official": true,
+    "ralph-loop@claude-plugins-official": true,
+    "skill-creator@claude-plugins-official": true,
+    "security-guidance@claude-plugins-official": true
+  },
+  "language": "Russian",
+  "skipWebFetchPreflight": true,
+  "alwaysThinkingEnabled": true,
+  "effortLevel": "high",
+  "autoCompactWindow": 1000000,
+  "fastMode": false,
+  "promptSuggestionEnabled": true,
+  "autoUpdatesChannel": "latest",
+  "voiceEnabled": true,
+  "autoMemoryEnabled": true,
+  "skipDangerousModePermissionPrompt": true
 }

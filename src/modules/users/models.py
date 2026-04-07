@@ -54,7 +54,9 @@ class Identity(BaseModel):
             "provider_identity_id",
             name="uq_identities_provider_identity_id",
         ),
-        {"comment": "Учетные данные пользователей и привязки к соцсетям (OAuth)"},
+        {
+            "comment": "Учетные данные пользователей и привязки к соцсетям (OAuth)"
+        },
     )
 
 

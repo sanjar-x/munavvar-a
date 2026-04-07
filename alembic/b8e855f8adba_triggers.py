@@ -1,6 +1,21 @@
-"""triggers"""
+"""triggers
+
+Revision ID: b8e855f8adba
+Revises: 4a1ea97312ca
+Create Date: 2026-03-31 12:55:54.617012
+
+"""
+
+from collections.abc import Sequence
 
 from alembic import op
+
+# revision identifiers, used by Alembic.
+revision: str = "b8e855f8adba"
+down_revision: str | Sequence[str] | None = "4a1ea97312ca"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
+
 
 # ---------------------------------------------------------------------------
 # SQL: Триггер автоматического пересчета балансов финансовых счетов

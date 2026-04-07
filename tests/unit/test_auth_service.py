@@ -1,5 +1,6 @@
 import uuid
 from types import SimpleNamespace
+from typing import Any, cast
 
 import pytest
 
@@ -11,13 +12,14 @@ from src.core.security.permissions import ROLE_SCOPES
 from src.modules.auth.schemas import LocalLogin
 from src.modules.auth.services import AuthService
 from src.modules.users.enums import Role
+from src.modules.users.services import UserService
 
 
 class FakeUserService:
-    def __init__(self, result):
+    def __init__(self, result: Any) -> None:
         self.result = result
 
-    async def get_user_local_identity(self, identity_id: str):
+    async def get_user_local_identity(self, identity_id: str) -> Any:
         return self.result
 
 
@@ -33,7 +35,7 @@ def make_identity(password_hash: str):
 async def test_local_login_returns_staff_token_with_role_scopes():
     user = make_user(Role.ADMIN)
     identity = make_identity(get_password_hash("secret-123"))
-    service = AuthService(FakeUserService((user, identity)))
+    service = AuthService(cast(UserService, FakeUserService((user, identity))))
 
     result = await service.local_login(
         LocalLogin(phone="+998901234567", password="secret-123")
@@ -50,7 +52,7 @@ async def test_local_login_returns_staff_token_with_role_scopes():
 async def test_local_login_rejects_client_accounts_even_with_valid_password():
     user = make_user(Role.CLIENT_B2C)
     identity = make_identity(get_password_hash("secret-123"))
-    service = AuthService(FakeUserService((user, identity)))
+    service = AuthService(cast(UserService, FakeUserService((user, identity))))
 
     with pytest.raises(ForbiddenError) as exc:
         await service.local_login(
@@ -64,7 +66,7 @@ async def test_local_login_rejects_client_accounts_even_with_valid_password():
 async def test_courier_login_returns_courier_token_with_role_scopes():
     user = make_user(Role.COURIER)
     identity = make_identity(get_password_hash("secret-123"))
-    service = AuthService(FakeUserService((user, identity)))
+    service = AuthService(cast(UserService, FakeUserService((user, identity))))
 
     result = await service.courier_login(
         LocalLogin(phone="+998901234567", password="secret-123")
@@ -81,7 +83,7 @@ async def test_courier_login_returns_courier_token_with_role_scopes():
 async def test_courier_login_rejects_non_courier_staff_accounts():
     user = make_user(Role.ADMIN)
     identity = make_identity(get_password_hash("secret-123"))
-    service = AuthService(FakeUserService((user, identity)))
+    service = AuthService(cast(UserService, FakeUserService((user, identity))))
 
     with pytest.raises(ForbiddenError) as exc:
         await service.courier_login(
@@ -95,10 +97,12 @@ async def test_courier_login_rejects_non_courier_staff_accounts():
 async def test_local_login_masks_invalid_hash_as_invalid_credentials():
     user = make_user(Role.CLIENT_B2C, user_id=WALKIN_USER_ID)
     identity = make_identity("!disabled")
-    service = AuthService(FakeUserService((user, identity)))
+    service = AuthService(cast(UserService, FakeUserService((user, identity))))
 
     with pytest.raises(UnauthorizedError) as exc:
-        await service.local_login(LocalLogin(phone="00000000002", password="anything"))
+        await service.local_login(
+            LocalLogin(phone="00000000002", password="anything")
+        )
 
     assert exc.value.error_code == "INVALID_CREDENTIALS"
 
@@ -107,7 +111,7 @@ async def test_local_login_masks_invalid_hash_as_invalid_credentials():
 async def test_client_login_rejects_staff_accounts():
     user = make_user(Role.COURIER)
     identity = make_identity(get_password_hash("secret-123"))
-    service = AuthService(FakeUserService((user, identity)))
+    service = AuthService(cast(UserService, FakeUserService((user, identity))))
 
     with pytest.raises(ForbiddenError) as exc:
         await service.client_login("+998901234567")
@@ -119,7 +123,7 @@ async def test_client_login_rejects_staff_accounts():
 async def test_client_login_rejects_walkin_account():
     user = make_user(Role.CLIENT_B2C, user_id=WALKIN_USER_ID)
     identity = make_identity("!disabled")
-    service = AuthService(FakeUserService((user, identity)))
+    service = AuthService(cast(UserService, FakeUserService((user, identity))))
 
     with pytest.raises(ForbiddenError) as exc:
         await service.client_login("00000000002")

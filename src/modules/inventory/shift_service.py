@@ -1,5 +1,6 @@
 # src/modules/inventory/shift_service.py
 from src.core.config import settings
+from src.core.exceptions import BadRequestError
 from src.modules.finances.enums import AccountType, TransactionStatus
 from src.modules.inventory.enums import (
     InventoryType,
@@ -133,9 +134,19 @@ class ShiftService:
                         inventory.user_id, AccountType.COURIER
                     )
                 )
+                if not courier_account:
+                    raise BadRequestError(
+                        message="Касса курьера не найдена",
+                        error_code="COURIER_ACCOUNT_NOT_FOUND",
+                    )
                 system_cash_account = (
                     await self.uow.accounts.get_system_cash_account()
                 )
+                if not system_cash_account:
+                    raise BadRequestError(
+                        message="Системная касса не найдена",
+                        error_code="SYSTEM_CASH_ACCOUNT_NOT_FOUND",
+                    )
                 await self.uow.financial_transactions.add(
                     {
                         "from_id": courier_account.id,
