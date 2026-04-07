@@ -12,6 +12,7 @@ from src.modules.orders.enums import OrderStatus, PaymentMethod, SaleType
 if TYPE_CHECKING:
     from src.infrastructure.database.models import User
     from src.modules.catalog.models import Product
+    from src.modules.contracts.models import Contract
     from src.modules.finances.models import Transaction
     from src.modules.inventory.models import Inventory, StockTransfer
 
@@ -100,6 +101,17 @@ class Order(BaseModel):
         index=True,
         comment="Склад-источник (заполняется только для самовывоза)",
     )
+    contract_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("contracts.id", ondelete="RESTRICT"),
+        nullable=True,
+        index=True,
+        comment=(
+            "Договор (обязателен при payment_method=CONTRACT, "
+            "иначе NULL). ondelete=RESTRICT: нельзя удалить "
+            "договор с привязанными заказами."
+        ),
+    )
     client: Mapped["User"] = relationship(
         foreign_keys=[client_id],
         back_populates="client_orders",
@@ -127,6 +139,11 @@ class Order(BaseModel):
         "Transaction",
         back_populates="order",
         cascade="all, delete-orphan",
+    )
+    contract: Mapped["Contract | None"] = relationship(
+        foreign_keys=[contract_id],
+        back_populates="orders",
+        lazy="raise",
     )
 
     __table_args__ = ({"comment": "Главная таблица заказов клиентов"},)

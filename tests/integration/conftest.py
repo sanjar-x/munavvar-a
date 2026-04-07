@@ -4,7 +4,7 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.core.constants import SYSTEM_USER_ID, WALKIN_USER_ID
+from src.core.constants import WALKIN_USER_ID
 from src.infrastructure.database.models import (
     Account,
     Identity,

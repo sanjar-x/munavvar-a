@@ -279,7 +279,7 @@ class ClientsDebtsResponse(BaseModel):
 class AcceptPaymentRequest(BaseModel):
     client_id: uuid.UUID
     amount: int = Field(gt=0)
-    payment_method: str = Field(pattern="^(cash|card)$")
+    payment_method: str = Field(pattern="^(cash|card|bank)$")
     reason: str = Field(min_length=3, max_length=255)
     order_id: uuid.UUID | None = None
 

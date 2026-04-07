@@ -1,7 +1,7 @@
 # src/modules/orders/repositories.py
 import uuid
 from collections.abc import Sequence
-from datetime import datetime
+from datetime import UTC, date, datetime, timedelta
 
 from sqlalchemy import Result, delete, desc, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -9,7 +9,6 @@ from sqlalchemy.orm import joinedload, selectinload
 
 from src.common.repository import BaseRepository
 from src.infrastructure.database.models import (
-    Identity,
     Inventory,
     Order,
     OrderItem,
@@ -148,6 +147,7 @@ class OrderRepository(BaseRepository[Order]):
         date_to: datetime | None = None,
         min_amount: int | None = None,
         max_amount: int | None = None,
+        contract_id: uuid.UUID | None = None,
     ) -> Sequence[Order]:
         """
         Универсальный поиск заказов по всем доступным атрибутам модели.
@@ -170,6 +170,8 @@ class OrderRepository(BaseRepository[Order]):
             )
         if sale_type:
             query = query.where(self.model.sale_type == sale_type)
+        if contract_id:
+            query = query.where(self.model.contract_id == contract_id)
 
         # Диапазоны дат (предполагается, что created_at есть в BaseModel)
         if date_from:
@@ -190,6 +192,41 @@ class OrderRepository(BaseRepository[Order]):
             .limit(limit)
         )
 
+        result: Result = await self.session.execute(query)
+        return result.scalars().all()
+
+    async def get_delivered_by_contract(
+        self,
+        contract_id: uuid.UUID,
+        date_from: date,
+        date_to: date,
+    ) -> Sequence[Order]:
+        """Все выполненные заказы по договору за период.
+        Используется при генерации Invoice и акта сверки.
+
+        date_from/date_to — включительно (полные сутки по UTC).
+        """
+        from_dt = datetime.combine(date_from, datetime.min.time()).replace(
+            tzinfo=UTC
+        )
+        # Захватываем весь день date_to — берём начало следующего дня
+        to_dt = datetime.combine(
+            date_to + timedelta(days=1), datetime.min.time()
+        ).replace(tzinfo=UTC)
+        query = (
+            select(self.model)
+            .where(
+                self.model.contract_id == contract_id,
+                self.model.status.in_([
+                    OrderStatus.DELIVERED,
+                    OrderStatus.PICKUP_COMPLETED,
+                ]),
+                self.model.created_at >= from_dt,
+                self.model.created_at < to_dt,
+                self.model.is_active.is_(True),
+            )
+            .order_by(self.model.created_at)
+        )
         result: Result = await self.session.execute(query)
         return result.scalars().all()
 

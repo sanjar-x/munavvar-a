@@ -27,9 +27,7 @@ async def get_dashboard(
         User,
         Security(get_current_user, scopes=[Scope.FINANCES_READ]),
     ],
-    billing_service: Annotated[
-        BillingService, Depends(get_billing_service)
-    ],
+    billing_service: Annotated[BillingService, Depends(get_billing_service)],
 ):
     """Финансовый дашборд: системные счета, итоги, pending."""
     return await billing_service.get_dashboard()
@@ -46,9 +44,7 @@ async def get_accounts(
         User,
         Security(get_current_user, scopes=[Scope.FINANCES_READ]),
     ],
-    billing_service: Annotated[
-        BillingService, Depends(get_billing_service)
-    ],
+    billing_service: Annotated[BillingService, Depends(get_billing_service)],
     type: Annotated[
         AccountType | None,
         Query(description="Фильтр по типу счёта"),
@@ -90,9 +86,7 @@ async def get_account_detail(
         User,
         Security(get_current_user, scopes=[Scope.FINANCES_READ]),
     ],
-    billing_service: Annotated[
-        BillingService, Depends(get_billing_service)
-    ],
+    billing_service: Annotated[BillingService, Depends(get_billing_service)],
 ):
     """Детальная информация по счёту с последними транзакциями."""
     return await billing_service.get_account_detail(
@@ -112,9 +106,7 @@ async def get_account_statement(
         User,
         Security(get_current_user, scopes=[Scope.FINANCES_READ]),
     ],
-    billing_service: Annotated[
-        BillingService, Depends(get_billing_service)
-    ],
+    billing_service: Annotated[BillingService, Depends(get_billing_service)],
     date_from: Annotated[
         datetime | None,
         Query(description="Начало периода"),
@@ -148,9 +140,7 @@ async def get_transactions(
         User,
         Security(get_current_user, scopes=[Scope.FINANCES_READ]),
     ],
-    billing_service: Annotated[
-        BillingService, Depends(get_billing_service)
-    ],
+    billing_service: Annotated[BillingService, Depends(get_billing_service)],
     status: Annotated[
         TransactionStatus | None,
         Query(description="Фильтр по статусу"),
@@ -209,9 +199,7 @@ async def create_transaction(
         User,
         Security(get_current_user, scopes=[Scope.FINANCES_WRITE]),
     ],
-    billing_service: Annotated[
-        BillingService, Depends(get_billing_service)
-    ],
+    billing_service: Annotated[BillingService, Depends(get_billing_service)],
 ):
     """Создание ручной проводки (инкассация, возврат и т.д.)."""
     return await billing_service.create_transaction(
@@ -232,9 +220,7 @@ async def verify_transaction(
         User,
         Security(get_current_user, scopes=[Scope.FINANCES_WRITE]),
     ],
-    billing_service: Annotated[
-        BillingService, Depends(get_billing_service)
-    ],
+    billing_service: Annotated[BillingService, Depends(get_billing_service)],
 ):
     """Верификация PENDING-транзакции (бухгалтер)."""
     return await billing_service.verify_transaction(
@@ -264,9 +250,7 @@ async def reject_transaction(
         User,
         Security(get_current_user, scopes=[Scope.FINANCES_WRITE]),
     ],
-    billing_service: Annotated[
-        BillingService, Depends(get_billing_service)
-    ],
+    billing_service: Annotated[BillingService, Depends(get_billing_service)],
 ):
     """Отклонение PENDING-транзакции с указанием причины."""
     return await billing_service.reject_transaction(
@@ -287,9 +271,7 @@ async def get_couriers_summary(
         User,
         Security(get_current_user, scopes=[Scope.FINANCES_READ]),
     ],
-    billing_service: Annotated[
-        BillingService, Depends(get_billing_service)
-    ],
+    billing_service: Annotated[BillingService, Depends(get_billing_service)],
 ):
     """Сводка по кассам курьеров: баланс, сборы, инкассация."""
     return await billing_service.get_couriers_summary()
@@ -306,9 +288,7 @@ async def get_client_debts(
         User,
         Security(get_current_user, scopes=[Scope.FINANCES_READ]),
     ],
-    billing_service: Annotated[
-        BillingService, Depends(get_billing_service)
-    ],
+    billing_service: Annotated[BillingService, Depends(get_billing_service)],
     min_debt: Annotated[
         int | None,
         Query(ge=0, description="Минимальный долг"),
@@ -332,15 +312,11 @@ async def get_client_debts(
 
 @finances_router.post("/cashbox/accept-payment", status_code=201)
 async def accept_payment(
-    client_id: Annotated[
-        uuid.UUID, Body(description="ID клиента")
-    ],
-    amount: Annotated[
-        int, Body(gt=0, description="Сумма оплаты")
-    ],
+    client_id: Annotated[uuid.UUID, Body(description="ID клиента")],
+    amount: Annotated[int, Body(gt=0, description="Сумма оплаты")],
     payment_method: Annotated[
         str,
-        Body(description="Способ оплаты: cash / card"),
+        Body(description="Способ оплаты: cash / card / bank"),
     ],
     reason: Annotated[
         str,
@@ -354,9 +330,7 @@ async def accept_payment(
         User,
         Security(get_current_user, scopes=[Scope.PAYMENTS_CREATE]),
     ],
-    billing_service: Annotated[
-        BillingService, Depends(get_billing_service)
-    ],
+    billing_service: Annotated[BillingService, Depends(get_billing_service)],
     order_id: Annotated[
         uuid.UUID | None,
         Body(description="ID заказа (опционально)"),

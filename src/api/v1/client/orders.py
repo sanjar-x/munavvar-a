@@ -44,7 +44,11 @@ async def create_order(
     ],
 ):
     """Создание"""
-    return await base_order_service.create_order(client_id=client.id, dto=dto)
+    return await base_order_service.create_order(
+        client_id=client.id,
+        dto=dto,
+        client_role=client.role,
+    )
 
 
 @orders_router.get("/{order_id}", response_model=OrderResponse)

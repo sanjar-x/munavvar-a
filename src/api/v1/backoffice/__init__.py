@@ -2,6 +2,7 @@ from fastapi import APIRouter
 
 from src.api.v1.backoffice.catalog import catalog_router
 from src.api.v1.backoffice.clients import clients_router
+from src.api.v1.backoffice.contracts import contracts_router
 from src.api.v1.backoffice.couriers import couriers_router
 from src.api.v1.backoffice.dashboard import (
     dashboard_router,
@@ -60,4 +61,9 @@ backoffice.include_router(
 )
 backoffice.include_router(
     system_router, prefix="/system", tags=["Backoffice | System"]
+)
+backoffice.include_router(
+    contracts_router,
+    prefix="/contracts",
+    tags=["Backoffice | Contracts"],
 )

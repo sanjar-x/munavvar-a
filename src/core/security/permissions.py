@@ -62,6 +62,14 @@ class Scope:
         "bills:read"  # Просмотр счетов-фактур и актов (Клиент B2B, Бухгалтер)
     )
 
+    # --- ДОГОВОРЫ (Contracts) ---
+    CONTRACTS_READ = "contracts:read"
+    # Просмотр списка договоров, деталей, прайс-листов
+    CONTRACTS_WRITE = "contracts:write"
+    # Создание договора, редактирование условий, управление прайс-листом
+    CONTRACTS_MANAGE = "contracts:manage"
+    # Активация / приостановка / расторжение (смена статуса)
+
     # --- СИСТЕМНЫЕ (System) ---
     SETTINGS_READ = "settings:read"  # Просмотр глобальных настроек системы
     SETTINGS_WRITE = "settings:write"  # Изменение системных настроек (Админ)
@@ -99,6 +107,9 @@ ROLE_SCOPES: dict[Role, list[str]] = {
         Scope.FINANCES_READ,
         Scope.FINANCES_WRITE,
         Scope.PAYMENTS_CREATE,
+        Scope.CONTRACTS_READ,
+        Scope.CONTRACTS_WRITE,
+        Scope.CONTRACTS_MANAGE,
         Scope.SETTINGS_READ,
         Scope.SETTINGS_WRITE,
     ],
@@ -109,6 +120,7 @@ ROLE_SCOPES: dict[Role, list[str]] = {
         Scope.FINANCES_READ,
         Scope.FINANCES_WRITE,
         Scope.BILLS_READ,
+        Scope.CONTRACTS_READ,
     ],
     # Кладовщик (Только склад и логистика)
     Role.STOREKEEPER: BASE_SCOPES
@@ -143,12 +155,13 @@ ROLE_SCOPES: dict[Role, list[str]] = {
         Scope.ORDERS_CREATE,
         Scope.ORDERS_CANCEL,
     ],
-    # Юр. лицо (Свои заказы + финансовые документы)
+    # Юр. лицо (Свои заказы + финансовые документы + договор)
     Role.CLIENT_B2B: BASE_SCOPES
     + [
         Scope.ORDERS_READ,
         Scope.ORDERS_CREATE,
         Scope.ORDERS_CANCEL,
         Scope.BILLS_READ,
+        Scope.CONTRACTS_READ,
     ],
 }

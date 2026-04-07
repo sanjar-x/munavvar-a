@@ -14,7 +14,6 @@ from src.infrastructure.database.models import (
     Inventory,
     User,
 )
-from src.modules.inventory.enums import InventoryType
 from src.modules.users.enums import Role
 from tests.conftest import make_auth_headers
 from tests.integration.conftest import (

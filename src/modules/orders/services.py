@@ -1,24 +1,33 @@
 # src/modules/orders/services.py
 import uuid
 from collections.abc import Sequence
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any, cast
 
 from src.common.service import BaseService
+from src.core.constants import WALKIN_USER_ID
+from src.core.exceptions import BadRequestError, NotFoundError
 from src.infrastructure.database.models import Order, StockTransfer
 from src.modules.catalog.public import CatalogService
+from src.modules.contracts.enums import ContractStatus
+from src.modules.contracts.exceptions import (
+    ContractExpiredError,
+    ContractNotActiveError,
+    ContractRequiredError,
+    CreditLimitExceededError,
+)
+from src.modules.contracts.models import Contract
 from src.modules.finances.enums import TransactionStatus
 from src.modules.inventory.enums import (
     InventoryType,
     TransferStatus,
     TransferType,
 )
-from src.modules.orders.enums import OrderStatus, PaymentMethod, SaleType
-from src.core.exceptions import BadRequestError, NotFoundError
 from src.modules.inventory.exceptions import (
-    InventoryNotFoundError,
     InsufficientStockError,
+    InventoryNotFoundError,
 )
+from src.modules.orders.enums import OrderStatus, PaymentMethod, SaleType
 from src.modules.orders.exceptions import (
     CannotRemoveLastItemError,
     ClientInventoryNotFoundError,
@@ -41,7 +50,6 @@ from src.modules.orders.schemas import (
 )
 from src.modules.orders.uow import BaseOrderUnitOfWork
 from src.modules.users.enums import Role
-from src.core.constants import WALKIN_USER_ID
 
 
 class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
@@ -140,51 +148,85 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
     # --- БИЗНЕС-ЛОГИКА ---
 
     async def create_order(
-        self, client_id: uuid.UUID, dto: OrderCreate
+        self,
+        client_id: uuid.UUID,
+        dto: OrderCreate,
+        client_role: Role = Role.CLIENT_B2C,
     ) -> Order:
         """
         Процесс Checkout'а.
         Формирует корзину заказа (OrderItem) и высчитывает (total_amount),
         замораживая цены из Каталога на момент покупки.
+
+        Для B2B-клиентов с payment_method=CONTRACT — обязательно нужен
+        активный договор. Цены и кредитный лимит проверяются ВНУТРИ
+        транзакции после SELECT FOR UPDATE (защита от TOCTOU).
         """
         if not dto.items:
             raise EmptyCartError()
 
-        # 1. Извлекаем уникальные ID товаров и идем за ценами в соседний домен
+        # 1. Каталожные цены: собственный UoW CatalogService — это
+        #    намеренно вне основной транзакции (snapshot read, без блокировки).
         product_ids = [item.product_id for item in dto.items]
         products = await self.catalog_service.get_by_ids(product_ids)
         price_map = {p.id: p.price for p in products}
 
-        # Валидация: все ли товары найдены
         missing_ids = [pid for pid in product_ids if pid not in price_map]
         if missing_ids:
             raise ProductsUnavailableError(missing_product_ids=missing_ids)
 
-        # 1.1 Валидация обмена тары (Task 3)
-        # Ищем товары, требующие возврата тары (returnable_item_id)
+        # 1.1 Товары, требующие возврата тары
         exchange_items = [
             (p, next(i for i in dto.items if i.product_id == p.id))
             for p in products
             if p.returnable_item_id is not None
         ]
 
-        # 2. Высчитываем стоимость строк и итоговую сумму
-        total_amount = 0
-        order_items_data = []
-        for item in dto.items:
-            current_price = price_map[item.product_id]
-            total_amount += current_price * item.quantity
-            order_items_data.append(
-                {
-                    "product_id": item.product_id,
-                    "quantity": item.quantity,
-                    "unit_price": current_price,  # Snapshot Pattern
-                }
-            )
-
-        # 3. Всё — оприходование тары И создание заказа — в одной транзакции
+        # 3. Всё — оприходование тары, договор, создание заказа — атомарно
         async with self.uow:
             capitalization_applied = False
+
+            # --- Блок A: CONTRACT-специфичная логика ---
+            # Весь этот блок выполняется ВНУТРИ async with self.uow,
+            # ПОСЛЕ SELECT FOR UPDATE на строку договора, чтобы исключить
+            # гонку TOCTOU (статус мог измениться между внешней проверкой
+            # и реальной фиксацией заказа).
+            contract: Contract | None = None
+            if dto.payment_method == PaymentMethod.CONTRACT:
+                contract = await self._get_and_validate_contract_locked(
+                    client_id=client_id,
+                    client_role=client_role,
+                )
+                # Переопределяем каталожные цены договорными ценами
+                contract_prices = (
+                    await self.uow.contracts.get_price_map_for_products(
+                        contract.id, product_ids
+                    )
+                )
+                price_map.update(contract_prices)
+
+            # 2. Высчитываем стоимость строк и итоговую сумму
+            #    (ВНУТРИ транзакции, чтобы использовать
+            #    актуальные договорные цены)
+            total_amount = 0
+            order_items_data = []
+            for item in dto.items:
+                current_price = price_map[item.product_id]
+                total_amount += current_price * item.quantity
+                order_items_data.append(
+                    {
+                        "product_id": item.product_id,
+                        "quantity": item.quantity,
+                        "unit_price": current_price,  # Snapshot Pattern
+                    }
+                )
+
+            # --- Блок B: Проверка и резервирование кредитного лимита ---
+            if contract is not None:
+                await self._check_and_reserve_credit(
+                    contract=contract,
+                    amount=total_amount,
+                )
 
             if exchange_items:
                 # Получаем баланс пустой тары клиента (с блокировкой от Race Condition)
@@ -260,6 +302,7 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
                     "status": OrderStatus.NEW,
                     "total_amount": total_amount,
                     "capitalization_applied": capitalization_applied,
+                    "contract_id": contract.id if contract else None,
                 }
             )
 
@@ -523,9 +566,7 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
                     order_id=order_id,
                     current_status=order.status,
                     expected_status=OrderStatus.NEW,
-                    message=(
-                        "Нельзя менять состав заказа в текущем статусе"
-                    ),
+                    message=("Нельзя менять состав заказа в текущем статусе"),
                 )
 
             # 3. Ищем, есть ли уже такой товар в заказе
@@ -587,9 +628,7 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
                     order_id=order_id,
                     current_status=order.status,
                     expected_status=OrderStatus.NEW,
-                    message=(
-                        "Нельзя менять состав заказа в текущем статусе"
-                    ),
+                    message=("Нельзя менять состав заказа в текущем статусе"),
                 )
 
             existing_item = (
@@ -737,8 +776,89 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
                     cast(Order, updated_order), actual_items
                 )
 
+            # CONTRACT: возврат зарезервированного кредита при отмене.
+            # decrement вызывается только если заказ ещё не был исполнен
+            # (DELIVERED/PICKUP_COMPLETED уже сделали decrement в settlement).
+            _settled_statuses = {
+                OrderStatus.DELIVERED,
+                OrderStatus.PICKUP_COMPLETED,
+            }
+            if (
+                new_status == OrderStatus.CANCELLED
+                and order.payment_method == PaymentMethod.CONTRACT
+                and order.contract_id is not None
+                and old_status not in _settled_statuses
+            ):
+                await self.uow.contracts.decrement_credit_used(
+                    order.contract_id, order.total_amount
+                )
+
             await self.uow.commit()
             return updated_order
+
+    async def _get_and_validate_contract_locked(
+        self,
+        client_id: uuid.UUID,
+        client_role: Role,
+    ) -> Contract:
+        """Получить активный договор клиента с блокировкой FOR UPDATE.
+
+        Вызывается ВНУТРИ async with self.uow.
+        Проверяет статус и срок действия ПОСЛЕ захвата строки,
+        что исключает TOCTOU-гонку.
+        """
+        if client_role != Role.CLIENT_B2B:
+            raise BadRequestError(
+                message=(
+                    "Оплата по договору доступна только для "
+                    "юридических лиц (CLIENT_B2B)"
+                ),
+                error_code="CONTRACT_PAYMENT_NOT_ALLOWED",
+                details={"client_role": str(client_role)},
+            )
+
+        contract = await self.uow.contracts.get_active_for_client(
+            client_id, with_for_update=True
+        )
+        if contract is None:
+            raise ContractRequiredError(client_id=client_id)
+
+        # Проверяем статус ПОСЛЕ SELECT FOR UPDATE
+        if contract.status != ContractStatus.ACTIVE:
+            raise ContractNotActiveError(
+                contract_id=contract.id,
+                status=str(contract.status),
+            )
+
+        # Проверяем срок действия (UTC-safe)
+        today = datetime.now(UTC).date()
+        if contract.end_date and contract.end_date < today:
+            raise ContractExpiredError(contract_id=contract.id)
+
+        return contract
+
+    async def _check_and_reserve_credit(
+        self,
+        contract: Contract,
+        amount: int,
+    ) -> None:
+        """Проверить кредитный лимит и зарезервировать сумму.
+
+        Вызывается ВНУТРИ async with self.uow ПОСЛЕ
+        _get_and_validate_contract_locked (строка уже залочена).
+        credit_limit = 0 означает безлимитный кредит.
+        """
+        if contract.credit_limit != 0:
+            total_exposure = contract.credit_used + amount
+            if total_exposure > contract.credit_limit:
+                raise CreditLimitExceededError(
+                    contract_id=contract.id,
+                    credit_limit=contract.credit_limit,
+                    current_exposure=contract.credit_used,
+                    order_amount=amount,
+                )
+
+        await self.uow.contracts.increment_credit_used(contract.id, amount)
 
     @staticmethod
     def _build_returnable_items(
@@ -794,9 +914,7 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
         transfer = await self.uow.transfers.add(transfer_data)
         await self.uow.flush()
 
-        effective_items = [
-            i for i in items if i.get("quantity", 0) > 0
-        ]
+        effective_items = [i for i in items if i.get("quantity", 0) > 0]
 
         await self.uow.transfer_items.add_many(
             [
@@ -1099,9 +1217,7 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
                 error_code="CLIENT_ACCOUNT_NOT_FOUND",
                 details={"client_id": str(order.client_id)},
             )
-        revenue_account = (
-            await self.uow.accounts.get_system_revenue_account()
-        )
+        revenue_account = await self.uow.accounts.get_system_revenue_account()
 
         # Долг клиенту (balance обновит триггер при INSERT)
         financial_txns: list[dict] = [
@@ -1117,10 +1233,8 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
 
         if order.payment_method == PaymentMethod.CASH:
             if order.courier_id:
-                courier_account = (
-                    await self.uow.accounts.get_courier_account(
-                        order.courier_id
-                    )
+                courier_account = await self.uow.accounts.get_courier_account(
+                    order.courier_id
                 )
                 if courier_account:
                     financial_txns.append(
@@ -1135,9 +1249,7 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
                     )
 
         elif order.payment_method == PaymentMethod.CARD:
-            card_account = (
-                await self.uow.accounts.get_system_card_account()
-            )
+            card_account = await self.uow.accounts.get_system_card_account()
             financial_txns.append(
                 {
                     "from_id": client_account.id,
@@ -1154,6 +1266,16 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
 
         await self.uow.financial_transactions.add_many(financial_txns)
 
+        # При CONTRACT-оплате — возвращаем зарезервированный кредит,
+        # т.к. долг теперь перешёл в финансовый баланс клиента.
+        if (
+            order.payment_method == PaymentMethod.CONTRACT
+            and order.contract_id is not None
+        ):
+            await self.uow.contracts.decrement_credit_used(
+                order.contract_id, order.total_amount
+            )
+
     async def _process_pickup_settlement(self, order: Order) -> None:
         """
         Финансовое закрытие самовывоза.
@@ -1168,15 +1290,12 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
         if not client_account:
             raise NotFoundError(
                 message=(
-                    "Финансовый счет клиента "
-                    f"{order.client_id} не найден"
+                    f"Финансовый счет клиента {order.client_id} не найден"
                 ),
                 error_code="CLIENT_ACCOUNT_NOT_FOUND",
                 details={"client_id": str(order.client_id)},
             )
-        revenue_account = (
-            await self.uow.accounts.get_system_revenue_account()
-        )
+        revenue_account = await self.uow.accounts.get_system_revenue_account()
 
         # Долг клиенту (самовывоз)
         financial_txns: list[dict] = [
@@ -1191,9 +1310,7 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
         ]
 
         if order.payment_method == PaymentMethod.CASH:
-            cash_account = (
-                await self.uow.accounts.get_system_cash_account()
-            )
+            cash_account = await self.uow.accounts.get_system_cash_account()
             financial_txns.append(
                 {
                     "from_id": client_account.id,
@@ -1201,16 +1318,12 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
                     "amount": order.total_amount,
                     "order_id": order.id,
                     "status": TransactionStatus.COMPLETED,
-                    "reason": (
-                        "Оплата наличными на складе (самовывоз)"
-                    ),
+                    "reason": ("Оплата наличными на складе (самовывоз)"),
                 }
             )
 
         elif order.payment_method == PaymentMethod.CARD:
-            card_account = (
-                await self.uow.accounts.get_system_card_account()
-            )
+            card_account = await self.uow.accounts.get_system_card_account()
             financial_txns.append(
                 {
                     "from_id": client_account.id,
@@ -1218,9 +1331,7 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
                     "amount": order.total_amount,
                     "order_id": order.id,
                     "status": TransactionStatus.PENDING,
-                    "reason": (
-                        "Перевод на карту (самовывоз)"
-                    ),
+                    "reason": ("Перевод на карту (самовывоз)"),
                 }
             )
 
@@ -1228,6 +1339,15 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
         # на балансе клиента до оплаты по договору
 
         await self.uow.financial_transactions.add_many(financial_txns)
+
+        # При CONTRACT-оплате — возвращаем зарезервированный кредит.
+        if (
+            order.payment_method == PaymentMethod.CONTRACT
+            and order.contract_id is not None
+        ):
+            await self.uow.contracts.decrement_credit_used(
+                order.contract_id, order.total_amount
+            )
 
     async def check_tara_availability(self, dto: TaraCheckRequest) -> dict:
         """

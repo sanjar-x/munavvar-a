@@ -685,9 +685,12 @@ class BillingService:
             if payment_method == "cash":
                 target = await self.uow.accounts.get_system_cash_account()
                 status = TransactionStatus.COMPLETED
-            else:
+            elif payment_method == "card":
                 target = await self.uow.accounts.get_system_card_account()
                 status = TransactionStatus.PENDING
+            else:  # bank
+                target = await self.uow.accounts.get_system_bank_account()
+                status = TransactionStatus.COMPLETED
 
             if not target:
                 raise AccountNotFoundError(

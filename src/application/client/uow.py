@@ -2,6 +2,7 @@
 from src.common.uow import IUnitOfWork
 from src.infrastructure.database.uow import BaseSQLAlchemyUoW
 from src.modules.catalog.repositories import ProductRepository
+from src.modules.contracts.repositories import ContractRepository
 from src.modules.finances.repositories import (
     AccountRepository,
     TransactionRepository,
@@ -31,6 +32,7 @@ class IClientUnitOfWork(IUnitOfWork):
     stock_transactions: StockTransactionRepository
     orders: OrderRepository
     order_items: OrderItemRepository
+    contracts: ContractRepository
 
 
 class ClientUnitOfWork(BaseSQLAlchemyUoW, IClientUnitOfWork):
@@ -49,5 +51,6 @@ class ClientUnitOfWork(BaseSQLAlchemyUoW, IClientUnitOfWork):
         )
         self.orders = OrderRepository(session=self.session)
         self.order_items = OrderItemRepository(session=self.session)
+        self.contracts = ContractRepository(session=self.session)
 
         return self

@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from src.api.v1.client.catalog import catalog_router
+from src.api.v1.client.contracts import contracts_router
 from src.api.v1.client.finances import finances_router
 from src.api.v1.client.inventory import inventory_router
 from src.api.v1.client.login import login_router
@@ -27,4 +28,9 @@ client_router.include_router(
     finances_router,
     prefix="/finances",
     tags=["Client | Finances"],
+)
+client_router.include_router(
+    contracts_router,
+    prefix="",
+    tags=["Client | Contracts"],
 )

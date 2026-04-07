@@ -22,6 +22,7 @@ _SESSION_FACTORY_MODULES = [
     "src.modules.orders.dependencies",
     "src.modules.inventory.dependencies",
     "src.modules.finances.dependencies",
+    "src.modules.contracts.dependencies",
     "src.application.client.dependencies",
     "src.application.courier.dependencies",
     "src.application.inventories.dependencies",
@@ -115,14 +116,8 @@ async def client(session_factory):
     for mod_path in _SESSION_FACTORY_MODULES:
         mod = sys.modules.get(mod_path)
         if mod and hasattr(mod, "async_session_maker"):
-            originals[mod_path] = getattr(
-                mod, "async_session_maker"
-            )
-            setattr(
-                mod,
-                "async_session_maker",
-                session_factory,
-            )
+            originals[mod_path] = mod.async_session_maker
+            mod.async_session_maker = session_factory
 
     app = create_app()
     transport = ASGITransport(
@@ -136,6 +131,4 @@ async def client(session_factory):
     for mod_path, original in originals.items():
         mod = sys.modules.get(mod_path)
         if mod:
-            setattr(
-                mod, "async_session_maker", original
-            )
+            mod.async_session_maker = original

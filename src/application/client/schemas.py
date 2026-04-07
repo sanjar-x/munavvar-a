@@ -106,6 +106,7 @@ class ClientResponse(BaseModel):
     )
     id: uuid.UUID
     username: str
+    role: ClientRole
     phone: str | None = None
     account: Account | None = None
     inventories: list[Inventory]

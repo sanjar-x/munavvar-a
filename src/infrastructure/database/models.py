@@ -1,6 +1,11 @@
 # src/infrastructure/database/models.py
 from src.infrastructure.database.base import BaseModel
 from src.modules.catalog.models import Product
+from src.modules.contracts.models import (  # noqa: F401
+    Contract,
+    ContractPriceItem,
+    Invoice,
+)
 from src.modules.finances.models import Account, Transaction
 from src.modules.inventory.models import (
     Balance,
@@ -15,6 +20,9 @@ from src.modules.users.models import Identity, User
 __all__ = [
     "BaseModel",
     "Product",
+    "Contract",
+    "ContractPriceItem",
+    "Invoice",
     "Account",
     "Transaction",
     "Balance",

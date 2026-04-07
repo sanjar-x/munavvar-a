@@ -6,9 +6,9 @@ from src.core.exceptions import (
     ConflictError,
     ForbiddenError,
     NotFoundError,
-    UnprocessableEntityError,
     ServiceUnavailableError,
     UnauthorizedError,
+    UnprocessableEntityError,
 )
 
 

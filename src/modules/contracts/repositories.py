@@ -1,0 +1,159 @@
+# src/modules/contracts/repositories.py
+import uuid
+from collections.abc import Sequence
+from typing import Any
+
+import sqlalchemy as sa
+from sqlalchemy import select
+from sqlalchemy.orm import joinedload, selectinload
+
+from src.common.repository import BaseRepository
+from src.modules.contracts.enums import ContractStatus
+from src.modules.contracts.models import (
+    Contract,
+    ContractPriceItem,
+    Invoice,
+)
+
+
+class ContractRepository(BaseRepository[Contract]):
+    def __init__(self, session: Any):
+        super().__init__(model=Contract, session=session)
+
+    async def get_active_for_client(
+        self,
+        client_id: uuid.UUID,
+        with_for_update: bool = False,
+    ) -> Contract | None:
+        """Активный договор клиента.
+        with_for_update=True — при проверке кредитного лимита
+        для предотвращения race condition (TOCTOU).
+        """
+        query = select(Contract).where(
+            Contract.client_id == client_id,
+            Contract.status == ContractStatus.ACTIVE,
+            Contract.is_active.is_(True),
+        )
+        if with_for_update:
+            query = query.with_for_update()
+        result = await self.session.execute(query)
+        return result.scalar_one_or_none()
+
+    async def get_with_price_items(
+        self,
+        contract_id: uuid.UUID,
+    ) -> Contract | None:
+        """Договор с eager-loaded прайс-листом (для API ответа)."""
+        query = (
+            select(Contract)
+            .options(selectinload(Contract.price_items))
+            .where(
+                Contract.id == contract_id,
+                Contract.is_active.is_(True),
+            )
+        )
+        result = await self.session.execute(query)
+        return result.scalar_one_or_none()
+
+    async def get_price_map_for_products(
+        self,
+        contract_id: uuid.UUID,
+        product_ids: list[uuid.UUID],
+    ) -> dict[uuid.UUID, int]:
+        """Возвращает {product_id: price} из договорного прайс-листа.
+        Только для запрошенных product_ids.
+        Используется в create_order() для override каталожных цен.
+        """
+        if not product_ids:
+            return {}
+        query = select(ContractPriceItem).where(
+            ContractPriceItem.contract_id == contract_id,
+            ContractPriceItem.product_id.in_(product_ids),
+            ContractPriceItem.is_active.is_(True),
+        )
+        result = await self.session.execute(query)
+        items = result.scalars().all()
+        return {item.product_id: item.price for item in items}
+
+    async def get_multi_with_client(
+        self,
+        status: ContractStatus | None,
+        client_id: uuid.UUID | None,
+        skip: int,
+        limit: int,
+    ) -> tuple[int, Sequence[Contract]]:
+        """Пагинированный список договоров (backoffice)."""
+        base = (
+            select(Contract)
+            .options(joinedload(Contract.client))
+            .where(Contract.is_active.is_(True))
+        )
+        count_q = (
+            sa.select(sa.func.count())
+            .select_from(Contract)
+            .where(Contract.is_active.is_(True))
+        )
+        if status:
+            base = base.where(Contract.status == status)
+            count_q = count_q.where(Contract.status == status)
+        if client_id:
+            base = base.where(Contract.client_id == client_id)
+            count_q = count_q.where(Contract.client_id == client_id)
+
+        total = (await self.session.execute(count_q)).scalar() or 0
+        result = await self.session.execute(
+            base.order_by(Contract.created_at.desc()).offset(skip).limit(limit)
+        )
+        return total, result.scalars().unique().all()
+
+    async def increment_credit_used(
+        self,
+        contract_id: uuid.UUID,
+        amount: int,
+    ) -> None:
+        """Атомарный инкремент credit_used при создании заказа.
+        Вызывается ПОСЛЕ lock на строку договора (with_for_update=True).
+        """
+        stmt = (
+            sa.update(Contract)
+            .where(Contract.id == contract_id)
+            .values(credit_used=Contract.credit_used + amount)
+        )
+        await self.session.execute(stmt)
+
+    async def decrement_credit_used(
+        self,
+        contract_id: uuid.UUID,
+        amount: int,
+    ) -> None:
+        """Уменьшение credit_used при завершении доставки/отмене.
+        Долг переходит с credit_used на account.balance (через триггер).
+        """
+        stmt = (
+            sa.update(Contract)
+            .where(Contract.id == contract_id)
+            .values(
+                credit_used=sa.func.greatest(Contract.credit_used - amount, 0)
+            )
+        )
+        await self.session.execute(stmt)
+
+
+class ContractPriceItemRepository(BaseRepository[ContractPriceItem]):
+    def __init__(self, session: Any):
+        super().__init__(model=ContractPriceItem, session=session)
+
+    async def get_by_contract_and_product(
+        self,
+        contract_id: uuid.UUID,
+        product_id: uuid.UUID,
+    ) -> ContractPriceItem | None:
+        return await self.get_by(
+            contract_id=contract_id,
+            product_id=product_id,
+        )
+
+
+class InvoiceRepository(BaseRepository[Invoice]):
+    def __init__(self, session: Any):
+        super().__init__(model=Invoice, session=session)
