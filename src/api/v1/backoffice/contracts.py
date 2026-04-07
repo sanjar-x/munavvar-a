@@ -66,7 +66,7 @@ async def list_contracts(
     ],
     service: Annotated[ContractService, Depends(get_contract_service)],
     skip: Annotated[int, Query(ge=0)] = 0,
-    limit: Annotated[int, Query(ge=1, le=200)] = 50,
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
     client_id: Annotated[uuid.UUID | None, Query(alias="clientId")] = None,
     status_filter: Annotated[
         ContractStatus | None, Query(alias="status")
@@ -255,7 +255,7 @@ async def get_contract_orders(
     contract_id: Annotated[uuid.UUID, Path()],
     service: Annotated[ContractService, Depends(get_contract_service)],
     skip: Annotated[int, Query(ge=0)] = 0,
-    limit: Annotated[int, Query(ge=1, le=200)] = 50,
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
 ):
     return await service.list_contract_orders(
         contract_id=contract_id,

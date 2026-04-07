@@ -48,6 +48,11 @@ def create_app() -> FastAPI:
 
     # 1. CORS (Слой 3 - самый внутренний)
     if settings.CORS_ORIGINS:
+        if settings.ENVIRONMENT == "prod" and "*" in settings.CORS_ORIGINS:
+            raise ValueError(
+                "Wildcard CORS ('*') не разрешён в продакшене. "
+                "Укажите конкретные origins в CORS_ORIGINS."
+            )
         app.add_middleware(
             CORSMiddleware,  # ty:ignore[invalid-argument-type]
             allow_origins=settings.CORS_ORIGINS,

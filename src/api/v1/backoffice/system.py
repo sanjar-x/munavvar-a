@@ -3,6 +3,8 @@ from typing import Annotated
 
 from fastapi import APIRouter, Security, status
 
+from src.core.config import settings
+from src.core.exceptions import ForbiddenError
 from src.core.security.permissions import Scope
 from src.core.seeder import Seeder
 from src.infrastructure.database.models import User
@@ -26,8 +28,13 @@ async def seed_database(
     """
     Запускает генератор тестовых данных
     (Товары, Склады, Курьеры, Клиенты, Заказы).
-    Доступно только администраторам.
+    Доступно только администраторам. Недоступно в продакшене.
     """
+    if settings.ENVIRONMENT == "prod":
+        raise ForbiddenError(
+            message="Заполнение тестовыми данными недоступно в продакшене.",
+            error_code="SEEDER_DISABLED_IN_PROD",
+        )
     seeder = Seeder()
     await seeder.seed_all()
     return {"message": "Database seeded successfully!"}

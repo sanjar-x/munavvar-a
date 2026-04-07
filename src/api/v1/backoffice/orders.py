@@ -55,7 +55,7 @@ async def search_orders(
         BaseOrderService, Depends(get_base_order_service)
     ],
     skip: Annotated[int, Query(ge=0)] = 0,
-    limit: Annotated[int, Query(ge=1, le=500)] = 50,
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
     statuses: Annotated[
         list[OrderStatus] | None, Query(description="Фильтр по статусам")
     ] = None,

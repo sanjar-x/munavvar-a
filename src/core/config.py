@@ -1,8 +1,8 @@
 import uuid
 from functools import lru_cache
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any, Literal, Self
 
-from pydantic import BeforeValidator, computed_field
+from pydantic import BeforeValidator, computed_field, model_validator
 from pydantic.types import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy.engine import URL
@@ -29,6 +29,15 @@ class Settings(BaseSettings):
 
     SECRET_KEY: SecretStr
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7
+
+    @model_validator(mode="after")
+    def validate_secret_key(self) -> Self:
+        key = self.SECRET_KEY.get_secret_value()
+        if len(key) < 32:
+            raise ValueError(
+                "SECRET_KEY должен содержать минимум 32 символа"
+            )
+        return self
 
     CORS_ORIGINS: Annotated[list[str] | str, BeforeValidator(parse_cors)] = []
 

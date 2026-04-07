@@ -16,7 +16,9 @@ class CourierCreate(BaseModel):
         ..., description="Номер телефона курьера (будет Identity)"
     )
     password: str = Field(
-        ..., description="Пароль курьера (в открытом виде, будет захэширован)"
+        ...,
+        min_length=8,
+        description="Пароль курьера (минимум 8 символов, будет захэширован)",
     )
 
 

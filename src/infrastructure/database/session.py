@@ -23,9 +23,9 @@ engine: AsyncEngine = create_async_engine(
     echo=settings.DEBUG,
     # --- Настройки пула соединений (Connection Pooling) ---
     # pool_size: Сколько постоянных соединений держать открытыми.
-    pool_size=15,
+    pool_size=20 if settings.ENVIRONMENT == "prod" else 15,
     # max_overflow: Сколько дополнительных соединений можно открыть.
-    max_overflow=10,
+    max_overflow=30 if settings.ENVIRONMENT == "prod" else 10,
     # pool_timeout: Сколько запрос будет ждать свободного соединения из пула,
     # прежде чем выбросить TimeoutError.
     pool_timeout=30,
