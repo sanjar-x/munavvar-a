@@ -55,7 +55,7 @@ class InventoryDashboardQueries:
         # Данные по курьерам и клиентам скрываются.
         is_storekeeper = warehouse_owner_id is not None
 
-        _WH_CO = [
+        _wh_co = [
             InventoryType.WAREHOUSE,
             InventoryType.COURIER,
         ]
@@ -65,21 +65,21 @@ class InventoryDashboardQueries:
                 func.coalesce(
                     func.sum(Balance.quantity).filter(
                         Product.type == ProductType.WATER,
-                        Inventory.type.in_(_WH_CO),
+                        Inventory.type.in_(_wh_co),
                     ),
                     0,
                 ).label("water"),
                 func.coalesce(
                     func.sum(Balance.quantity).filter(
                         Product.type == ProductType.CONTAINER,
-                        Inventory.type.in_(_WH_CO),
+                        Inventory.type.in_(_wh_co),
                     ),
                     0,
                 ).label("container"),
                 func.coalesce(
                     func.sum(Balance.quantity).filter(
                         Product.type == ProductType.EQUIPMENT,
-                        Inventory.type.in_(_WH_CO),
+                        Inventory.type.in_(_wh_co),
                     ),
                     0,
                 ).label("equipment"),

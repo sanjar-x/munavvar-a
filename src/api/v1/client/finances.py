@@ -53,16 +53,15 @@ async def get_my_balance(
             limit=20,
         )
 
-    payments: list[ClientPaymentEntry] = []
-    for txn in txns:
-        payments.append(
-            ClientPaymentEntry(
-                amount=txn.amount,
-                status=txn.status,
-                reason=txn.reason,
-                created_at=txn.created_at,
-            )
+    payments: list[ClientPaymentEntry] = [
+        ClientPaymentEntry(
+            amount=txn.amount,
+            status=txn.status,
+            reason=txn.reason,
+            created_at=txn.created_at,
         )
+        for txn in txns
+    ]
 
     return ClientBalanceResponse(
         account_id=account.id,
