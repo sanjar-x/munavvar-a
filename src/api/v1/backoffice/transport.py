@@ -129,4 +129,4 @@ async def delete_transport(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Transport not found"
         )
-    return None
+    return

@@ -12,7 +12,7 @@ def parse_cors(v: Any) -> list[str] | str:
     """Парсит CORS из .env ('http://localhost,https://prod.com') в []."""
     if isinstance(v, str) and not v.startswith("["):
         return [i.strip() for i in v.split(",") if i.strip()]
-    elif isinstance(v, list):
+    if isinstance(v, list):
         return v
     raise ValueError(v)
 
@@ -34,9 +34,7 @@ class Settings(BaseSettings):
     def validate_secret_key(self) -> Self:
         key = self.SECRET_KEY.get_secret_value()
         if len(key) < 32:
-            raise ValueError(
-                "SECRET_KEY должен содержать минимум 32 символа"
-            )
+            raise ValueError("SECRET_KEY должен содержать минимум 32 символа")
         return self
 
     CORS_ORIGINS: Annotated[list[str] | str, BeforeValidator(parse_cors)] = []
