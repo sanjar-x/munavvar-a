@@ -106,7 +106,7 @@ class ContractService:
                 )
 
             existing = await self.uow.contracts.get_active_for_client(
-                contract.client_id
+                contract.client_id, with_for_update=True
             )
             if existing and existing.id != contract_id:
                 raise ContractAlreadyActiveError(
@@ -193,9 +193,10 @@ class ContractService:
                     current=contract.status,
                     target=ContractStatus.ACTIVE,
                 )
-            # Проверяем коллизию: мог появиться другой ACTIVE
+            # Проверяем коллизию: мог появиться другой ACTIVE.
+            # with_for_update=True предотвращает race condition.
             existing = await self.uow.contracts.get_active_for_client(
-                contract.client_id
+                contract.client_id, with_for_update=True
             )
             if existing and existing.id != contract_id:
                 raise ContractAlreadyActiveError(

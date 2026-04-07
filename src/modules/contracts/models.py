@@ -149,23 +149,29 @@ class Contract(BaseModel):
     )
     invoices: Mapped[list["Invoice"]] = relationship(
         back_populates="contract",
-        cascade="all, delete-orphan",
+        # No cascade: ondelete="RESTRICT" on Invoice.contract_id
+        # prevents deletion when invoices exist. passive_deletes
+        # avoids SQLAlchemy loading all rows before the DB error.
+        passive_deletes=True,
         lazy="raise",
     )
     orders: Mapped[list["Order"]] = relationship(
         back_populates="contract",
         foreign_keys="[Order.contract_id]",
+        passive_deletes=True,
         lazy="raise",
     )
     status_logs: Mapped[list["ContractStatusLog"]] = relationship(
         back_populates="contract",
-        cascade="all, delete-orphan",
+        # Append-only audit log — never delete. RESTRICT on FK.
+        passive_deletes=True,
         lazy="raise",
         order_by="ContractStatusLog.created_at",
     )
     amendments: Mapped[list["ContractAmendment"]] = relationship(
         back_populates="contract",
-        cascade="all, delete-orphan",
+        # Legal documents — never delete. RESTRICT on FK.
+        passive_deletes=True,
         lazy="raise",
         order_by="ContractAmendment.effective_date",
     )
