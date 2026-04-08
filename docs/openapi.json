@@ -7239,20 +7239,6 @@
             ],
             "title": "Legal Address"
           },
-          "bank_account_number": {
-            "anyOf": [
-              { "type": "string", "maxLength": 25 },
-              { "type": "null" }
-            ],
-            "title": "Bank Account Number"
-          },
-          "bank_name": {
-            "anyOf": [
-              { "type": "string", "maxLength": 255 },
-              { "type": "null" }
-            ],
-            "title": "Bank Name"
-          },
           "notes": {
             "anyOf": [
               { "type": "string", "maxLength": 2000 },
@@ -7298,14 +7284,6 @@
           "legal_address": {
             "anyOf": [{ "type": "string" }, { "type": "null" }],
             "title": "Legal Address"
-          },
-          "bank_account_number": {
-            "anyOf": [{ "type": "string" }, { "type": "null" }],
-            "title": "Bank Account Number"
-          },
-          "bank_name": {
-            "anyOf": [{ "type": "string" }, { "type": "null" }],
-            "title": "Bank Name"
           },
           "notes": {
             "anyOf": [{ "type": "string" }, { "type": "null" }],
@@ -7379,8 +7357,6 @@
           "legal_name",
           "inn",
           "legal_address",
-          "bank_account_number",
-          "bank_name",
           "notes",
           "signed_at",
           "signed_by_id",
@@ -7428,14 +7404,6 @@
           "legal_address": {
             "anyOf": [{ "type": "string" }, { "type": "null" }],
             "title": "Legal Address"
-          },
-          "bank_account_number": {
-            "anyOf": [{ "type": "string" }, { "type": "null" }],
-            "title": "Bank Account Number"
-          },
-          "bank_name": {
-            "anyOf": [{ "type": "string" }, { "type": "null" }],
-            "title": "Bank Name"
           },
           "notes": {
             "anyOf": [{ "type": "string" }, { "type": "null" }],
@@ -7503,8 +7471,6 @@
           "legal_name",
           "inn",
           "legal_address",
-          "bank_account_number",
-          "bank_name",
           "notes",
           "signed_at",
           "signed_by_id",
@@ -7623,18 +7589,6 @@
             ],
             "title": "Legal Address"
           },
-          "bank_account_number": {
-            "anyOf": [
-              { "type": "string", "maxLength": 25 },
-              { "type": "null" }
-            ],
-            "title": "Bank Account Number"
-          },
-          "bank_name": {
-            "anyOf": [
-              { "type": "string", "maxLength": 255 },
-              { "type": "null" }
-            ],
             "title": "Bank Name"
           },
           "notes": {

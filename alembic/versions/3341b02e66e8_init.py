@@ -293,13 +293,6 @@ def upgrade() -> None:
         ),
         sa.Column("legal_address", sa.Text(), nullable=True),
         sa.Column(
-            "bank_account_number",
-            sa.String(length=25),
-            nullable=True,
-            comment="Расчётный счёт клиента (для актов сверки)",
-        ),
-        sa.Column("bank_name", sa.String(length=255), nullable=True),
-        sa.Column(
             "notes", sa.Text(), nullable=True, comment="Внутренние примечания"
         ),
         sa.Column("signed_at", sa.TIMESTAMP(timezone=True), nullable=True),

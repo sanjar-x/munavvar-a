@@ -82,8 +82,6 @@ class ContractService:
                     "legal_name": dto.legal_name,
                     "inn": dto.inn,
                     "legal_address": dto.legal_address,
-                    "bank_account_number": dto.bank_account_number,
-                    "bank_name": dto.bank_name,
                     "notes": dto.notes,
                 }
             )
@@ -307,9 +305,7 @@ class ContractService:
         - cancellation_reason на заказ
         - OrderStatusLog (аудит перехода)
         """
-        cancelled = await self.uow.orders.bulk_cancel_by_contract(
-            contract_id
-        )
+        cancelled = await self.uow.orders.bulk_cancel_by_contract(contract_id)
         total_released = 0
         for order_id, old_status, reserved in cancelled:
             if reserved and reserved > 0:
@@ -626,10 +622,8 @@ class ContractService:
             # Аудит: проверяем наличие оплаты на счёте
             contract = await self.uow.contracts.get(contract_id)
             if contract:
-                account = (
-                    await self.uow.accounts.get_client_account(
-                        contract.client_id,
-                    )
+                account = await self.uow.accounts.get_client_account(
+                    contract.client_id,
                 )
                 if account and account.balance >= 0:
                     log.warning(
@@ -854,9 +848,7 @@ class ContractService:
                         "from_status": ContractStatus.ACTIVE,
                         "to_status": ContractStatus.EXPIRED,
                         "changed_by_id": None,
-                        "reason": (
-                            "Истёк срок действия договора"
-                        ),
+                        "reason": ("Истёк срок действия договора"),
                     }
                 )
             await self.uow.commit()

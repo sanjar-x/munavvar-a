@@ -1,7 +1,7 @@
 # Архитектурное исследование: Интеграция сущности «Договор» (Contract) для Юр. лиц — Senior Enterprise Edition
 
-> **Статус:** Финальная редакция  
-> **Покрытие:** Полный цикл — от ERD до тест-стратегии, включая race conditions, audit trail, Invoice lifecycle  
+> **Статус:** Финальная редакция
+> **Покрытие:** Полный цикл — от ERD до тест-стратегии, включая race conditions, audit trail, Invoice lifecycle
 > **Глубина:** Все файлы codebase изучены вживую. Ссылки на конкретные строки кода.
 
 ---
@@ -10,8 +10,8 @@
 
 ### 1.1 Клиентские типы и их текущий учёт
 
-| Тип               | Роль        | PaymentMethod          | Финансовое закрытие                                                        | Статус                                 |
-| ----------------- | ----------- | ---------------------- | -------------------------------------------------------------------------- | -------------------------------------- |
+| Тип               | Роль        | PaymentMethod          | Финансовое закрытие                                                        | Статус                                |
+| ----------------- | ----------- | ---------------------- | -------------------------------------------------------------------------- | ------------------------------------- |
 | Анонимный Walk-in | SYSTEM user | CASH                   | Revenue→Client→Cash (COMPLETED), затем списание в VIRTUAL_LOSS             | ✅ Полностью реализован                |
 | B2C (физлицо)     | CLIENT_B2C  | CASH / CARD            | Revenue→Client + Client→Courier/Card                                       | ✅ Полностью реализован                |
 | B2B (юрлицо)      | CLIENT_B2B  | CASH / CARD / CONTRACT | CONTRACT: только Revenue→Client (COMPLETED). Долг висит на Account.balance | ⚠️ Долг накапливается, но нет договора |
@@ -187,13 +187,6 @@ class Contract(BaseModel):
         comment="ИНН/ПИНФЛ юридического лица",
     )
     legal_address: Mapped[str | None] = mapped_column(Text, nullable=True)
-    bank_account_number: Mapped[str | None] = mapped_column(
-        String(25), nullable=True,
-        comment="Расчётный счёт клиента (для актов сверки)",
-    )
-    bank_name: Mapped[str | None] = mapped_column(
-        String(255), nullable=True
-    )
 
     # Служебные поля
     notes: Mapped[str | None] = mapped_column(
@@ -451,7 +444,7 @@ class Invoice(BaseModel):
 │  credit_used  ← приложение обновляет (НЕ триггер)            │
 │  payment_due_days                                            │
 │  start_date / end_date (NULL = бессрочный)                   │
-│  legal_name, inn, legal_address, bank_account_number         │
+│  legal_name, inn, legal_address         │
 │  signed_by_id ──────────────────────────────── FK → users.id │
 │  PARTIAL UNIQUE INDEX: (client_id) WHERE status='active'     │
 └───────────┬──────────────────────────────────────────────────┘
@@ -839,8 +832,6 @@ class ContractService:
                 "legal_name": dto.legal_name,
                 "inn": dto.inn,
                 "legal_address": dto.legal_address,
-                "bank_account_number": dto.bank_account_number,
-                "bank_name": dto.bank_name,
                 "notes": dto.notes,
             })
             await self.uow.commit()
@@ -1621,18 +1612,18 @@ ROLE_SCOPES: dict[Role, list[str]] = {
 
 | Действие                       | ADMIN | ACCOUNTANT | CLIENT_B2B | CLIENT_B2C |
 | ------------------------------ | ----- | ---------- | ---------- | ---------- |
-| Создать договор                | ✅    | ❌         | ❌         | ❌         |
-| Просмотр списка всех договоров | ✅    | ✅         | ❌         | ❌         |
-| Просмотр своего договора       | ✅    | ✅         | ✅         | ❌         |
-| Редактировать условия          | ✅    | ❌         | ❌         | ❌         |
-| Управлять прайс-листом         | ✅    | ❌         | ❌         | ❌         |
-| Активировать договор           | ✅    | ❌         | ❌         | ❌         |
-| Приостановить договор          | ✅    | ❌         | ❌         | ❌         |
-| Расторгнуть договор            | ✅    | ❌         | ❌         | ❌         |
-| Создать заказ CONTRACT         | ✅ ¹  | ❌         | ✅ ²       | ❌         |
-| Выставить Invoice              | ✅    | ✅         | ❌         | ❌         |
-| Просмотр Invoice               | ✅    | ✅         | ✅         | ❌         |
-| Принять банк. перевод (оплату) | ✅    | ✅         | ❌         | ❌         |
+| Создать договор                | ✅     | ❌          | ❌          | ❌          |
+| Просмотр списка всех договоров | ✅     | ✅          | ❌          | ❌          |
+| Просмотр своего договора       | ✅     | ✅          | ✅          | ❌          |
+| Редактировать условия          | ✅     | ❌          | ❌          | ❌          |
+| Управлять прайс-листом         | ✅     | ❌          | ❌          | ❌          |
+| Активировать договор           | ✅     | ❌          | ❌          | ❌          |
+| Приостановить договор          | ✅     | ❌          | ❌          | ❌          |
+| Расторгнуть договор            | ✅     | ❌          | ❌          | ❌          |
+| Создать заказ CONTRACT         | ✅ ¹   | ❌          | ✅ ²        | ❌          |
+| Выставить Invoice              | ✅     | ✅          | ❌          | ❌          |
+| Просмотр Invoice               | ✅     | ✅          | ✅          | ❌          |
+| Принять банк. перевод (оплату) | ✅     | ✅          | ❌          | ❌          |
 
 > ¹ ADMIN — через **backoffice**-роут (`POST /backoffice/orders`), охраняемый
 > `Scope.ORDERS_EDIT`. `ORDERS_CREATE` ADMIN'у **не нужен**.
@@ -1925,10 +1916,6 @@ def upgrade() -> None:
         sa.Column("legal_name", sa.String(255), nullable=False),
         sa.Column("inn", sa.String(14), nullable=False),
         sa.Column("legal_address", sa.Text, nullable=True),
-        sa.Column(
-            "bank_account_number", sa.String(25), nullable=True
-        ),
-        sa.Column("bank_name", sa.String(255), nullable=True),
         sa.Column("notes", sa.Text, nullable=True),
         sa.Column(
             "signed_at", sa.TIMESTAMP(timezone=True), nullable=True
@@ -2807,10 +2794,6 @@ class ContractCreate(BaseModel):
     legal_name: str = Field(min_length=1, max_length=255)
     inn: str = Field(min_length=9, max_length=14)
     legal_address: str | None = Field(default=None, max_length=500)
-    bank_account_number: str | None = Field(
-        default=None, max_length=25
-    )
-    bank_name: str | None = Field(default=None, max_length=255)
     notes: str | None = Field(default=None, max_length=2000)
 
 
@@ -2822,10 +2805,6 @@ class ContractUpdate(BaseModel):
     )
     end_date: date | None = None
     legal_address: str | None = Field(default=None, max_length=500)
-    bank_account_number: str | None = Field(
-        default=None, max_length=25
-    )
-    bank_name: str | None = Field(default=None, max_length=255)
     notes: str | None = Field(default=None, max_length=2000)
 
 
@@ -2850,8 +2829,6 @@ class ContractResponse(BaseModel):
     legal_name: str
     inn: str
     legal_address: str | None
-    bank_account_number: str | None
-    bank_name: str | None
     notes: str | None
     signed_at: datetime | None
     signed_by_id: uuid.UUID | None
@@ -2975,5 +2952,5 @@ from src.modules.contracts.models import (  # noqa: F401
 
 ---
 
-_Версия: 2.3 (Final Corrected Edition)_  
+_Версия: 2.3 (Final Corrected Edition)_
 _Статус: Исправлено 3 бага v2.3 (§8.1 удалён несуществующий IBaseOrderUnitOfWork + исправлено имя поля transactions, §8.2 Блок A дополнен проверкой роли B2B, §10.3 уточнена матрица ADMIN-route). Готово к реализации Фазы 1._

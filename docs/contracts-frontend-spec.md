@@ -41,7 +41,7 @@ frontend-интеграцию. См. §19.26–19.28 и §20.9.
 | **MUST** / **SHALL** | Обязательное требование (RFC 2119)                      |
 | **SHOULD**           | Рекомендация; отклонение требует обоснования            |
 | **MAY**              | Опциональная возможность                                |
-| ✅ / ❌              | Разрешено / Запрещено (в таблицах переходов и матрицах) |
+| ✅ / ❌                | Разрешено / Запрещено (в таблицах переходов и матрицах) |
 | `NEW vX.Y`           | Функциональность, добавленная в версии X.Y              |
 | `BREAKING`           | Изменение, ломающее обратную совместимость              |
 | UZS                  | Узбекский сум — все денежные значения в целых сумах     |
@@ -321,11 +321,11 @@ frontend-интеграцию. См. §19.26–19.28 и §20.9.
 
 | Из / В         | DRAFT | ACTIVE | SUSPENDED | TERMINATED | EXPIRED |
 | -------------- | :---: | :----: | :-------: | :--------: | :-----: |
-| **DRAFT**      |   —   |   ✅   |    ❌     |     ❌     |   ❌    |
-| **ACTIVE**     |  ❌   |   —    |    ✅     |     ✅     |   ✅¹   |
-| **SUSPENDED**  |  ❌   |   ✅   |     —     |     ✅     |   ❌    |
-| **TERMINATED** |  ❌   |   ❌   |    ❌     |     —      |   ❌    |
-| **EXPIRED**    |  ❌   |   ❌   |    ❌     |     ❌     |    —    |
+| **DRAFT**      |   —   |   ✅    |     ❌     |     ❌      |    ❌    |
+| **ACTIVE**     |   ❌   |   —    |     ✅     |     ✅      |   ✅¹    |
+| **SUSPENDED**  |   ❌   |   ✅    |     —     |     ✅      |    ❌    |
+| **TERMINATED** |   ❌   |   ❌    |     ❌     |     —      |    ❌    |
+| **EXPIRED**    |   ❌   |   ❌    |     ❌     |     ❌      |    —    |
 
 > ¹ EXPIRED — только автоматический переход (job).
 
@@ -333,11 +333,11 @@ frontend-интеграцию. См. §19.26–19.28 и §20.9.
 
 | Статус       | Заказы разрешены | Условия редактируемы | Терминальный | API-триггер                   |
 | ------------ | :--------------: | :------------------: | :----------: | ----------------------------- |
-| `draft`      |        ❌        |          ✅          |      ❌      | `POST /`                      |
-| `active`     |        ✅        |          ✅          |      ❌      | `POST /{id}/activate`         |
-| `suspended`  |        ❌        |          ❌          |      ❌      | `POST /{id}/suspend`          |
-| `terminated` |        ❌        |          ❌          |      ✅      | `POST /{id}/terminate`        |
-| `expired`    |        ❌        |          ❌          |      ✅      | `POST /jobs/expire-contracts` |
+| `draft`      |        ❌         |          ✅           |      ❌       | `POST /`                      |
+| `active`     |        ✅         |          ✅           |      ❌       | `POST /{id}/activate`         |
+| `suspended`  |        ❌         |          ❌           |      ❌       | `POST /{id}/suspend`          |
+| `terminated` |        ❌         |          ❌           |      ✅       | `POST /{id}/terminate`        |
+| `expired`    |        ❌         |          ❌           |      ✅       | `POST /jobs/expire-contracts` |
 
 ### 10.4 Блокирующие условия переходов
 
@@ -376,13 +376,13 @@ frontend-интеграцию. См. §19.26–19.28 и §20.9.
 
 ### 11.2 Матрица переходов
 
-| Из / В        | DRAFT | ISSUED | PAID | OVERDUE | CANCELLED |
-| ------------- | :---: | :----: | :--: | :-----: | :-------: |
-| **DRAFT**     |   —   |   ✅   |  ❌  |   ❌    |    ✅     |
-| **ISSUED**    |  ❌   |   —    |  ✅  |   ✅¹   |    ✅     |
-| **PAID**      |  ❌   |   ❌   |  —   |   ❌    |    ❌     |
-| **OVERDUE**   |  ❌   |   ❌   |  ✅  |    —    |    ❌     |
-| **CANCELLED** |  ❌   |   ❌   |  ❌  |   ❌    |     —     |
+| Из / В        | DRAFT | ISSUED | PAID  | OVERDUE | CANCELLED |
+| ------------- | :---: | :----: | :---: | :-----: | :-------: |
+| **DRAFT**     |   —   |   ✅    |   ❌   |    ❌    |     ✅     |
+| **ISSUED**    |   ❌   |   —    |   ✅   |   ✅¹    |     ✅     |
+| **PAID**      |   ❌   |   ❌    |   —   |    ❌    |     ❌     |
+| **OVERDUE**   |   ❌   |   ❌    |   ✅   |    —    |     ❌     |
+| **CANCELLED** |   ❌   |   ❌    |   ❌   |    ❌    |     —     |
 
 > ¹ OVERDUE — только автоматический переход (job).
 
@@ -390,11 +390,11 @@ frontend-интеграцию. См. §19.26–19.28 и §20.9.
 
 | Статус      | Описание                            | Терминальный | Можно аннулировать |
 | ----------- | ----------------------------------- | ------------ | ------------------ |
-| `draft`     | Черновик, формируется автоматически | ❌           | ✅                 |
-| `issued`    | Выставлен клиенту, ожидает оплаты   | ❌           | ✅                 |
-| `paid`      | Полностью оплачен                   | ✅           | ❌                 |
-| `overdue`   | Срок оплаты истёк                   | ❌           | ❌                 |
-| `cancelled` | Аннулирован                         | ✅           | —                  |
+| `draft`     | Черновик, формируется автоматически | ❌            | ✅                  |
+| `issued`    | Выставлен клиенту, ожидает оплаты   | ❌            | ✅                  |
+| `paid`      | Полностью оплачен                   | ✅            | ❌                  |
+| `overdue`   | Срок оплаты истёк                   | ❌            | ❌                  |
+| `cancelled` | Аннулирован                         | ✅            | —                  |
 
 > ⚠️ `partially_paid` существует в enum, но **НЕ реализован** на сервере.
 > **Не отображать** этот статус в UI.
@@ -913,8 +913,6 @@ interface ContractResponse {
   legal_name: string;
   inn: string; // 9–14 символов
   legal_address: string | null;
-  bank_account_number: string | null;
-  bank_name: string | null;
   notes: string | null;
   signed_at: string | null; // ISO datetime
   signed_by_id: string | null; // UUIDv7
@@ -1231,8 +1229,6 @@ interface ContractCreateRequest {
   legal_name: string; // 1–255 символов
   inn: string; // 9–14 символов
   legal_address?: string | null; // ≤ 500 символов
-  bank_account_number?: string | null; // ≤ 25 символов
-  bank_name?: string | null; // ≤ 255 символов
   notes?: string | null; // ≤ 2000 символов
 }
 
@@ -1242,8 +1238,6 @@ interface ContractUpdateRequest {
   payment_due_days?: number; // > 0, ≤ 365
   end_date?: string | null;
   legal_address?: string | null;
-  bank_account_number?: string | null;
-  bank_name?: string | null;
   notes?: string | null;
 }
 
@@ -1304,7 +1298,7 @@ POST /api/v1/backoffice/contracts/?clientId={uuid}
 
 | Параметр   | Тип  | Расположение | Обязательный | Описание         |
 | ---------- | ---- | ------------ | :----------: | ---------------- |
-| `clientId` | UUID | Query        |      ✅      | ID клиента (B2B) |
+| `clientId` | UUID | Query        |      ✅       | ID клиента (B2B) |
 
 **Scope:** `contracts:write`
 
@@ -1312,19 +1306,17 @@ POST /api/v1/backoffice/contracts/?clientId={uuid}
 
 **Валидация полей:**
 
-| Поле                  | Тип            | Ограничения               | Default |
-| --------------------- | -------------- | ------------------------- | ------- |
-| `number`              | string         | `min: 1`, `max: 50`       | —       |
-| `start_date`          | date           | ISO format                | —       |
-| `end_date`            | date \| null   | `> start_date` если задан | null    |
-| `credit_limit`        | integer        | `≥ 0`                     | 0       |
-| `payment_due_days`    | integer        | `> 0`, `≤ 365`            | 30      |
-| `legal_name`          | string         | `min: 1`, `max: 255`      | —       |
-| `inn`                 | string         | `min: 9`, `max: 14`       | —       |
-| `legal_address`       | string \| null | `max: 500`                | null    |
-| `bank_account_number` | string \| null | `max: 25`                 | null    |
-| `bank_name`           | string \| null | `max: 255`                | null    |
-| `notes`               | string \| null | `max: 2000`               | null    |
+| Поле               | Тип            | Ограничения               | Default |
+| ------------------ | -------------- | ------------------------- | ------- |
+| `number`           | string         | `min: 1`, `max: 50`       | —       |
+| `start_date`       | date           | ISO format                | —       |
+| `end_date`         | date \| null   | `> start_date` если задан | null    |
+| `credit_limit`     | integer        | `≥ 0`                     | 0       |
+| `payment_due_days` | integer        | `> 0`, `≤ 365`            | 30      |
+| `legal_name`       | string         | `min: 1`, `max: 255`      | —       |
+| `inn`              | string         | `min: 9`, `max: 14`       | —       |
+| `legal_address`    | string \| null | `max: 500`                | null    |
+| `notes`            | string \| null | `max: 2000`               | null    |
 
 **Пример запроса:**
 
@@ -1342,8 +1334,6 @@ Content-Type: application/json
   "legal_name": "ООО «Акватория»",
   "inn": "123456789",
   "legal_address": "г. Ташкент, ул. Навои, 42",
-  "bank_account_number": "20208000123456789012",
-  "bank_name": "НБУ",
   "notes": "VIP-клиент, приоритетная доставка"
 }
 ```
@@ -1364,8 +1354,6 @@ Content-Type: application/json
   "legal_name": "ООО «Акватория»",
   "inn": "123456789",
   "legal_address": "г. Ташкент, ул. Навои, 42",
-  "bank_account_number": "20208000123456789012",
-  "bank_name": "НБУ",
   "notes": "VIP-клиент, приоритетная доставка",
   "signed_at": null,
   "signed_by_id": null,
@@ -1397,10 +1385,10 @@ GET /api/v1/backoffice/contracts/?skip=0&limit=50&clientId={uuid}&status={status
 
 | Параметр   | Тип            | Обязательный | Default | Описание                |
 | ---------- | -------------- | :----------: | ------- | ----------------------- |
-| `skip`     | integer        |      ❌      | 0       | Смещение (≥ 0)          |
-| `limit`    | integer        |      ❌      | 50      | Размер страницы (1–100) |
-| `clientId` | UUID \| null   |      ❌      | null    | Фильтр по клиенту       |
-| `status`   | ContractStatus |      ❌      | null    | Фильтр по статусу       |
+| `skip`     | integer        |      ❌       | 0       | Смещение (≥ 0)          |
+| `limit`    | integer        |      ❌       | 50      | Размер страницы (1–100) |
+| `clientId` | UUID \| null   |      ❌       | null    | Фильтр по клиенту       |
+| `status`   | ContractStatus |      ❌       | null    | Фильтр по статусу       |
 
 **Scope:** `contracts:read`
 
@@ -1430,8 +1418,7 @@ Authorization: Bearer eyJhbGci...
     "legal_name": "ООО «Акватория»",
     "inn": "123456789",
     "legal_address": "г. Ташкент, ул. Навои, 42",
-    "bank_account_number": "20208000123456789012",
-    "bank_name": "НБУ",
+
     "notes": "VIP-клиент",
     "signed_at": "2025-04-01T12:00:00+00:00",
     "signed_by_id": "01961a2b-1111-7000-8000-000000000099",
@@ -1474,8 +1461,6 @@ GET /api/v1/backoffice/contracts/{contract_id}
   "legal_name": "ООО «Акватория»",
   "inn": "123456789",
   "legal_address": "г. Ташкент, ул. Навои, 42",
-  "bank_account_number": "20208000123456789012",
-  "bank_name": "НБУ",
   "notes": null,
   "signed_at": "2025-04-01T12:00:00+00:00",
   "signed_by_id": "01961a2b-1111-7000-8000-000000000099",
@@ -1520,15 +1505,13 @@ PATCH /api/v1/backoffice/contracts/{contract_id}
 
 **Валидация полей:**
 
-| Поле                  | Ограничения                                    |
-| --------------------- | ---------------------------------------------- |
-| `credit_limit`        | `≥ 0`; не может быть `< credit_used` (при > 0) |
-| `payment_due_days`    | `> 0`, `≤ 365`                                 |
-| `end_date`            | `> start_date` если задан                      |
-| `legal_address`       | `max: 500`                                     |
-| `bank_account_number` | `max: 25`                                      |
-| `bank_name`           | `max: 255`                                     |
-| `notes`               | `max: 2000`                                    |
+| Поле               | Ограничения                                    |
+| ------------------ | ---------------------------------------------- |
+| `credit_limit`     | `≥ 0`; не может быть `< credit_used` (при > 0) |
+| `payment_due_days` | `> 0`, `≤ 365`                                 |
+| `end_date`         | `> start_date` если задан                      |
+| `legal_address`    | `max: 500`                                     |
+| `notes`            | `max: 2000`                                    |
 
 **Пример запроса:**
 
@@ -1600,7 +1583,7 @@ POST /api/v1/backoffice/contracts/{contract_id}/suspend
 
 | Поле     | Тип    | Ограничения    | Обязательный |
 | -------- | ------ | -------------- | :----------: |
-| `reason` | string | 3–512 символов |      ✅      |
+| `reason` | string | 3–512 символов |      ✅       |
 
 **Ответ — 200:** `ContractResponse` с `status: "suspended"`
 
@@ -1669,7 +1652,7 @@ POST /api/v1/backoffice/contracts/{contract_id}/terminate
 
 | Поле     | Тип    | Ограничения    | Обязательный |
 | -------- | ------ | -------------- | :----------: |
-| `reason` | string | 3–512 символов |      ✅      |
+| `reason` | string | 3–512 символов |      ✅       |
 
 **Ответ — 200:** `ContractResponse` с `status: "terminated"`
 
@@ -1940,8 +1923,8 @@ GET /api/v1/backoffice/contracts/{contract_id}/reconciliation?dateFrom=2025-03-0
 
 | Параметр   | Тип  | Alias      | Обязательный |
 | ---------- | ---- | ---------- | :----------: |
-| `dateFrom` | date | `dateFrom` |      ✅      |
-| `dateTo`   | date | `dateTo`   |      ✅      |
+| `dateFrom` | date | `dateFrom` |      ✅       |
+| `dateTo`   | date | `dateTo`   |      ✅       |
 
 **Ответ — 200:** `ReconciliationResponse`
 
@@ -2397,7 +2380,7 @@ POST /api/v1/client/orders/{order_id}/cancel
 
 | Поле     | Тип            | Ограничения    | Обязательный |
 | -------- | -------------- | -------------- | :----------: |
-| `reason` | string \| null | ≤ 500 символов |      ❌      |
+| `reason` | string \| null | ≤ 500 символов |      ❌       |
 
 **Ответ — 200:** `OrderResponse` с `status: "cancelled"`
 

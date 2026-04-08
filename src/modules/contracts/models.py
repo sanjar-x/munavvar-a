@@ -102,13 +102,6 @@ class Contract(BaseModel):
         comment="ИНН/ПИНФЛ юридического лица",
     )
     legal_address: Mapped[str | None] = mapped_column(Text, nullable=True)
-    bank_account_number: Mapped[str | None] = mapped_column(
-        String(25),
-        nullable=True,
-        comment="Расчётный счёт клиента (для актов сверки)",
-    )
-    bank_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
-
     # Служебные поля
     notes: Mapped[str | None] = mapped_column(
         Text, nullable=True, comment="Внутренние примечания"
