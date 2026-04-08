@@ -79,3 +79,51 @@ class TestBackofficeTransferCreate:
         assert data["items"][0]["quantity"] == 1
         assert data["items"][0]["product"]["id"] == str(products["water"].id)
         assert data["items"][0]["product"]["name"] == products["water"].name
+
+    async def test_duplicate_product_lines_are_summed_for_stock_check(
+        self,
+        client,
+        db_session,
+        admin_user,
+        products,
+        warehouse_inventory,
+        courier_inventory,
+        system_entities,
+    ):
+        headers = make_auth_headers(admin_user.id, Role.ADMIN)
+
+        await load_stock(
+            session=db_session,
+            from_inv_id=system_entities["virtual_vendor"].id,
+            to_inv_id=warehouse_inventory.id,
+            product_id=products["water"].id,
+            quantity=5,
+            created_by_id=system_entities["system_user"].id,
+        )
+
+        response = await client.post(
+            "/api/v1/backoffice/transfers/",
+            json={
+                "type": TransferType.COURIER_LOAD,
+                "from_id": str(warehouse_inventory.id),
+                "to_id": str(courier_inventory.id),
+                "items": [
+                    {
+                        "product_id": str(products["water"].id),
+                        "quantity": 3,
+                    },
+                    {
+                        "product_id": str(products["water"].id),
+                        "quantity": 3,
+                    },
+                ],
+            },
+            headers=headers,
+        )
+
+        assert response.status_code == 409, response.text
+        data = response.json()
+        assert data["error"]["code"] == "INSUFFICIENT_STOCK"
+        assert data["error"]["details"]["shortages"] == {
+            str(products["water"].id): 1
+        }

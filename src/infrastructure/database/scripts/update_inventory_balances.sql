@@ -25,6 +25,16 @@ ORDER BY v.inv_id ON CONFLICT (inventory_id, product_id) DO
 UPDATE
 SET quantity = inventory_balances.quantity + EXCLUDED.quantity,
     updated_at = NOW();
+IF EXISTS (
+    SELECT 1
+    FROM inventory_balances AS balance
+        JOIN inventories AS inventory ON inventory.id = balance.inventory_id
+    WHERE balance.product_id = NEW.product_id
+        AND balance.inventory_id IN (NEW.from_id, NEW.to_id)
+        AND inventory.type NOT IN ('VIRTUAL_VENDOR', 'VIRTUAL_LOSS')
+        AND balance.quantity < 0
+) THEN RAISE EXCEPTION 'Negative balances are not allowed for non-virtual inventories.';
+END IF;
 RETURN NEW;
 END IF;
 RETURN NULL;

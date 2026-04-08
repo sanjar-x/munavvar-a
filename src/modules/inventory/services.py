@@ -482,11 +482,20 @@ class StockTransferService:
                 if not locked:
                     raise InventoryNotFoundError(inventory_id=from_id)
                 balances = {b.product_id: b.quantity for b in locked.balances}
-                shortages: dict[uuid.UUID, int] = {}
+                requested_quantities: dict[uuid.UUID, int] = {}
                 for item in schema.items:
-                    available = balances.get(item.product_id, 0)
-                    if available < item.quantity:
-                        shortages[item.product_id] = item.quantity - available
+                    requested_quantities[item.product_id] = (
+                        requested_quantities.get(item.product_id, 0)
+                        + item.quantity
+                    )
+                shortages: dict[uuid.UUID, int] = {}
+                for (
+                    product_id,
+                    requested_quantity,
+                ) in requested_quantities.items():
+                    available = balances.get(product_id, 0)
+                    if available < requested_quantity:
+                        shortages[product_id] = requested_quantity - available
                 if shortages:
                     raise InsufficientStockError(shortages=shortages)
 

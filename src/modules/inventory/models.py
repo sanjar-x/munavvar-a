@@ -260,10 +260,6 @@ class Balance(BaseModel):
         UniqueConstraint(
             "inventory_id", "product_id", name="uq_inventory_product_balance"
         ),
-        CheckConstraint(
-            "quantity >= 0",
-            name="ck_inventory_balances_quantity_non_negative",
-        ),
         {
             "comment": (
                 "Материализованные (закэшированные) остатки."
