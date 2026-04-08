@@ -328,6 +328,7 @@ class UserRepository(BaseRepository[User]):
                 self.model.role.in_([Role.CLIENT_B2B, Role.CLIENT_B2C]),
             )
             .options(
+                selectinload(self.model.identities),
                 selectinload(self.model.inventories).options(
                     selectinload(Inventory.balances).joinedload(
                         Balance.product
