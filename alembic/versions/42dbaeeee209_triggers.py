@@ -1,8 +1,8 @@
 """triggers
 
-Revision ID: b8e855f8adba
-Revises: 4a1ea97312ca
-Create Date: 2026-03-31 12:55:54.617012
+Revision ID: 42dbaeeee209
+Revises: 3341b02e66e8
+Create Date: 2026-04-08 08:23:16.690947
 
 """
 
@@ -11,11 +11,10 @@ from collections.abc import Sequence
 from alembic import op
 
 # revision identifiers, used by Alembic.
-revision: str = "b8e855f8adba"
-down_revision: str | Sequence[str] | None = "4a1ea97312ca"
+revision: str = "42dbaeeee209"
+down_revision: str | Sequence[str] | None = "3341b02e66e8"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
-
 
 # ---------------------------------------------------------------------------
 # SQL: Триггер автоматического пересчета балансов финансовых счетов
@@ -163,7 +162,6 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-
     # 2. Удаляем триггер и функцию инвентаря
     op.execute(DROP_INVENTORY_BALANCES_TRIGGER)
     op.execute(DROP_INVENTORY_FUNCTION)

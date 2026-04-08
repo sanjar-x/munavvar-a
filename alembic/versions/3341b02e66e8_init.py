@@ -1,8 +1,8 @@
 """init
 
-Revision ID: 4a1ea97312ca
+Revision ID: 3341b02e66e8
 Revises:
-Create Date: 2026-03-31 12:52:31.007749
+Create Date: 2026-04-08 08:23:11.474643
 
 """
 
@@ -15,7 +15,7 @@ from sqlalchemy.dialects import postgresql
 from alembic import op
 
 # revision identifiers, used by Alembic.
-revision: str = "4a1ea97312ca"
+revision: str = "3341b02e66e8"
 down_revision: str | Sequence[str] | None = None
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
@@ -189,6 +189,7 @@ def upgrade() -> None:
         sa.Column(
             "balance",
             sa.BIGINT(),
+            server_default=sa.text("0"),
             nullable=False,
             comment="Текущий баланс. Обновляется строго через SQL-триггер транзакций!",
         ),
@@ -225,6 +226,163 @@ def upgrade() -> None:
     )
     op.create_index(
         op.f("ix_accounts_type"), "accounts", ["type"], unique=False
+    )
+    op.create_table(
+        "contracts",
+        sa.Column(
+            "number",
+            sa.String(length=50),
+            nullable=False,
+            comment="Номер договора (HOD-2025-001)",
+        ),
+        sa.Column(
+            "client_id",
+            sa.UUID(),
+            nullable=False,
+            comment="B2B клиент (role=CLIENT_B2B)",
+        ),
+        sa.Column(
+            "status",
+            sa.Enum(
+                "draft",
+                "active",
+                "suspended",
+                "terminated",
+                "expired",
+                name="contract_status_enum",
+                metadata=MetaData(),
+            ),
+            nullable=False,
+        ),
+        sa.Column("start_date", sa.Date(), nullable=False),
+        sa.Column(
+            "end_date",
+            sa.Date(),
+            nullable=True,
+            comment="None = бессрочный договор",
+        ),
+        sa.Column(
+            "credit_limit",
+            sa.BigInteger(),
+            nullable=False,
+            comment="Кредитный лимит в сумах (UZS). 0 = без ограничений.",
+        ),
+        sa.Column(
+            "credit_used",
+            sa.BigInteger(),
+            nullable=False,
+            comment="In-flight: сумма заказов в статусах NEW..ARRIVED, ещё не попавших на счёт. Обновляется приложением (не триггером) при create_order/complete_delivery.",
+        ),
+        sa.Column(
+            "payment_due_days",
+            sa.Integer(),
+            nullable=False,
+            comment="Отсрочка платежа: Net-15, Net-30, Net-60",
+        ),
+        sa.Column(
+            "legal_name",
+            sa.String(length=255),
+            nullable=False,
+            comment="Полное юридическое название организации",
+        ),
+        sa.Column(
+            "inn",
+            sa.String(length=14),
+            nullable=False,
+            comment="ИНН/ПИНФЛ юридического лица",
+        ),
+        sa.Column("legal_address", sa.Text(), nullable=True),
+        sa.Column(
+            "bank_account_number",
+            sa.String(length=25),
+            nullable=True,
+            comment="Расчётный счёт клиента (для актов сверки)",
+        ),
+        sa.Column("bank_name", sa.String(length=255), nullable=True),
+        sa.Column(
+            "notes", sa.Text(), nullable=True, comment="Внутренние примечания"
+        ),
+        sa.Column("signed_at", sa.TIMESTAMP(timezone=True), nullable=True),
+        sa.Column(
+            "signed_by_id",
+            sa.UUID(),
+            nullable=True,
+            comment="Кем активирован (admin user)",
+        ),
+        sa.Column("suspended_at", sa.TIMESTAMP(timezone=True), nullable=True),
+        sa.Column("suspension_reason", sa.String(length=512), nullable=True),
+        sa.Column("terminated_at", sa.TIMESTAMP(timezone=True), nullable=True),
+        sa.Column("termination_reason", sa.String(length=512), nullable=True),
+        sa.Column("id", sa.UUID(), nullable=False, comment="ID (UUIDv7)"),
+        sa.Column(
+            "is_active",
+            sa.BOOLEAN(),
+            server_default=sa.text("true"),
+            nullable=False,
+            comment="Флаг активности записи. False означает логическое удаление.",
+        ),
+        sa.Column(
+            "created_at",
+            sa.TIMESTAMP(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+            comment="Дата и время создания записи",
+        ),
+        sa.Column(
+            "updated_at",
+            sa.TIMESTAMP(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+            comment="Дата и время последнего обновления",
+        ),
+        sa.CheckConstraint(
+            "credit_limit >= 0", name="ck_contract_credit_limit_non_neg"
+        ),
+        sa.CheckConstraint(
+            "credit_used <= credit_limit OR credit_limit = 0",
+            name="ck_contract_credit_used_le_limit",
+        ),
+        sa.CheckConstraint(
+            "credit_used >= 0", name="ck_contract_credit_used_non_neg"
+        ),
+        sa.CheckConstraint(
+            "end_date IS NULL OR end_date > start_date",
+            name="ck_contract_dates_order",
+        ),
+        sa.CheckConstraint(
+            "payment_due_days > 0", name="ck_contract_payment_due_days_pos"
+        ),
+        sa.ForeignKeyConstraint(
+            ["client_id"], ["users.id"], ondelete="RESTRICT"
+        ),
+        sa.ForeignKeyConstraint(
+            ["signed_by_id"], ["users.id"], ondelete="RESTRICT"
+        ),
+        sa.PrimaryKeyConstraint("id"),
+        sa.UniqueConstraint("number"),
+        comment="Договоры с юридическими лицами (B2B)",
+    )
+    op.create_index(
+        "idx_contract_client_status",
+        "contracts",
+        ["client_id", "status"],
+        unique=False,
+    )
+    op.create_index(
+        op.f("ix_contracts_client_id"),
+        "contracts",
+        ["client_id"],
+        unique=False,
+    )
+    op.create_index(
+        op.f("ix_contracts_status"), "contracts", ["status"], unique=False
+    )
+    op.create_index(
+        "uq_one_active_contract_per_client",
+        "contracts",
+        ["client_id"],
+        unique=True,
+        postgresql_where=sa.text("status = 'active' AND is_active = true"),
     )
     op.create_table(
         "identities",
@@ -366,6 +524,222 @@ def upgrade() -> None:
         postgresql_where=sa.text("type = 'COURIER' AND is_active = true"),
     )
     op.create_table(
+        "contract_amendments",
+        sa.Column("contract_id", sa.UUID(), nullable=False),
+        sa.Column(
+            "number",
+            sa.String(length=50),
+            nullable=False,
+            comment="Номер ДС в рамках договора (ДС-001, ДС-002...)",
+        ),
+        sa.Column(
+            "description",
+            sa.Text(),
+            nullable=False,
+            comment="Описание изменений (что и почему изменилось)",
+        ),
+        sa.Column(
+            "effective_date",
+            sa.Date(),
+            nullable=False,
+            comment="Дата вступления в силу доп. соглашения",
+        ),
+        sa.Column(
+            "created_by_id",
+            sa.UUID(),
+            nullable=True,
+            comment="Кто создал ДС (admin)",
+        ),
+        sa.Column("id", sa.UUID(), nullable=False, comment="ID (UUIDv7)"),
+        sa.Column(
+            "is_active",
+            sa.BOOLEAN(),
+            server_default=sa.text("true"),
+            nullable=False,
+            comment="Флаг активности записи. False означает логическое удаление.",
+        ),
+        sa.Column(
+            "created_at",
+            sa.TIMESTAMP(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+            comment="Дата и время создания записи",
+        ),
+        sa.Column(
+            "updated_at",
+            sa.TIMESTAMP(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+            comment="Дата и время последнего обновления",
+        ),
+        sa.ForeignKeyConstraint(
+            ["contract_id"], ["contracts.id"], ondelete="RESTRICT"
+        ),
+        sa.ForeignKeyConstraint(
+            ["created_by_id"], ["users.id"], ondelete="SET NULL"
+        ),
+        sa.PrimaryKeyConstraint("id"),
+        sa.UniqueConstraint(
+            "contract_id", "number", name="uq_contract_amendment_number"
+        ),
+        comment="Дополнительные соглашения к договорам",
+    )
+    op.create_index(
+        op.f("ix_contract_amendments_contract_id"),
+        "contract_amendments",
+        ["contract_id"],
+        unique=False,
+    )
+    op.create_table(
+        "contract_price_items",
+        sa.Column(
+            "contract_id",
+            sa.UUID(),
+            nullable=False,
+            comment="Договор (CASCADE: при удалении договора — удаляются цены)",
+        ),
+        sa.Column("product_id", sa.UUID(), nullable=False),
+        sa.Column(
+            "price",
+            sa.BigInteger(),
+            nullable=False,
+            comment="Договорная цена в сумах (UZS)",
+        ),
+        sa.Column("id", sa.UUID(), nullable=False, comment="ID (UUIDv7)"),
+        sa.Column(
+            "is_active",
+            sa.BOOLEAN(),
+            server_default=sa.text("true"),
+            nullable=False,
+            comment="Флаг активности записи. False означает логическое удаление.",
+        ),
+        sa.Column(
+            "created_at",
+            sa.TIMESTAMP(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+            comment="Дата и время создания записи",
+        ),
+        sa.Column(
+            "updated_at",
+            sa.TIMESTAMP(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+            comment="Дата и время последнего обновления",
+        ),
+        sa.CheckConstraint(
+            "price >= 0", name="ck_contract_price_item_price_non_neg"
+        ),
+        sa.ForeignKeyConstraint(
+            ["contract_id"], ["contracts.id"], ondelete="CASCADE"
+        ),
+        sa.ForeignKeyConstraint(
+            ["product_id"], ["products.id"], ondelete="RESTRICT"
+        ),
+        sa.PrimaryKeyConstraint("id"),
+        sa.UniqueConstraint(
+            "contract_id", "product_id", name="uq_contract_price_item_product"
+        ),
+        comment="Индивидуальный прайс-лист по договору. При отсутствии позиции — фолбэк на products.price.",
+    )
+    op.create_index(
+        op.f("ix_contract_price_items_contract_id"),
+        "contract_price_items",
+        ["contract_id"],
+        unique=False,
+    )
+    op.create_index(
+        op.f("ix_contract_price_items_product_id"),
+        "contract_price_items",
+        ["product_id"],
+        unique=False,
+    )
+    op.create_table(
+        "contract_status_logs",
+        sa.Column("contract_id", sa.UUID(), nullable=False),
+        sa.Column(
+            "from_status",
+            sa.Enum(
+                "draft",
+                "active",
+                "suspended",
+                "terminated",
+                "expired",
+                name="contract_status_enum",
+                metadata=MetaData(),
+            ),
+            nullable=True,
+            comment="NULL = запись при создании договора",
+        ),
+        sa.Column(
+            "to_status",
+            sa.Enum(
+                "draft",
+                "active",
+                "suspended",
+                "terminated",
+                "expired",
+                name="contract_status_enum",
+                metadata=MetaData(),
+            ),
+            nullable=False,
+        ),
+        sa.Column(
+            "changed_by_id",
+            sa.UUID(),
+            nullable=True,
+            comment="Кто изменил статус (admin); NULL = системное действие",
+        ),
+        sa.Column(
+            "reason",
+            sa.String(length=512),
+            nullable=True,
+            comment="Причина приостановки / расторжения / истечения",
+        ),
+        sa.Column("id", sa.UUID(), nullable=False, comment="ID (UUIDv7)"),
+        sa.Column(
+            "is_active",
+            sa.BOOLEAN(),
+            server_default=sa.text("true"),
+            nullable=False,
+            comment="Флаг активности записи. False означает логическое удаление.",
+        ),
+        sa.Column(
+            "created_at",
+            sa.TIMESTAMP(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+            comment="Дата и время создания записи",
+        ),
+        sa.Column(
+            "updated_at",
+            sa.TIMESTAMP(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+            comment="Дата и время последнего обновления",
+        ),
+        sa.ForeignKeyConstraint(
+            ["changed_by_id"], ["users.id"], ondelete="SET NULL"
+        ),
+        sa.ForeignKeyConstraint(
+            ["contract_id"], ["contracts.id"], ondelete="RESTRICT"
+        ),
+        sa.PrimaryKeyConstraint("id"),
+        comment="Append-only аудит переходов статуса договора",
+    )
+    op.create_index(
+        "idx_contract_status_log_contract",
+        "contract_status_logs",
+        ["contract_id"],
+        unique=False,
+    )
+    op.create_index(
+        op.f("ix_contract_status_logs_contract_id"),
+        "contract_status_logs",
+        ["contract_id"],
+        unique=False,
+    )
+    op.create_table(
         "inventory_balances",
         sa.Column("inventory_id", sa.UUID(), nullable=False),
         sa.Column("product_id", sa.UUID(), nullable=False),
@@ -397,11 +771,14 @@ def upgrade() -> None:
             nullable=False,
             comment="Дата и время последнего обновления",
         ),
+        sa.CheckConstraint(
+            "quantity >= 0", name="ck_inventory_balances_quantity_non_negative"
+        ),
         sa.ForeignKeyConstraint(
             ["inventory_id"], ["inventories.id"], ondelete="CASCADE"
         ),
         sa.ForeignKeyConstraint(
-            ["product_id"], ["products.id"], ondelete="CASCADE"
+            ["product_id"], ["products.id"], ondelete="RESTRICT"
         ),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint(
@@ -414,6 +791,89 @@ def upgrade() -> None:
         "inventory_balances",
         ["product_id"],
         unique=False,
+    )
+    op.create_table(
+        "invoices",
+        sa.Column(
+            "number",
+            sa.String(length=50),
+            nullable=False,
+            comment="Номер счёта (СФ-2025-001)",
+        ),
+        sa.Column("contract_id", sa.UUID(), nullable=False),
+        sa.Column(
+            "status",
+            sa.Enum(
+                "draft",
+                "issued",
+                "partially_paid",
+                "paid",
+                "overdue",
+                "cancelled",
+                name="invoice_status_enum",
+                metadata=MetaData(),
+            ),
+            nullable=False,
+        ),
+        sa.Column("period_from", sa.Date(), nullable=False),
+        sa.Column("period_to", sa.Date(), nullable=False),
+        sa.Column(
+            "amount",
+            sa.BigInteger(),
+            nullable=False,
+            comment="Сумма заказов за период",
+        ),
+        sa.Column(
+            "due_date",
+            sa.Date(),
+            nullable=True,
+            comment="Срок оплаты = issued_at + contract.payment_due_days",
+        ),
+        sa.Column("issued_at", sa.TIMESTAMP(timezone=True), nullable=True),
+        sa.Column("paid_at", sa.TIMESTAMP(timezone=True), nullable=True),
+        sa.Column("id", sa.UUID(), nullable=False, comment="ID (UUIDv7)"),
+        sa.Column(
+            "is_active",
+            sa.BOOLEAN(),
+            server_default=sa.text("true"),
+            nullable=False,
+            comment="Флаг активности записи. False означает логическое удаление.",
+        ),
+        sa.Column(
+            "created_at",
+            sa.TIMESTAMP(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+            comment="Дата и время создания записи",
+        ),
+        sa.Column(
+            "updated_at",
+            sa.TIMESTAMP(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+            comment="Дата и время последнего обновления",
+        ),
+        sa.CheckConstraint("amount >= 0", name="ck_invoice_amount_non_neg"),
+        sa.CheckConstraint(
+            "period_to > period_from", name="ck_invoice_period_order"
+        ),
+        sa.ForeignKeyConstraint(
+            ["contract_id"], ["contracts.id"], ondelete="RESTRICT"
+        ),
+        sa.PrimaryKeyConstraint("id"),
+        sa.UniqueConstraint(
+            "contract_id", "number", name="uq_invoice_contract_number"
+        ),
+        comment="Счета-фактуры, выставляемые по биллинговому циклу договора",
+    )
+    op.create_index(
+        op.f("ix_invoices_contract_id"),
+        "invoices",
+        ["contract_id"],
+        unique=False,
+    )
+    op.create_index(
+        op.f("ix_invoices_status"), "invoices", ["status"], unique=False
     )
     op.create_table(
         "orders",
@@ -478,7 +938,12 @@ def upgrade() -> None:
         ),
         sa.Column(
             "sale_type",
-            sa.String(length=30),
+            sa.Enum(
+                "delivery",
+                "warehouse_pickup",
+                name="sale_type_enum",
+                metadata=MetaData(),
+            ),
             server_default="delivery",
             nullable=False,
             comment="Тип продажи: delivery (доставка) или warehouse_pickup (самовывоз)",
@@ -488,6 +953,30 @@ def upgrade() -> None:
             sa.UUID(),
             nullable=True,
             comment="Склад-источник (заполняется только для самовывоза)",
+        ),
+        sa.Column(
+            "contract_id",
+            sa.UUID(),
+            nullable=True,
+            comment="Договор (обязателен при payment_method=CONTRACT, иначе NULL). ondelete=RESTRICT: нельзя удалить договор с привязанными заказами.",
+        ),
+        sa.Column(
+            "reserved_credit_amount",
+            sa.BIGINT(),
+            nullable=True,
+            comment="Зарезервированная сумма кредита при создании заказа. Используется для корректного возврата credit_used при частичной доставке или отмене. NULL для не-CONTRACT заказов.",
+        ),
+        sa.Column(
+            "cancellation_reason",
+            sa.String(length=500),
+            nullable=True,
+            comment="Причина отмены заказа (заполняется при CANCELLED)",
+        ),
+        sa.Column(
+            "notes",
+            sa.String(length=500),
+            nullable=True,
+            comment="Заметки / инструкции по доставке (например, код домофона, этаж)",
         ),
         sa.Column("id", sa.UUID(), nullable=False, comment="ID (UUIDv7)"),
         sa.Column(
@@ -518,6 +1007,9 @@ def upgrade() -> None:
             ["client_inventory_id"], ["inventories.id"], ondelete="RESTRICT"
         ),
         sa.ForeignKeyConstraint(
+            ["contract_id"], ["contracts.id"], ondelete="RESTRICT"
+        ),
+        sa.ForeignKeyConstraint(
             ["courier_id"], ["users.id"], ondelete="SET NULL"
         ),
         sa.ForeignKeyConstraint(
@@ -534,6 +1026,9 @@ def upgrade() -> None:
         "orders",
         ["client_inventory_id"],
         unique=False,
+    )
+    op.create_index(
+        op.f("ix_orders_contract_id"), "orders", ["contract_id"], unique=False
     )
     op.create_index(
         op.f("ix_orders_courier_id"), "orders", ["courier_id"], unique=False
@@ -609,6 +1104,90 @@ def upgrade() -> None:
         op.f("ix_order_items_product_id"),
         "order_items",
         ["product_id"],
+        unique=False,
+    )
+    op.create_table(
+        "order_status_logs",
+        sa.Column("order_id", sa.UUID(), nullable=False),
+        sa.Column(
+            "old_status",
+            sa.Enum(
+                "new",
+                "assigned",
+                "in_transit",
+                "arrived",
+                "delivered",
+                "pickup_completed",
+                "cancelled",
+                name="order_status_enum",
+                metadata=MetaData(),
+            ),
+            nullable=True,
+            comment="Статус до перехода (NULL при создании)",
+        ),
+        sa.Column(
+            "new_status",
+            sa.Enum(
+                "new",
+                "assigned",
+                "in_transit",
+                "arrived",
+                "delivered",
+                "pickup_completed",
+                "cancelled",
+                name="order_status_enum",
+                metadata=MetaData(),
+            ),
+            nullable=False,
+            comment="Статус после перехода",
+        ),
+        sa.Column(
+            "changed_by_id",
+            sa.UUID(),
+            nullable=True,
+            comment="Кто инициировал переход (NULL для системных)",
+        ),
+        sa.Column(
+            "reason",
+            sa.String(length=500),
+            nullable=True,
+            comment="Причина перехода (при отмене/возврате)",
+        ),
+        sa.Column("id", sa.UUID(), nullable=False, comment="ID (UUIDv7)"),
+        sa.Column(
+            "is_active",
+            sa.BOOLEAN(),
+            server_default=sa.text("true"),
+            nullable=False,
+            comment="Флаг активности записи. False означает логическое удаление.",
+        ),
+        sa.Column(
+            "created_at",
+            sa.TIMESTAMP(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+            comment="Дата и время создания записи",
+        ),
+        sa.Column(
+            "updated_at",
+            sa.TIMESTAMP(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+            comment="Дата и время последнего обновления",
+        ),
+        sa.ForeignKeyConstraint(
+            ["changed_by_id"], ["users.id"], ondelete="SET NULL"
+        ),
+        sa.ForeignKeyConstraint(
+            ["order_id"], ["orders.id"], ondelete="CASCADE"
+        ),
+        sa.PrimaryKeyConstraint("id"),
+        comment="Аудит-лог всех переходов статуса заказа",
+    )
+    op.create_index(
+        op.f("ix_order_status_logs_order_id"),
+        "order_status_logs",
+        ["order_id"],
         unique=False,
     )
     op.create_table(
@@ -1071,6 +1650,10 @@ def downgrade() -> None:
         op.f("ix_stock_transfers_from_id"), table_name="stock_transfers"
     )
     op.drop_table("stock_transfers")
+    op.drop_index(
+        op.f("ix_order_status_logs_order_id"), table_name="order_status_logs"
+    )
+    op.drop_table("order_status_logs")
     op.drop_index(op.f("ix_order_items_product_id"), table_name="order_items")
     op.drop_index(op.f("ix_order_items_order_id"), table_name="order_items")
     op.drop_table("order_items")
@@ -1078,14 +1661,40 @@ def downgrade() -> None:
     op.drop_index(op.f("ix_orders_status"), table_name="orders")
     op.drop_index(op.f("ix_orders_sale_type"), table_name="orders")
     op.drop_index(op.f("ix_orders_courier_id"), table_name="orders")
+    op.drop_index(op.f("ix_orders_contract_id"), table_name="orders")
     op.drop_index(op.f("ix_orders_client_inventory_id"), table_name="orders")
     op.drop_index(op.f("ix_orders_client_id"), table_name="orders")
     op.drop_table("orders")
+    op.drop_index(op.f("ix_invoices_status"), table_name="invoices")
+    op.drop_index(op.f("ix_invoices_contract_id"), table_name="invoices")
+    op.drop_table("invoices")
     op.drop_index(
         op.f("ix_inventory_balances_product_id"),
         table_name="inventory_balances",
     )
     op.drop_table("inventory_balances")
+    op.drop_index(
+        op.f("ix_contract_status_logs_contract_id"),
+        table_name="contract_status_logs",
+    )
+    op.drop_index(
+        "idx_contract_status_log_contract", table_name="contract_status_logs"
+    )
+    op.drop_table("contract_status_logs")
+    op.drop_index(
+        op.f("ix_contract_price_items_product_id"),
+        table_name="contract_price_items",
+    )
+    op.drop_index(
+        op.f("ix_contract_price_items_contract_id"),
+        table_name="contract_price_items",
+    )
+    op.drop_table("contract_price_items")
+    op.drop_index(
+        op.f("ix_contract_amendments_contract_id"),
+        table_name="contract_amendments",
+    )
+    op.drop_table("contract_amendments")
     op.drop_index(
         "uq_active_courier_inventory",
         table_name="inventories",
@@ -1096,6 +1705,15 @@ def downgrade() -> None:
     op.drop_table("inventories")
     op.drop_index(op.f("ix_identities_user_id"), table_name="identities")
     op.drop_table("identities")
+    op.drop_index(
+        "uq_one_active_contract_per_client",
+        table_name="contracts",
+        postgresql_where=sa.text("status = 'active' AND is_active = true"),
+    )
+    op.drop_index(op.f("ix_contracts_status"), table_name="contracts")
+    op.drop_index(op.f("ix_contracts_client_id"), table_name="contracts")
+    op.drop_index("idx_contract_client_status", table_name="contracts")
+    op.drop_table("contracts")
     op.drop_index(op.f("ix_accounts_type"), table_name="accounts")
     op.drop_index("idx_account_user_type", table_name="accounts")
     op.drop_table("accounts")
