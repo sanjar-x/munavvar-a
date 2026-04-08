@@ -21,7 +21,7 @@ class ProductBase(BaseModel):
         default=0,
         ge=0,  # ge=0 гарантирует, что цена не будет отрицательной
         title="Цена",
-        description="Цена в минимальных единицах (копейки/тиыйны)",
+        description="Цена в сумах (UZS), целое число",
         examples=[20000],
     )
     attributes: dict[str, Any] = Field(

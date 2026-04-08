@@ -31,11 +31,11 @@ class CourierFleetCard(BaseModel):
     orders_delivered_today: int = 0
     cash_balance: int = Field(
         default=0,
-        description="Тийины — баланс кассы курьера",
+        description="сум — баланс кассы курьера",
     )
     cash_collected_today: int = Field(
         default=0,
-        description="Тийины — собрано за сегодня",
+        description="сум — собрано за сегодня",
     )
     containers_collected_today: int = Field(
         default=0,
@@ -50,7 +50,7 @@ class CourierFleetResponse(BaseModel):
     total_active: int
     total_stock_on_couriers: int
     total_courier_cash: int = Field(
-        description="Тийины",
+        description="сум",
     )
 
 

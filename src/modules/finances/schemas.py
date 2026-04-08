@@ -57,7 +57,7 @@ class AccountResponse(AccountBase):
     balance: int = Field(
         title="Текущий баланс",
         description=(
-            "В минимальных единицах (копейки/тиыйны). "
+            "В сумах (UZS), целое число. "
             "Может быть отрицательным (долг)."
         ),
     )

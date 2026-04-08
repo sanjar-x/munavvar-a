@@ -71,7 +71,7 @@ class Contract(BaseModel):
         BigInteger,
         nullable=False,
         default=0,
-        comment="Кредитный лимит в тийинах. 0 = без ограничений.",
+        comment="Кредитный лимит в сумах (UZS). 0 = без ограничений.",
     )
     credit_used: Mapped[int] = mapped_column(
         BigInteger,
@@ -232,7 +232,7 @@ class ContractPriceItem(BaseModel):
     price: Mapped[int] = mapped_column(
         BigInteger,
         nullable=False,
-        comment="Договорная цена в тийинах",
+        comment="Договорная цена в сумах (UZS)",
     )
 
     contract: Mapped[Contract] = relationship(

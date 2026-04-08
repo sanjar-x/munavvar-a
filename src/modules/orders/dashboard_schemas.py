@@ -33,7 +33,7 @@ class OrdersSummary(BaseModel):
     delivered_today: int
     cancelled_today: int
     revenue_today: int = Field(
-        description="Тийины, сумма завершённых сегодня",
+        description="сум, сумма завершённых сегодня",
     )
     by_sale_type: dict[str, int] = Field(
         description='{"delivery": N, "warehouse_pickup": N}',
@@ -51,7 +51,7 @@ class PaymentMethodStats(BaseModel):
         description="cash | card | contract",
     )
     orders_count: int
-    total_amount: int = Field(description="Тийины")
+    total_amount: int = Field(description="сум")
 
 
 class PaymentBreakdownResponse(BaseModel):
@@ -68,8 +68,8 @@ class PaymentBreakdownResponse(BaseModel):
 class OrderTrendPoint(BaseModel):
     period: str
     orders_count: int
-    revenue: int = Field(description="Тийины")
-    avg_order_value: int = Field(description="Тийины")
+    revenue: int = Field(description="сум")
+    avg_order_value: int = Field(description="сум")
 
 
 class OrderTrendResponse(BaseModel):
@@ -124,7 +124,7 @@ class TopClientItem(BaseModel):
         description="client_b2c | client_b2b",
     )
     orders_count: int
-    total_amount: int = Field(description="Тийины")
+    total_amount: int = Field(description="сум")
 
 
 class TopClientsResponse(BaseModel):

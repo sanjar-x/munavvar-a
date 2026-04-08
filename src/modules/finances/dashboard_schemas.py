@@ -13,7 +13,7 @@ class RevenueTrendPoint(BaseModel):
     period: str = Field(
         description="2026-03-15 | 2026-W12 | 2026-03",
     )
-    revenue: int = Field(description="Тийины")
+    revenue: int = Field(description="сум")
     orders_count: int
 
 
@@ -40,7 +40,7 @@ class AgingBucket(BaseModel):
         description="None для 60+",
     )
     clients_count: int
-    total_amount: int = Field(description="Тийины")
+    total_amount: int = Field(description="сум")
 
 
 class DebtAgingResponse(BaseModel):
@@ -61,7 +61,7 @@ class TopDebtorItem(BaseModel):
         description="client_b2c | client_b2b",
     )
     phone: str | None = None
-    debt_amount: int = Field(description="Тийины")
+    debt_amount: int = Field(description="сум")
     last_payment_date: date | None = None
     days_overdue: int
 
@@ -80,10 +80,10 @@ class FinanceSummaryKPIs(BaseModel):
     """EP-12: Расчётные финансовые метрики."""
 
     avg_order_value: int = Field(
-        description="Тийины (AOV)",
+        description="сум (AOV)",
     )
     total_orders: int
-    total_revenue: int = Field(description="Тийины")
+    total_revenue: int = Field(description="сум")
 
     card_confirmation_rate: float = Field(
         description="0.0-1.0",
@@ -109,8 +109,8 @@ class SegmentRevenue(BaseModel):
         description="client_b2b | client_b2c",
     )
     orders_count: int
-    total_revenue: int = Field(description="Тийины")
-    avg_order_value: int = Field(description="Тийины")
+    total_revenue: int = Field(description="сум")
+    avg_order_value: int = Field(description="сум")
 
 
 class RevenueBySegmentResponse(BaseModel):
@@ -129,7 +129,7 @@ class PaymentMethodFinanceStats(BaseModel):
         description="cash | card | contract",
     )
     transactions_count: int
-    total_amount: int = Field(description="Тийины")
+    total_amount: int = Field(description="сум")
 
 
 class PaymentMethodsFinanceResponse(BaseModel):

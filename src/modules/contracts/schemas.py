@@ -90,7 +90,7 @@ class ContractDetailResponse(ContractResponse):
 
 
 class PriceItemCreate(BaseModel):
-    price: int = Field(ge=0, description="Договорная цена в тийинах")
+    price: int = Field(ge=0, description="Договорная цена в сумах")
 
 
 class PriceItemResponse(BaseModel):

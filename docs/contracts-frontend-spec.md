@@ -4,15 +4,14 @@
 
 ---
 
-| Реквизит             | Значение                                            |
-| -------------------- | --------------------------------------------------- |
-| **Версия документа** | 3.0.0                                               |
-| **Статус**           | APPROVED                                            |
-| **Аудитория**        | Frontend-разработчики, QA-инженеры, Tech Lead       |
-| **Формат**           | BRD + FLOW + API SPEC                               |
-| **Base URL**         | `{API_BASE}/api/v1`                                 |
-| **Источник истины**  | Backend-код: `src/modules/contracts/`               |
-| **Денежная единица** | Тийин (1 UZS = 100 тийин). Все суммы — целые числа. |
+| Реквизит             | Значение                                      |
+| -------------------- | --------------------------------------------- |
+| **Версия документа** | 3.1.0                                         |
+| **Статус**           | APPROVED                                      |
+| **Аудитория**        | Frontend-разработчики, QA-инженеры, Tech Lead |
+| **Формат**           | BRD + FLOW + API SPEC                         |
+| **Base URL**         | `{API_BASE}/api/v1`                           |
+| **Источник истины**  | Backend-код: `src/modules/contracts/`         |
 
 > **Для Frontend-разработчика.** Данный документ объединяет бизнес-требования,
 > диаграммы процессов и полную спецификацию API. Каждый endpoint включает
@@ -20,7 +19,7 @@
 > и карту ошибок. Копируйте типы «как есть» — они сгенерированы из
 > Pydantic-схем backend'а.
 
-## Changelog v2.0.0 → v3.0.0
+## Changelog v2.0.0 → v3.1.0
 
 > **⚠️ Внимание Frontend-разработчиков!** Данная секция перечисляет все
 > изменения между коммитами `19c2ccc` и `41c14e1`. Изменения сгруппированы
@@ -28,44 +27,46 @@
 
 ### 🔴 Breaking Changes
 
-| # | Изменение | Было | Стало | Раздел |
-|---|-----------|------|-------|--------|
-| 1 | Ответ `GET /backoffice/orders/` | `OrderResponse[]` | `OrdersResponse` (обёртка с `total_count`) | §18.2 |
-| 2 | Лимит `GET /backoffice/orders/` | `le=500` | `le=100` | — |
-| 3 | Лимит `GET /backoffice/contracts/` | `le=200` | `le=100` | §19.2 |
-| 4 | Лимит `GET /{id}/orders` | `le=200` | `le=100` | §19.12 |
-| 5 | Scope `POST /backoffice/orders/` | `orders:edit` | `orders:create` | — |
-| 6 | Scope `POST /backoffice/orders/warehouse-sale` | `orders:edit` | `orders:create` | — |
-| 7 | Ответ `GET /client/orders/history` | `OrderResponse[]` | `OrdersResponse` | §20.5 |
-| 8 | Scope `DELETE /client/orders/{id}/items/{pid}` | `orders:create` | `orders:cancel` | — |
-| 9 | Scope `GET /backoffice/clients/` | `users:write` | `users:read` | — |
-| 10 | Scope `GET /backoffice/clients/{id}` | `users:write` | `users:read` | — |
+| #   | Изменение                                      | Было              | Стало                                      | Раздел |
+| --- | ---------------------------------------------- | ----------------- | ------------------------------------------ | ------ |
+| 1   | Ответ `GET /backoffice/orders/`                | `OrderResponse[]` | `OrdersResponse` (обёртка с `total_count`) | §18.2  |
+| 2   | Лимит `GET /backoffice/orders/`                | `le=500`          | `le=100`                                   | —      |
+| 3   | Лимит `GET /backoffice/contracts/`             | `le=200`          | `le=100`                                   | §19.2  |
+| 4   | Лимит `GET /{id}/orders`                       | `le=200`          | `le=100`                                   | §19.12 |
+| 5   | Scope `POST /backoffice/orders/`               | `orders:edit`     | `orders:create`                            | —      |
+| 6   | Scope `POST /backoffice/orders/warehouse-sale` | `orders:edit`     | `orders:create`                            | —      |
+| 7   | Ответ `GET /client/orders/history`             | `OrderResponse[]` | `OrdersResponse`                           | §20.5  |
+| 8   | Scope `DELETE /client/orders/{id}/items/{pid}` | `orders:create`   | `orders:cancel`                            | —      |
+| 9   | Scope `GET /backoffice/clients/`               | `users:write`     | `users:read`                               | —      |
+| 10  | Scope `GET /backoffice/clients/{id}`           | `users:write`     | `users:read`                               | —      |
+| 11  | **Валюта: тийинов нет**                        | Описания ссылались на «тийины» | **Все суммы — целые числа в сумах (UZS)** | §💰 |
 
 ### 🟢 New Features
 
-| # | Что добавлено | Раздел |
-|---|--------------|--------|
-| 1 | `OrderResponse` — 4 новых поля: `contract_id`, `reserved_credit_amount`, `notes`, `cancellation_reason` | §18.2 |
-| 2 | Новый тип `OrdersResponse` (`total_count` + `orders[]`) | §18.2 |
-| 3 | Новый тип `CancelOrderRequest` с полем `reason` | §18.3 |
-| 4 | Новый тип `OrderStatus` enum | §18.1 |
-| 5 | `POST /backoffice/orders/jobs/expire-stale` — автоочистка устаревших заказов | §19.25 |
-| 6 | `POST /client/orders/{id}/cancel` — отмена заказа клиентом | §20.6 |
-| 7 | `GET /client/orders/history` — пагинированная история с фильтром `status` | §20.5 |
-| 8 | `GET /client/inventory/balance` — баланс тары клиента | §20.7 |
-| 9 | `GET /courier/inventory/my-stock` — остатки товаров в машине курьера | §20.8 |
-| 10 | `GET /backoffice/finances/b2b-debts` — дебиторка B2B по договорам | — |
-| 11 | Suspend/Terminate/Expire контракта автоматически отменяют NEW/ASSIGNED заказы | §19.6, §19.8, §19.24 |
-| 12 | `OrderCreate.notes` — заметки к доставке (код домофона, этаж и т.д.) | §18.3 |
+| #   | Что добавлено                                                                                           | Раздел               |
+| --- | ------------------------------------------------------------------------------------------------------- | -------------------- |
+| 1   | `OrderResponse` — 4 новых поля: `contract_id`, `reserved_credit_amount`, `notes`, `cancellation_reason` | §18.2                |
+| 2   | Новый тип `OrdersResponse` (`total_count` + `orders[]`)                                                 | §18.2                |
+| 3   | Новый тип `CancelOrderRequest` с полем `reason`                                                         | §18.3                |
+| 4   | Новый тип `OrderStatus` enum                                                                            | §18.1                |
+| 5   | `POST /backoffice/orders/jobs/expire-stale` — автоочистка устаревших заказов                            | §19.25               |
+| 6   | `POST /client/orders/{id}/cancel` — отмена заказа клиентом                                              | §20.6                |
+| 7   | `GET /client/orders/history` — пагинированная история с фильтром `status`                               | §20.5                |
+| 8   | `GET /client/inventory/balance` — баланс тары клиента                                                   | §20.7                |
+| 9   | `GET /courier/inventory/my-stock` — остатки товаров в машине курьера                                    | §20.8                |
+| 10  | `GET /backoffice/finances/b2b-debts` — дебиторка B2B по договорам                                       | —                    |
+| 11  | Suspend/Terminate/Expire контракта автоматически отменяют NEW/ASSIGNED заказы                           | §19.6, §19.8, §19.24 |
+| 12  | `OrderCreate.notes` — заметки к доставке (код домофона, этаж и т.д.)                                    | §18.3                |
+| 13  | Секция «Валютная конвенция» — `formatMoney()` утилита, полный перечень денежных полей                    | §💰                  |
 
 ### 🔧 Fixes
 
-| # | Исправление | Влияние на Frontend |
-|---|------------|---------------------|
-| 1 | Исправлен баг `bulk_cancel_by_contract`: кредит по отменённым заказам теперь корректно возвращается | `credit_used` обновляется правильно при массовой отмене |
-| 2 | `expire-stale` теперь очищает и ASSIGNED заказы (72ч по `updated_at`) | Заказы в ASSIGNED не зависают бесконечно |
-| 3 | Фактуры за оплату с отсутствующим платежом генерируют предупреждение (аудит) | Нет изменения API, внутренний лог |
-| 4 | `response_model` добавлен на все финансовые эндпоинты | Ответы теперь строго типизированы |
+| #   | Исправление                                                                                         | Влияние на Frontend                                     |
+| --- | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| 1   | Исправлен баг `bulk_cancel_by_contract`: кредит по отменённым заказам теперь корректно возвращается | `credit_used` обновляется правильно при массовой отмене |
+| 2   | `expire-stale` теперь очищает и ASSIGNED заказы (72ч по `updated_at`)                               | Заказы в ASSIGNED не зависают бесконечно                |
+| 3   | Фактуры за оплату с отсутствующим платежом генерируют предупреждение (аудит)                        | Нет изменения API, внутренний лог                       |
+| 4   | `response_model` добавлен на все финансовые эндпоинты                                               | Ответы теперь строго типизированы                       |
 
 ---
 
@@ -83,16 +84,16 @@
 
 ## 2. Бизнес-контекст
 
-| Параметр              | Значение                                                     |
-| --------------------- | ------------------------------------------------------------ |
-| Тип клиентов          | Юридические лица (B2B), role = `client_b2b`                  |
-| Предмет договора      | Поставка бутилированной воды с отсрочкой платежа             |
-| Денежная единица      | Тийин (1 UZS = 100 тийин)                                    |
-| Кредитная модель      | `credit_limit = 0` → безлимитный; `> 0` → потолок в тийинах  |
-| Ценообразование       | Индивидуальный прайс-лист → fallback на каталог              |
-| Биллинговый цикл      | По запросу: оператор генерирует счёт за произвольный период  |
-| Сверка                | Акт сверки за период: DELIVERED заказы vs банковские платежи |
-| Инвариант целостности | `credit_used ≤ credit_limit` (или `credit_limit = 0`)        |
+| Параметр              | Значение                                                           |
+| --------------------- | ------------------------------------------------------------------ |
+| Тип клиентов          | Юридические лица (B2B), role = `client_b2b`                        |
+| Предмет договора      | Поставка бутилированной воды с отсрочкой платежа                   |
+| Денежная единица      | Целые числа в сумах (UZS). Тийинов нет — дробная часть отсутствует |
+| Кредитная модель      | `credit_limit = 0` → безлимитный; `> 0`                            |
+| Ценообразование       | Индивидуальный прайс-лист → fallback на каталог                    |
+| Биллинговый цикл      | По запросу: оператор генерирует счёт за произвольный период        |
+| Сверка                | Акт сверки за период: DELIVERED заказы vs банковские платежи       |
+| Инвариант целостности | `credit_used ≤ credit_limit` (или `credit_limit = 0`)              |
 
 ## 3. Матрица стейкхолдеров
 
@@ -123,7 +124,6 @@
 | **Счёт-фактура (Invoice)**      | Документ биллинга за период; генерируется из DELIVERED заказов                            |
 | **Акт сверки (Reconciliation)** | Сопоставление DELIVERED заказов и банковских платежей за период                           |
 | **ДС (Amendment)**              | Дополнительное соглашение, фиксирующее изменения условий договора                         |
-| **Тийин**                       | Минимальная денежная единица: 1 UZS = 100 тийин. Все суммы хранятся в тийинах             |
 | **IDOR**                        | Insecure Direct Object Reference — атака через подстановку чужого ID                      |
 | **Snapshot pricing**            | Цена фиксируется в `OrderItem.unit_price` на момент создания заказа                       |
 
@@ -149,7 +149,7 @@
 | US-A03 | Как Admin, я приостанавливаю договор при просрочке          | Статус → SUSPENDED; `reason` обязателен; заказы блокируются        |
 | US-A04 | Как Admin, я восстанавливаю приостановленный договор        | Статус → ACTIVE; коллизия с другим ACTIVE — ошибка 409             |
 | US-A05 | Как Admin, я расторгаю договор досрочно                     | Статус → TERMINATED; терминальный, необратимый                     |
-| US-A06 | Как Admin, я устанавливаю индивидуальные цены на товары     | Upsert по `(contract_id, product_id)`; цена в тийинах              |
+| US-A06 | Как Admin, я устанавливаю индивидуальные цены на товары     | Upsert по `(contract_id, product_id)`                              |
 | US-A07 | Как Admin, я генерирую счёт-фактуру за период               | Черновик с суммой DELIVERED заказов; дубли запрещены               |
 | US-A08 | Как Admin, я выставляю счёт клиенту (DRAFT → ISSUED)        | `issued_at` заполняется; `due_date` рассчитан                      |
 | US-A09 | Как Admin, я отмечаю счёт как оплаченный                    | ISSUED/OVERDUE → PAID; `paid_at` заполняется                       |
@@ -217,25 +217,25 @@
 
 ## 8. Ограничения и допущения
 
-| Тип         | Описание                                                                                       |
-| ----------- | ---------------------------------------------------------------------------------------------- |
-| Ограничение | Все суммы — целые числа в тийинах. Frontend округляет при отображении, не при отправке         |
-| Ограничение | `credit_used` обновляется приложением, не триггерами. Возможна кратковременная десинхронизация |
-| Ограничение | `partially_paid` присутствует в enum, но **не имеет** серверной реализации. Не рендерить в UI  |
-| Допущение   | Один клиент имеет не более одного ACTIVE договора в любой момент времени                       |
-| Допущение   | Все даты — ISO 8601 (`YYYY-MM-DD`), все timestamps — ISO 8601 с timezone                       |
-| Допущение   | Job-эндпоинты идемпотентны: повторный вызов безопасен (`updated: 0`)                           |
+| Тип         | Описание                                                                                        |
+| ----------- | ----------------------------------------------------------------------------------------------- |
+| Ограничение | Все суммы — целые числа в сумах (UZS), без тийинов. Отображать как есть: `12500` → `12 500 сум` |
+| Ограничение | `credit_used` обновляется приложением, не триггерами. Возможна кратковременная десинхронизация  |
+| Ограничение | `partially_paid` присутствует в enum, но **не имеет** серверной реализации. Не рендерить в UI   |
+| Допущение   | Один клиент имеет не более одного ACTIVE договора в любой момент времени                        |
+| Допущение   | Все даты — ISO 8601 (`YYYY-MM-DD`), все timestamps — ISO 8601 с timezone                        |
+| Допущение   | Job-эндпоинты идемпотентны: повторный вызов безопасен (`updated: 0`)                            |
 
 ## 9. Out of Scope (v1)
 
-| Функция                           | Причина исключения                     | Статус         |
-| --------------------------------- | -------------------------------------- | -------------- |
-| Частичная оплата инвойсов         | `partially_paid` зарезервирован в enum | Планируется v2 |
-| Автоматическая генерация инвойсов | Cron/Celery не настроен                | Планируется v2 |
-| Электронная подпись (ЭЦП)         | Требует интеграции с ГНСК              | Вне скоупа     |
-| PDF-генерация документов          | Требует шаблонизатор (WeasyPrint)      | Планируется v2 |
-| Мультивалютность                  | Все операции в UZS                     | Вне скоупа     |
-| Уведомления (email/SMS)           | Сервис уведомлений не реализован       | Планируется v2 |
+| Функция                           | Причина исключения                           | Статус         |
+| --------------------------------- | -------------------------------------------- | -------------- |
+| Частичная оплата инвойсов         | `partially_paid` зарезервирован в enum       | Планируется v2 |
+| Автоматическая генерация инвойсов | Cron/Celery не настроен                      | Планируется v2 |
+| Электронная подпись (ЭЦП)         | Требует интеграции с ГНСК                    | Вне скоупа     |
+| PDF-генерация документов          | Требует шаблонизатор (WeasyPrint)            | Планируется v2 |
+| Мультивалютность                  | Все операции в UZS (целые сумы, без тийинов) | Вне скоупа     |
+| Уведомления (email/SMS)           | Сервис уведомлений не реализован             | Планируется v2 |
 
 ---
 
@@ -656,6 +656,93 @@ JWT содержит:
 }
 ```
 
+## 💰 Валютная конвенция (Currency Convention)
+
+> **⚠️ КРИТИЧЕСКИ ВАЖНО для Frontend-разработчиков**
+
+### Основное правило
+
+**Все денежные значения — целые числа в сумах (UZS). Тийинов нет.**
+
+| Параметр               | Значение                                                   |
+| ---------------------- | ---------------------------------------------------------- |
+| Единица измерения      | 1 = 1 сум (UZS)                                            |
+| Тип данных             | `int` (целое число)                                        |
+| Минимальная единица    | 1 сум (дробной части нет)                                  |
+| Формат отображения     | `12 500 сум` (разделитель тысяч — пробел)                  |
+| Десятичные знаки       | **Нет.** Никогда не делить/умножать на 100                 |
+| Отрицательные значения | Допустимы для `balance` (означает долг)                    |
+| Ноль                   | `credit_limit = 0` → безлимитный; `amount = 0` → нет суммы |
+
+### Какие поля являются денежными
+
+```typescript
+// ✅ Все эти поля — целые числа в сумах (UZS):
+type MoneyField =
+  | "price" // Цена товара / позиции прайс-листа
+  | "unit_price" // Историческая цена в OrderItem
+  | "total" // quantity × unit_price в OrderItem
+  | "total_amount" // Сумма заказа
+  | "amount" // Сумма инвойса / транзакции / платежа
+  | "credit_limit" // Кредитный лимит договора
+  | "credit_used" // Использованный кредит
+  | "reserved_credit_amount" // Зарезервированный кредит заказа
+  | "balance" // Баланс счёта / сверки
+  | "opening_balance" // Начальное сальдо
+  | "closing_balance" // Конечное сальдо
+  | "running_balance" // Текущее сальдо
+  | "debt_amount" // Сумма долга
+  | "revenue" // Выручка
+  | "avg_order_value" // Средний чек
+  | "cash_balance"; // Касса курьера
+```
+
+### Утилита форматирования
+
+```typescript
+/**
+ * Форматирует сумму в сумах (UZS).
+ * Backend отдаёт целое число — никакого деления на 100!
+ *
+ * @example formatMoney(12500)  → "12 500 сум"
+ * @example formatMoney(0)      → "0 сум"
+ * @example formatMoney(-3000)  → "−3 000 сум"
+ */
+function formatMoney(amount: number): string {
+  const formatted = Math.abs(amount)
+    .toString()
+    .replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+  const sign = amount < 0 ? "−" : "";
+  return `${sign}${formatted} сум`;
+}
+
+/**
+ * Форматирует кредитный лимит.
+ * 0 = без ограничений (особый случай).
+ */
+function formatCreditLimit(limit: number): string {
+  return limit === 0 ? "Без ограничений" : formatMoney(limit);
+}
+```
+
+### Частые ошибки (Anti-patterns)
+
+```typescript
+// ❌ НЕПРАВИЛЬНО — тийинов нет, не надо делить на 100
+const display = (amount / 100).toFixed(2) + " сум";
+
+// ❌ НЕПРАВИЛЬНО — не использовать toFixed
+const display = amount.toFixed(2) + " сум";
+
+// ❌ НЕПРАВИЛЬНО — не использовать parseFloat
+const parsed = parseFloat(response.price);
+
+// ✅ ПРАВИЛЬНО — значение уже в сумах, целое число
+const display = formatMoney(response.price);
+```
+
+---
+
 ## 18. TypeScript типы
 
 ### 18.1 Enums
@@ -721,8 +808,8 @@ interface ContractResponse {
   status: ContractStatus;
   start_date: string; // "2025-01-01" (ISO date)
   end_date: string | null; // null = бессрочный
-  credit_limit: number; // тийин; 0 = безлимитный
-  credit_used: number; // тийин; in-flight сумма
+  credit_limit: number; // сум (UZS), 0 = безлимитный
+  credit_used: number; // сум (UZS), in-flight сумма
   payment_due_days: number; // 1–365
   legal_name: string;
   inn: string; // 9–14 символов
@@ -751,7 +838,7 @@ interface PriceItemResponse {
   id: string;
   contract_id: string;
   product_id: string;
-  price: number; // тийин
+  price: number; // сум (UZS)
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -765,7 +852,7 @@ interface InvoiceResponse {
   status: InvoiceStatus;
   period_from: string; // ISO date
   period_to: string; // ISO date
-  amount: number; // тийин
+  amount: number; // сум (UZS)
   due_date: string | null; // ISO date
   issued_at: string | null; // ISO datetime
   paid_at: string | null; // ISO datetime
@@ -800,14 +887,14 @@ interface AmendmentResponse {
 interface ReconciliationOrderItem {
   order_id: string;
   created_at: string;
-  total_amount: number; // тийин
+  total_amount: number;
 }
 
 /** Элемент акта сверки — платёж */
 interface ReconciliationPaymentItem {
   transaction_id: string;
   created_at: string;
-  amount: number; // тийин
+  amount: number;
   reason: string | null;
 }
 
@@ -819,10 +906,10 @@ interface ReconciliationResponse {
   period_from: string; // ISO date
   period_to: string; // ISO date
   orders: ReconciliationOrderItem[];
-  total_billed: number; // тийин
+  total_billed: number; // сум (UZS)
   payments: ReconciliationPaymentItem[];
-  total_paid: number; // тийин
-  balance: number; // total_billed - total_paid; >0 = клиент должен
+  total_paid: number; // сум (UZS)
+  balance: number; // сум (UZS), total_billed - total_paid; >0 = клиент должен
 }
 
 /** Ответ job-эндпоинтов */
@@ -846,12 +933,12 @@ interface OrderResponse {
   courier: UserResponse | null;
   status: OrderStatus;
   payment_method: PaymentMethod;
-  total_amount: number; // тийин
+  total_amount: number; // сум (UZS)
   capitalization_applied: boolean;
   sale_type: SaleType;
   warehouse_id: string | null;
   contract_id: string | null; // NEW v3.0 — ID договора
-  reserved_credit_amount: number | null; // NEW v3.0 — тийин
+  reserved_credit_amount: number | null; // сум (UZS), NEW v3.0
   notes: string | null; // NEW v3.0 — заметки к доставке
   cancellation_reason: string | null; // NEW v3.0 — причина отмены
   items: OrderItemResponse[];
@@ -875,8 +962,8 @@ interface OrderItemResponse {
   product_id: string;
   product: ProductResponse;
   quantity: number;
-  unit_price: number; // тийин, историческая цена
-  total: number; // quantity * unit_price
+  unit_price: number; // сум (UZS), историческая цена
+  total: number; // сум (UZS), quantity × unit_price
 }
 ```
 
@@ -921,7 +1008,7 @@ interface ContractTerminateRequest {
 
 /** Установка договорной цены */
 interface PriceItemCreateRequest {
-  price: number; // ≥ 0, тийин
+  price: number; // ≥ 0,
 }
 
 /** Генерация счёта-фактуры */
@@ -1384,9 +1471,9 @@ PUT /api/v1/backoffice/contracts/{contract_id}/prices/{product_id}
 }
 ```
 
-| Поле    | Тип     | Ограничения | Описание       |
-| ------- | ------- | ----------- | -------------- |
-| `price` | integer | `≥ 0`       | Цена в тийинах |
+| Поле    | Тип     | Ограничения | Описание |
+| ------- | ------- | ----------- | -------- |
+| `price` | integer | `≥ 0`       | Цена     |
 
 **Ответ — 200:** `PriceItemResponse`
 
@@ -1696,7 +1783,7 @@ POST /api/v1/backoffice/contracts/{contract_id}/amendments
 ```json
 {
   "number": "ДС-001",
-  "description": "Увеличение кредитного лимита до 10 000 000 тийин",
+  "description": "Увеличение кредитного лимита до 10 000 000",
   "effective_date": "2025-05-01"
 }
 ```
@@ -1898,11 +1985,11 @@ GET /api/v1/client/orders/history?skip=0&limit=20&status=delivered
 
 **Scope:** `orders:read`
 
-| Параметр | Тип         | Default | Ограничения     | Описание           |
-| -------- | ----------- | ------- | --------------- | ------------------ |
-| `skip`   | integer     | 0       | `≥ 0`           | Смещение           |
-| `limit`  | integer     | 20      | `1–100`         | Размер страницы    |
-| `status` | OrderStatus | null    | опциональный    | Фильтр по статусу  |
+| Параметр | Тип         | Default | Ограничения  | Описание          |
+| -------- | ----------- | ------- | ------------ | ----------------- |
+| `skip`   | integer     | 0       | `≥ 0`        | Смещение          |
+| `limit`  | integer     | 20      | `1–100`      | Размер страницы   |
+| `status` | OrderStatus | null    | опциональный | Фильтр по статусу |
 
 **Ответ — 200:** `OrdersResponse`
 
@@ -1967,10 +2054,10 @@ POST /api/v1/client/orders/{order_id}/cancel
 
 **Ошибки:**
 
-| HTTP | Код                        | Ситуация                             |
-| ---- | -------------------------- | ------------------------------------ |
-| 404  | `ORDER_NOT_FOUND`          | Заказ не найден или чужой            |
-| 409  | `ORDER_CANCEL_NOT_ALLOWED` | Статус ∉ {`new`, `assigned`}         |
+| HTTP | Код                        | Ситуация                     |
+| ---- | -------------------------- | ---------------------------- |
+| 404  | `ORDER_NOT_FOUND`          | Заказ не найден или чужой    |
+| 409  | `ORDER_CANCEL_NOT_ALLOWED` | Статус ∉ {`new`, `assigned`} |
 
 ---
 
@@ -2036,44 +2123,12 @@ GET /api/v1/courier/inventory/my-stock
 | `DUPLICATE_INVOICE_PERIOD`         | 409  | Генерация инвойса за период с активным инвойсом     | `contract_id`, `period_from`, `period_to`                                    |
 | `DUPLICATE_AMENDMENT_NUMBER`       | 409  | Создание ДС с дублирующимся номером                 | `contract_id`, `number`                                                      |
 | `CREDIT_LIMIT_BELOW_USED`          | 400  | Уменьшение `credit_limit` ниже `credit_used`        | `new_limit`, `credit_used`                                                   |
-| `ORDER_NOT_FOUND`                  | 404  | Заказ не найден или не принадлежит пользователю      | `order_id`                                                                   |
-| `ORDER_CANCEL_NOT_ALLOWED`         | 409  | Отмена невозможна (статус ≠ new/assigned)            | `order_id`, `current_status`                                                 |
+| `ORDER_NOT_FOUND`                  | 404  | Заказ не найден или не принадлежит пользователю     | `order_id`                                                                   |
+| `ORDER_CANCEL_NOT_ALLOWED`         | 409  | Отмена невозможна (статус ≠ new/assigned)           | `order_id`, `current_status`                                                 |
 
 ---
 
 ## 22. Руководство по реализации UI
-
-### 22.1 Форматирование валюты
-
-```typescript
-/**
- * Конвертирует тийины в отформатированную строку UZS.
- * formatTiyin(1500000) → "15 000,00 сўм"
- * formatTiyin(0)       → "0,00 сўм"
- */
-function formatTiyin(tiyin: number): string {
-  const uzs = tiyin / 100;
-  return (
-    uzs.toLocaleString("ru-UZ", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }) + " сўм"
-  );
-}
-
-/**
- * Для ввода: пользователь вводит UZS, мы конвертируем в тийины.
- * parseUzsToTiyin("15000") → 1500000
- * parseUzsToTiyin("15000.50") → 1500050
- */
-function parseUzsToTiyin(uzs: string): number {
-  return Math.round(parseFloat(uzs) * 100);
-}
-```
-
-> **Правило:** Все суммы в API — тийины (целые числа).
-> Frontend показывает UZS с 2 знаками после запятой.
-> При отправке — округляет к ближайшему тийину.
 
 ### 22.2 Конфигурация бейджей статуса договора
 
@@ -2194,7 +2249,7 @@ function getCreditInfo(props: CreditBarProps) {
     isUnlimited: false,
     percentage,
     available,
-    label: `${formatTiyin(creditUsed)} / ${formatTiyin(creditLimit)}`,
+    label: creditUsed / creditLimit,
     variant,
   };
 }
@@ -2237,7 +2292,7 @@ function canPlaceOrder(
   if (orderAmount > available) {
     return {
       allowed: false,
-      reason: `Сумма заказа (${formatTiyin(orderAmount)}) превышает доступный кредит (${formatTiyin(available)}).`,
+      reason: `Сумма заказа (${orderAmount}) превышает доступный кредит (${available}).`,
     };
   }
 
@@ -2548,7 +2603,7 @@ function getInvoiceActions(status: InvoiceStatus): ActionButton[] {
 - [ ] Обновление существующей позиции (PUT — upsert)
 - [ ] Удаление позиции (DELETE /prices/{product_id}) → 204
 - [ ] Удаление — ошибка 404 для несуществующей позиции
-- [ ] Цена отображается в UZS, отправляется в тийинах
+- [ ] Цена отображается в UZS
 
 ### 23.4 Счета-фактуры
 
@@ -2573,7 +2628,7 @@ function getInvoiceActions(status: InvoiceStatus): ActionButton[] {
 - [ ] `balance > 0` — клиент должен
 - [ ] `balance < 0` — переплата
 - [ ] `balance == 0` — взаиморасчёты закрыты
-- [ ] Суммы отображаются в UZS с 2 знаками
+- [ ] Суммы отображаются в UZS без дробной части (целые числа, разделитель тысяч — пробел)
 
 ### 23.6 Кредитная шкала
 

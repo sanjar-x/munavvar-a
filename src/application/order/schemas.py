@@ -106,6 +106,6 @@ class OrderResponse(BaseModel):
     client_inventory_id: uuid.UUID
     payment_method: PaymentMethod
     status: str
-    total_amount: float  # Или Decimal
+    total_amount: int
 
     model_config = ConfigDict(from_attributes=True)
