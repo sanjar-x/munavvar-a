@@ -1,57 +1,92 @@
-# HOD Platform — Contracts Module
+# HOD Platform — Frontend Integration Specification
 
-## Frontend Integration Specification
+## Модуль «Договоры» и платформенные изменения API
 
 ---
 
-| Реквизит             | Значение                                      |
-| -------------------- | --------------------------------------------- |
-| **Версия документа** | 3.2.0                                         |
-| **Статус**           | APPROVED                                      |
-| **Аудитория**        | Frontend-разработчики, QA-инженеры, Tech Lead |
-| **Формат**           | BRD + FLOW + API SPEC                         |
-| **Base URL**         | `{API_BASE}/api/v1`                           |
-| **Источник истины**  | Backend-код: `src/modules/contracts/` + смежные модули |
+### Управление документом
 
-> **Для Frontend-разработчика.** Данный документ объединяет бизнес-требования,
-> диаграммы процессов и полную спецификацию API. Каждый endpoint включает
-> TypeScript-типы, примеры запросов/ответов, таблицы валидации полей
-> и карту ошибок. Копируйте типы «как есть» — они сгенерированы из
-> Pydantic-схем backend'а.
->
-> **v3.2+:** Помимо модуля Contracts, документ покрывает
-> платформенные изменения API (авторизация, инвентарь, финансы,
-> накладные), затрагивающие frontend-интеграцию. См. §19.26–19.28 и §20.9.
+| Реквизит            | Значение                                           |
+| ------------------- | -------------------------------------------------- |
+| **Идентификатор**   | `HOD-FE-SPEC-001`                                  |
+| **Версия**          | 3.2.0                                              |
+| **Статус**          | APPROVED                                           |
+| **Классификация**   | INTERNAL — Frontend Engineering                    |
+| **Аудитория**       | Frontend-разработчики, QA-инженеры, Tech Lead      |
+| **Формат**          | BRD + FLOW + API SPEC (единый документ)            |
+| **Base URL**        | `{API_BASE}/api/v1`                                |
+| **Источник истины** | Backend: `src/modules/contracts/` и смежные модули |
+| **Ответственный**   | Backend Engineering Team                           |
+
+### Назначение и область действия
+
+Настоящий документ является **единственным источником правды** для
+frontend-интеграции модуля «Договоры» (Contracts) и связанных
+платформенных API. Документ объединяет:
+
+- **Part I (§1–§9)** — бизнес-требования (BRD): цели, правила, ограничения;
+- **Part II (§10–§14)** — процессные потоки (FLOW): машины состояний, диаграммы;
+- **Part III (§15–§23)** — техническая спецификация (API SPEC): типы,
+  эндпоинты, ошибки, UI-рекомендации, тестирование.
+
+Начиная с v3.2, документ также покрывает **платформенные изменения API**
+(авторизация, инвентарь, финансы, накладные), затрагивающие
+frontend-интеграцию. См. §19.26–19.28 и §20.9.
+
+### Нотация и соглашения
+
+| Обозначение          | Значение                                                |
+| -------------------- | ------------------------------------------------------- |
+| `§N.M`               | Перекрёстная ссылка на раздел N, подраздел M            |
+| **MUST** / **SHALL** | Обязательное требование (RFC 2119)                      |
+| **SHOULD**           | Рекомендация; отклонение требует обоснования            |
+| **MAY**              | Опциональная возможность                                |
+| ✅ / ❌              | Разрешено / Запрещено (в таблицах переходов и матрицах) |
+| `NEW vX.Y`           | Функциональность, добавленная в версии X.Y              |
+| `BREAKING`           | Изменение, ломающее обратную совместимость              |
+| UZS                  | Узбекский сум — все денежные значения в целых сумах     |
+
+> **NOTE:** TypeScript-типы в данном документе сгенерированы из
+> Pydantic-схем backend'а. Копируйте «как есть» без модификаций.
+
+### Ревизии
+
+| Версия | Описание                                                           |
+| ------ | ------------------------------------------------------------------ |
+| 3.2.0  | Платформенные изменения API, новые типы, B2B-дебиторка, фильтры    |
+| 3.1.0  | Валютная конвенция — удалены тийины, все суммы в целых сумах (UZS) |
+| 3.0.0  | Заказы, отмена клиентом, тара, курьерский инвентарь, jobs          |
+| 2.0.0  | Первичная спецификация модуля Contracts                            |
 
 ## Changelog v2.0.0 → v3.2.0
 
-> **⚠️ Внимание Frontend-разработчиков!** Данная секция перечисляет все
-> изменения между коммитами `19c2ccc` и `41c14e1`. Изменения сгруппированы
-> по типу: ломающие (breaking), новые возможности и исправления.
+> **ATTENTION — Frontend Engineering.** Данная секция перечисляет все
+> API-контрактные изменения между коммитами `19c2ccc` и `41c14e1`.
+> Изменения классифицированы по степени воздействия на frontend-код.
 > Начиная с v3.2.0 документ также покрывает **платформенные изменения API**,
 > влияющие на frontend-интеграцию за пределами модуля Contracts.
 
-### 🔴 Breaking Changes
+### BREAKING CHANGES
 
-| #   | Изменение                                      | Было              | Стало                                      | Раздел |
-| --- | ---------------------------------------------- | ----------------- | ------------------------------------------ | ------ |
-| 1   | Ответ `GET /backoffice/orders/`                | `OrderResponse[]` | `OrdersResponse` (обёртка с `total_count`) | §18.2  |
-| 2   | Лимит `GET /backoffice/orders/`                | `le=500`          | `le=100`                                   | —      |
-| 3   | Лимит `GET /backoffice/contracts/`             | `le=200`          | `le=100`                                   | §19.2  |
-| 4   | Лимит `GET /{id}/orders`                       | `le=200`          | `le=100`                                   | §19.12 |
-| 5   | Scope `POST /backoffice/orders/`               | `orders:edit`     | `orders:create`                            | —      |
-| 6   | Scope `POST /backoffice/orders/warehouse-sale` | `orders:edit`     | `orders:create`                            | —      |
-| 7   | Ответ `GET /client/orders/history`             | `OrderResponse[]` | `OrdersResponse`                           | §20.5  |
-| 8   | Scope `DELETE /client/orders/{id}/items/{pid}` | `orders:create`   | `orders:cancel`                            | —      |
-| 9   | Scope `GET /backoffice/clients/`               | `users:write`     | `users:read`                               | —      |
-| 10  | Scope `GET /backoffice/clients/{id}`           | `users:write`     | `users:read`                               | —      |
-| 11  | **Валюта: тийинов нет**                        | Описания ссылались на «тийины» | **Все суммы — целые числа в сумах (UZS)** | §💰 |
-| 12  | `POST /client/login` — формат запроса          | `phone` как query-параметр | Request body `LocalLogin` `{phone, password}` | §18.3 |
-| 13  | `GET /health` — проверка БД                    | `{"status":"ok","environment":"..."}` | `{"status":"ok"}` / 503 `{"status":"db_unavailable"}` | — |
-| 14  | `POST /backoffice/shifts/close` **удалён**     | Роутер `/shifts` существовал | Роутер удалён полностью | — |
-| 15  | `PATCH /backoffice/users/{id}` — валидация     | Без ограничений на self-edit | Запрет self-edit (`SELF_MODIFICATION_FORBIDDEN`) и назначения роли SYSTEM (`SYSTEM_ROLE_FORBIDDEN`) | §21 |
+| #   | Изменение                                      | Было                                  | Стало                                                                                               | Раздел |
+| --- | ---------------------------------------------- | ------------------------------------- | --------------------------------------------------------------------------------------------------- | ------ |
+| 1   | Ответ `GET /backoffice/orders/`                | `OrderResponse[]`                     | `OrdersResponse` (обёртка с `total_count`)                                                          | §18.2  |
+| 2   | Лимит `GET /backoffice/orders/`                | `le=500`                              | `le=100`                                                                                            | —      |
+| 3   | Лимит `GET /backoffice/contracts/`             | `le=200`                              | `le=100`                                                                                            | §19.2  |
+| 4   | Лимит `GET /{id}/orders`                       | `le=200`                              | `le=100`                                                                                            | §19.12 |
+| 5   | Scope `POST /backoffice/orders/`               | `orders:edit`                         | `orders:create`                                                                                     | —      |
+| 6   | Scope `POST /backoffice/orders/warehouse-sale` | `orders:edit`                         | `orders:create`                                                                                     | —      |
+| 7   | Ответ `GET /client/orders/history`             | `OrderResponse[]`                     | `OrdersResponse`                                                                                    | §20.5  |
+| 8   | Scope `DELETE /client/orders/{id}/items/{pid}` | `orders:create`                       | `orders:cancel`                                                                                     | —      |
+| 9   | Scope `GET /backoffice/clients/`               | `users:write`                         | `users:read`                                                                                        | —      |
+| 10  | Scope `GET /backoffice/clients/{id}`           | `users:write`                         | `users:read`                                                                                        | —      |
+| 11  | **Валюта: тийинов нет**                        | Описания ссылались на «тийины»        | **Все суммы — целые числа в сумах (UZS)**                                                           | §17.3  |
+| 12  | `POST /client/login` — формат запроса          | `phone` как query-параметр            | Request body `LocalLogin` `{phone, password}`                                                       | §18.3  |
+| 13  | `GET /health` — проверка БД                    | `{"status":"ok","environment":"..."}` | `{"status":"ok"}` / 503 `{"status":"db_unavailable"}`                                               | —      |
+| 14  | `POST /backoffice/shifts/close` **удалён**     | Роутер `/shifts` существовал          | Роутер удалён полностью                                                                             | —      |
+| 15  | `PATCH /backoffice/users/{id}` — валидация     | Без ограничений на self-edit          | Запрет self-edit (`SELF_MODIFICATION_FORBIDDEN`) и назначения роли SYSTEM (`SYSTEM_ROLE_FORBIDDEN`) | §21    |
 
-### 🟢 New Features
+### NEW CAPABILITIES
 
 | #   | Что добавлено                                                                                           | Раздел               |
 | --- | ------------------------------------------------------------------------------------------------------- | -------------------- |
@@ -67,15 +102,15 @@
 | 10  | `GET /backoffice/finances/b2b-debts` — дебиторка B2B по договорам                                       | —                    |
 | 11  | Suspend/Terminate/Expire контракта автоматически отменяют NEW/ASSIGNED заказы                           | §19.6, §19.8, §19.24 |
 | 12  | `OrderCreate.notes` — заметки к доставке (код домофона, этаж и т.д.)                                    | §18.3                |
-| 13  | Секция «Валютная конвенция» — `formatMoney()` утилита, полный перечень денежных полей                    | §💰                  |
-| 14  | Фильтры накладных: `type`, `from_date`, `to_date`, `warehouse_id` на `GET /backoffice/transfers/`      | §19.28               |
+| 13  | Секция «Валютная конвенция» — `formatMoney()` утилита, полный перечень денежных полей                   | §17.3                |
+| 14  | Фильтры накладных: `type`, `from_date`, `to_date`, `warehouse_id` на `GET /backoffice/transfers/`       | §19.28               |
 | 15  | `GET /backoffice/inventories/search` — поиск инвентарей по названию и типу                              | §19.27               |
 | 16  | `CourierCreate.password` теперь требует `min_length=8`                                                  | —                    |
-| 17  | `DashboardTotals` — 2 новых B2B поля: `total_b2b_credit_used`, `total_b2b_settled_debt`                | §18.2                |
+| 17  | `DashboardTotals` — 2 новых B2B поля: `total_b2b_credit_used`, `total_b2b_settled_debt`                 | §18.2                |
 | 18  | `POST /backoffice/orders/` теперь возвращает `OrderResponse` (201)                                      | —                    |
 | 19  | `GET /backoffice/finances/b2b-debts` — дебиторка B2B по договорам (полная спецификация)                 | §19.26               |
 
-### 🔧 Fixes
+### DEFECT CORRECTIONS
 
 | #   | Исправление                                                                                         | Влияние на Frontend                                     |
 | --- | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
@@ -87,7 +122,7 @@
 
 ---
 
-# ЧАСТЬ I — BRD (Business Requirements Document)
+# PART I — BUSINESS REQUIREMENTS DOCUMENT (BRD)
 
 ## 1. Резюме проекта (Executive Summary)
 
@@ -256,7 +291,7 @@
 
 ---
 
-# ЧАСТЬ II — FLOW (Business Process Flows)
+# PART II — BUSINESS PROCESS FLOWS (FLOW)
 
 ## 10. Машина состояний: Договор (Contract)
 
@@ -594,7 +629,7 @@ Order DELIVERED / PICKUP_COMPLETED / CANCELLED:
 
 ---
 
-# ЧАСТЬ III — API SPEC (Technical Specification)
+# PART III — TECHNICAL SPECIFICATION (API SPEC)
 
 ## 15. Аутентификация
 
@@ -644,9 +679,9 @@ JWT содержит:
 | Development | `http://localhost:8000/api/v1` |
 | Production  | `https://api.hod.uz/api/v1`    |
 
-## 17. Конверт ответа (Response Envelope)
+## 17. Конвенции ответов и данных (Response & Data Conventions)
 
-### Успешный ответ
+### 17.1 Успешный ответ (Success Response Envelope)
 
 ```json
 // Одиночный объект — 200/201:
@@ -659,7 +694,7 @@ JWT содержит:
 (пустой ответ)
 ```
 
-### Ответ с ошибкой
+### 17.2 Ответ с ошибкой (Error Response Envelope)
 
 ```json
 {
@@ -673,11 +708,11 @@ JWT содержит:
 }
 ```
 
-## 💰 Валютная конвенция (Currency Convention)
+### 17.3 Валютная конвенция (Currency Convention)
 
-> **⚠️ КРИТИЧЕСКИ ВАЖНО для Frontend-разработчиков**
+> **CRITICAL:** Обязательно к прочтению перед работой с любыми денежными полями.
 
-### Основное правило
+#### 17.3.1 Основное правило
 
 **Все денежные значения — целые числа в сумах (UZS). Тийинов нет.**
 
@@ -691,7 +726,7 @@ JWT содержит:
 | Отрицательные значения | Допустимы для `balance` (означает долг)                    |
 | Ноль                   | `credit_limit = 0` → безлимитный; `amount = 0` → нет суммы |
 
-### Какие поля являются денежными
+#### 17.3.2 Денежные поля (Money Fields)
 
 ```typescript
 // ✅ Все эти поля — целые числа в сумах (UZS):
@@ -714,7 +749,7 @@ type MoneyField =
   | "cash_balance"; // Касса курьера
 ```
 
-### Утилита форматирования
+#### 17.3.3 Утилита форматирования (Formatting Utility)
 
 ```typescript
 /**
@@ -742,7 +777,7 @@ function formatCreditLimit(limit: number): string {
 }
 ```
 
-### Частые ошибки (Anti-patterns)
+#### 17.3.4 Anti-patterns
 
 ```typescript
 // ❌ НЕПРАВИЛЬНО — тийинов нет, не надо делить на 100
@@ -2089,14 +2124,14 @@ GET /api/v1/backoffice/finances/b2b-debts
 
 **Поля `B2BContractDebt`:**
 
-| Поле                    | Тип    | Описание                                          |
-| ----------------------- | ------ | ------------------------------------------------- |
-| `credit_limit`          | int    | Кредитный лимит (0 = безлимитный)                 |
-| `credit_used`           | int    | In-flight кредит (зарезервированный заказами)     |
-| `account_balance`       | int    | Баланс финансового счёта (< 0 = задолженность)    |
-| `total_exposure`        | int    | `credit_used + |account_balance|`                 |
-| `limit_utilization_pct` | float  | 0.0–1.0 (для шкалы в UI)                         |
-| `due_date_status`       | string | `ok` / `overdue` / `no_limit`                     |
+| Поле                    | Тип    | Описание                                       |
+| ----------------------- | ------ | ---------------------------------------------- | --------------- | --- |
+| `credit_limit`          | int    | Кредитный лимит (0 = безлимитный)              |
+| `credit_used`           | int    | In-flight кредит (зарезервированный заказами)  |
+| `account_balance`       | int    | Баланс финансового счёта (< 0 = задолженность) |
+| `total_exposure`        | int    | `credit_used +                                 | account_balance | `   |
+| `limit_utilization_pct` | float  | 0.0–1.0 (для шкалы в UI)                       |
+| `due_date_status`       | string | `ok` / `overdue` / `no_limit`                  |
 
 **UI-рекомендации:**
 
@@ -2116,11 +2151,11 @@ GET /api/v1/backoffice/inventories/search
 
 **Параметры:**
 
-| Параметр | Тип           | Default | Описание                                         |
-| -------- | ------------- | ------- | ------------------------------------------------ |
-| `q`      | string        | `""`    | Поисковый запрос по названию                     |
+| Параметр | Тип           | Default | Описание                                       |
+| -------- | ------------- | ------- | ---------------------------------------------- |
+| `q`      | string        | `""`    | Поисковый запрос по названию                   |
 | `type`   | InventoryType | —       | Фильтр по типу (CLIENT, WAREHOUSE, COURIER, …) |
-| `limit`  | integer       | 50      | Макс. результатов (1–200)                        |
+| `limit`  | integer       | 50      | Макс. результатов (1–200)                      |
 
 **Ответ — 200:** `InventorySearchResult[]`
 
@@ -2150,12 +2185,12 @@ GET /api/v1/backoffice/transfers/
 
 **Новые параметры (добавлены к существующим `page`, `size`):**
 
-| Параметр       | Тип           | Default | Описание                         |
-| -------------- | ------------- | ------- | -------------------------------- |
-| `type`         | TransferType  | —       | Фильтр по типу накладной        |
-| `from_date`    | date          | —       | Начальная дата (включительно)    |
-| `to_date`      | date          | —       | Конечная дата (включительно)     |
-| `warehouse_id` | UUID          | —       | Склад (from или to)             |
+| Параметр       | Тип          | Default | Описание                      |
+| -------------- | ------------ | ------- | ----------------------------- |
+| `type`         | TransferType | —       | Фильтр по типу накладной      |
+| `from_date`    | date         | —       | Начальная дата (включительно) |
+| `to_date`      | date         | —       | Конечная дата (включительно)  |
+| `warehouse_id` | UUID         | —       | Склад (from или to)           |
 
 ---
 
@@ -2395,6 +2430,7 @@ GET /health
 **Было:** `{"status": "ok", "environment": "dev"}`
 
 **Стало:**
+
 - 200 — `{"status": "ok"}` (поле `environment` удалено)
 - 503 — `{"status": "db_unavailable"}` (БД недоступна)
 
@@ -2408,10 +2444,10 @@ GET /health
 
 `PATCH /backoffice/users/{user_id}` теперь проверяет:
 
-| Проверка           | Ошибка                         | HTTP |
-| ------------------ | ------------------------------ | ---- |
-| Self-edit          | `SELF_MODIFICATION_FORBIDDEN`  | 400  |
-| Назначение SYSTEM  | `SYSTEM_ROLE_FORBIDDEN`        | 403  |
+| Проверка          | Ошибка                        | HTTP |
+| ----------------- | ----------------------------- | ---- |
+| Self-edit         | `SELF_MODIFICATION_FORBIDDEN` | 400  |
+| Назначение SYSTEM | `SYSTEM_ROLE_FORBIDDEN`       | 403  |
 
 #### 20.9.5 Создание курьера — пароль
 
@@ -2452,6 +2488,20 @@ Frontend должен валидировать длину пароля ≥ 8 с�
 ---
 
 ## 22. Руководство по реализации UI
+
+### 22.1 Принципы реализации UI (UI Implementation Principles)
+
+Данный раздел определяет архитектурные принципы построения frontend-компонентов
+для HOD Platform. Все рекомендации в §22.2–§22.11 основаны на этих принципах.
+
+| Принцип                          | Описание                                                                                               |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| **Data-driven rendering**        | Бейджи, кнопки, доступность действий определяются значениями `status` и `scope` из API, а не хардкодом |
+| **Scope-gated actions**          | Кнопки и пункты меню отображаются только при наличии соответствующего `scope` в JWT (§22.9)            |
+| **Consistent badge mapping**     | Каждый `status` enum однозначно маппится на цвет/label через конфиг-объект (§22.2, §22.3)              |
+| **Cursor-based pagination**      | Для списковых эндпоинтов — `offset`/`limit`; UI использует «Загрузить ещё» или бесконечный скролл      |
+| **Money formatting via utility** | Все денежные значения отображаются через `formatMoney()` (§17.3.3), без ручного форматирования         |
+| **Date localization**            | Все даты форматируются через единую утилиту (§22.8), формат `dd.MM.yyyy` для RU-локали                 |
 
 ### 22.2 Конфигурация бейджей статуса договора
 
@@ -3043,4 +3093,4 @@ function getInvoiceActions(status: InvoiceStatus): ActionButton[] {
 
 ---
 
-_Конец документа_
+--- END OF DOCUMENT ---
