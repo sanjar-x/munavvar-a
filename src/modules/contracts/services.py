@@ -32,6 +32,7 @@ from src.modules.contracts.schemas import (
     ReconciliationResponse,
 )
 from src.modules.contracts.uow import IContractUnitOfWork
+from src.modules.orders.enums import OrderStatus
 
 log = structlog.get_logger(__name__)
 
@@ -173,7 +174,10 @@ class ContractService:
             )
 
             # Отмена незавершённых заказов и возврат кредита
-            await self._cancel_inflight_orders(contract_id)
+            await self._cancel_inflight_orders(
+                contract_id,
+                reason="Приостановка договора",
+            )
 
             await self.uow.status_logs.add(
                 {
@@ -271,7 +275,10 @@ class ContractService:
             )
 
             # Отмена незавершённых заказов и возврат кредита
-            await self._cancel_inflight_orders(contract_id)
+            await self._cancel_inflight_orders(
+                contract_id,
+                reason="Расторжение договора",
+            )
 
             await self.uow.status_logs.add(
                 {
@@ -288,18 +295,39 @@ class ContractService:
     async def _cancel_inflight_orders(
         self,
         contract_id: uuid.UUID,
+        reason: str = "Отмена по договору",
     ) -> None:
         """Отмена NEW/ASSIGNED заказов и возврат кредита.
-        Вызывается при suspend/terminate внутри открытого UoW.
-        IN_TRANSIT/ARRIVED заказы не отменяются (товар в пути).
+
+        Вызывается при suspend/terminate/expire внутри
+        открытого UoW. IN_TRANSIT/ARRIVED заказы не
+        отменяются (товар в пути).
+
+        Для каждого заказа пишет:
+        - cancellation_reason на заказ
+        - OrderStatusLog (аудит перехода)
         """
         cancelled = await self.uow.orders.bulk_cancel_by_contract(
             contract_id
         )
         total_released = 0
-        for _order_id, reserved in cancelled:
+        for order_id, old_status, reserved in cancelled:
             if reserved and reserved > 0:
                 total_released += reserved
+
+            # Аудит: причина + лог перехода
+            await self.uow.orders.update(
+                order_id,
+                {"cancellation_reason": reason},
+            )
+            await self.uow.order_status_logs.log_transition(
+                order_id=order_id,
+                old_status=old_status,
+                new_status=OrderStatus.CANCELLED,
+                changed_by_id=None,
+                reason=reason,
+            )
+
         if total_released > 0:
             await self.uow.contracts.decrement_credit_used(
                 contract_id, total_released
@@ -578,7 +606,11 @@ class ContractService:
         contract_id: uuid.UUID,
         invoice_id: uuid.UUID,
     ) -> Invoice:
-        """ISSUED | OVERDUE → PAID. Устанавливает paid_at = now(UTC)."""
+        """ISSUED | OVERDUE → PAID. Устанавливает paid_at = now(UTC).
+
+        Логирует предупреждение, если для контракта нет
+        финансовых транзакций, покрывающих сумму счёта.
+        """
         async with self.uow:
             invoice = await self.uow.invoices.get(invoice_id)
             if not invoice or invoice.contract_id != contract_id:
@@ -590,6 +622,28 @@ class ContractService:
                     current_status=invoice.status,
                     expected_statuses=list(allowed),
                 )
+
+            # Аудит: проверяем наличие оплаты на счёте
+            contract = await self.uow.contracts.get(contract_id)
+            if contract:
+                account = (
+                    await self.uow.accounts.get_client_account(
+                        contract.client_id,
+                    )
+                )
+                if account and account.balance >= 0:
+                    log.warning(
+                        "invoice_marked_paid_no_payment",
+                        invoice_id=str(invoice_id),
+                        contract_id=str(contract_id),
+                        invoice_amount=invoice.amount,
+                        account_balance=account.balance,
+                        hint=(
+                            "Счёт отмечен оплаченным, но "
+                            "баланс клиента ≥ 0 (нет долга)"
+                        ),
+                    )
+
             invoice = await self.uow.invoices.update(
                 invoice_id,
                 {
@@ -776,13 +830,20 @@ class ContractService:
     async def run_expire_job(self) -> int:
         """Переводит ACTIVE → EXPIRED договоры с истёкшим end_date.
 
-        Логирует каждый переход в ContractStatusLog.
+        Для каждого истёкшего договора:
+        - Отменяет NEW/ASSIGNED заказы и возвращает кредит
+        - Логирует переход в ContractStatusLog
+
         Идемпотентен: повторный вызов = 0 обновлений.
         Возвращает количество обновлённых договоров.
         """
         async with self.uow:
             candidates = await self.uow.contracts.get_expirable()
             for contract in candidates:
+                await self._cancel_inflight_orders(
+                    contract.id,
+                    reason="Истёк срок действия договора",
+                )
                 await self.uow.contracts.update(
                     contract.id,
                     {"status": ContractStatus.EXPIRED},
@@ -792,8 +853,10 @@ class ContractService:
                         "contract_id": contract.id,
                         "from_status": ContractStatus.ACTIVE,
                         "to_status": ContractStatus.EXPIRED,
-                        "changed_by_id": None,  # системное действие
-                        "reason": "Истёк срок действия договора",
+                        "changed_by_id": None,
+                        "reason": (
+                            "Истёк срок действия договора"
+                        ),
                     }
                 )
             await self.uow.commit()

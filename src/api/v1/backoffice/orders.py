@@ -408,11 +408,12 @@ async def get_courier_tasks(
 
 @orders_router.post(
     "/jobs/expire-stale",
-    summary="Отменить зависшие заказы в статусе NEW",
+    summary="Отменить зависшие заказы",
     description=(
-        "Массово отменяет заказы в NEW старше порога "
-        "(по умолчанию 48 часов). Возвращает кредит по "
-        "контрактным заказам. Идемпотентен."
+        "Массово отменяет заказы: NEW старше порога "
+        "(по умолчанию 48ч), ASSIGNED старше 72ч. "
+        "Возвращает кредит по контрактным заказам. "
+        "Идемпотентен."
     ),
 )
 async def run_expire_stale_orders_job(
@@ -426,6 +427,10 @@ async def run_expire_stale_orders_job(
     max_age_hours: Annotated[
         int, Query(ge=1, le=720, alias="maxAgeHours")
     ] = 48,
+    assigned_max_age_hours: Annotated[
+        int,
+        Query(ge=1, le=720, alias="assignedMaxAgeHours"),
+    ] = 72,
 ):
     """Автоматическая экспирация заказов.
 
@@ -435,6 +440,7 @@ async def run_expire_stale_orders_job(
     """
     cancelled = await service.expire_stale_orders(
         max_age_hours=max_age_hours,
+        assigned_max_age_hours=assigned_max_age_hours,
         admin_id=admin.id,
     )
     return {"cancelled": cancelled}

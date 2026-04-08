@@ -1721,9 +1721,14 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
     async def expire_stale_orders(
         self,
         max_age_hours: int = 48,
+        assigned_max_age_hours: int = 72,
         admin_id: uuid.UUID | None = None,
     ) -> int:
-        """Массовая отмена заказов в статусе NEW старше порога.
+        """Массовая отмена просроченных заказов.
+
+        Обрабатывает два статуса:
+        - NEW старше ``max_age_hours`` (по умолчанию 48ч)
+        - ASSIGNED старше ``assigned_max_age_hours`` (72ч)
 
         Для каждого заказа:
         - Переводит статус в CANCELLED
@@ -1736,48 +1741,66 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
         Returns:
             Количество отменённых заказов.
         """
-        cutoff = datetime.now(UTC) - timedelta(hours=max_age_hours)
         cancelled = 0
 
-        async with self.uow:
-            stale = await self.uow.orders.get_stale_orders(
-                older_than=cutoff,
-            )
-            reason = (
+        batches: list[
+            tuple[OrderStatus, datetime, str]
+        ] = [
+            (
+                OrderStatus.NEW,
+                datetime.now(UTC) - timedelta(hours=max_age_hours),
                 f"Авто-отмена: заказ не обработан"
-                f" за {max_age_hours}ч"
-            )
-            for order in stale:
-                await self.uow.orders.update_status(
-                    order.id, OrderStatus.CANCELLED
+                f" за {max_age_hours}ч",
+            ),
+            (
+                OrderStatus.ASSIGNED,
+                datetime.now(UTC)
+                - timedelta(hours=assigned_max_age_hours),
+                f"Авто-отмена: заказ не доставлен"
+                f" за {assigned_max_age_hours}ч",
+            ),
+        ]
+
+        async with self.uow:
+            for status, cutoff, reason in batches:
+                stale = await self.uow.orders.get_stale_orders(
+                    older_than=cutoff,
+                    status=status,
+                    by_updated=(
+                        status != OrderStatus.NEW
+                    ),
                 )
-                # CONTRACT: возврат кредита
-                if (
-                    order.payment_method == PaymentMethod.CONTRACT
-                    and order.contract_id is not None
-                    and order.reserved_credit_amount
-                ):
-                    await self.uow.contracts.decrement_credit_used(
-                        order.contract_id,
-                        order.reserved_credit_amount,
+                for order in stale:
+                    await self.uow.orders.update_status(
+                        order.id, OrderStatus.CANCELLED
                     )
+                    if (
+                        order.payment_method
+                        == PaymentMethod.CONTRACT
+                        and order.contract_id is not None
+                        and order.reserved_credit_amount
+                    ):
+                        await self.uow.contracts.decrement_credit_used(
+                            order.contract_id,
+                            order.reserved_credit_amount,
+                        )
+                        await self.uow.orders.update(
+                            order.id,
+                            {"reserved_credit_amount": 0},
+                        )
+
                     await self.uow.orders.update(
                         order.id,
-                        {"reserved_credit_amount": 0},
+                        {"cancellation_reason": reason},
                     )
-
-                await self.uow.orders.update(
-                    order.id,
-                    {"cancellation_reason": reason},
-                )
-                await self.uow.status_logs.log_transition(
-                    order_id=order.id,
-                    old_status=OrderStatus.NEW,
-                    new_status=OrderStatus.CANCELLED,
-                    changed_by_id=admin_id,
-                    reason=reason,
-                )
-                cancelled += 1
+                    await self.uow.status_logs.log_transition(
+                        order_id=order.id,
+                        old_status=status,
+                        new_status=OrderStatus.CANCELLED,
+                        changed_by_id=admin_id,
+                        reason=reason,
+                    )
+                    cancelled += 1
 
             await self.uow.commit()
         return cancelled

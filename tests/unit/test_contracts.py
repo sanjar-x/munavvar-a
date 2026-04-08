@@ -27,6 +27,7 @@ from src.modules.contracts.schemas import (
     ContractUpdate,
 )
 from src.modules.contracts.services import ContractService
+from src.modules.orders.enums import OrderStatus
 
 # ─── Helpers ──────────────────────────────────────────────
 
@@ -106,12 +107,18 @@ class FakeInvoiceRepo:
         self.get_overdue_candidates = AsyncMock(return_value=[])
 
 
+class FakeOrderStatusLogRepo:
+    def __init__(self):
+        self.log_transition = AsyncMock()
+
+
 class FakeOrderRepo:
     def __init__(self):
         self.search_orders = AsyncMock(return_value=[])
         self.get_delivered_by_contract = AsyncMock(return_value=[])
         self.bulk_cancel_by_contract = AsyncMock(return_value=[])
         self.count_inflight_by_contract = AsyncMock(return_value=0)
+        self.update = AsyncMock()
 
 
 class FakeStatusLogRepo:
@@ -141,6 +148,7 @@ def make_uow(
     uow.price_items = price_items or FakePriceItemRepo()
     uow.invoices = invoices or FakeInvoiceRepo()
     uow.orders = orders or FakeOrderRepo()
+    uow.order_status_logs = FakeOrderStatusLogRepo()
     uow.accounts = MagicMock()
     uow.transactions = MagicMock()
     uow.status_logs = status_logs or FakeStatusLogRepo()
@@ -1317,8 +1325,8 @@ class TestSuspensionCancelsOrders:
         orders_repo = FakeOrderRepo()
         # Two orders cancelled, each with 50_000 reserved
         orders_repo.bulk_cancel_by_contract.return_value = [
-            (uuid.uuid4(), 50_000),
-            (uuid.uuid4(), 50_000),
+            (uuid.uuid4(), OrderStatus.NEW, 50_000),
+            (uuid.uuid4(), OrderStatus.ASSIGNED, 50_000),
         ]
         orders_repo.count_inflight_by_contract.return_value = 0
 
@@ -1356,7 +1364,7 @@ class TestSuspensionCancelsOrders:
 
         orders_repo = FakeOrderRepo()
         orders_repo.bulk_cancel_by_contract.return_value = [
-            (uuid.uuid4(), 30_000),
+            (uuid.uuid4(), OrderStatus.NEW, 30_000),
         ]
         orders_repo.count_inflight_by_contract.return_value = 0
 

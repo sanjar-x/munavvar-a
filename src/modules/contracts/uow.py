@@ -12,7 +12,10 @@ from src.modules.finances.repositories import (
     AccountRepository,
     TransactionRepository,
 )
-from src.modules.orders.repositories import OrderRepository
+from src.modules.orders.repositories import (
+    OrderRepository,
+    OrderStatusLogRepository,
+)
 
 
 class IContractUnitOfWork(IUnitOfWork):
@@ -20,6 +23,7 @@ class IContractUnitOfWork(IUnitOfWork):
     price_items: ContractPriceItemRepository
     invoices: InvoiceRepository
     orders: OrderRepository
+    order_status_logs: OrderStatusLogRepository
     accounts: AccountRepository  # для актов сверки
     transactions: TransactionRepository  # для платёжных записей
     status_logs: ContractStatusLogRepository  # аудит переходов
@@ -33,6 +37,9 @@ class ContractUnitOfWork(BaseSQLAlchemyUoW, IContractUnitOfWork):
         self.price_items = ContractPriceItemRepository(session=self.session)
         self.invoices = InvoiceRepository(session=self.session)
         self.orders = OrderRepository(session=self.session)
+        self.order_status_logs = OrderStatusLogRepository(
+            session=self.session
+        )
         self.accounts = AccountRepository(session=self.session)
         self.transactions = TransactionRepository(session=self.session)
         self.status_logs = ContractStatusLogRepository(session=self.session)

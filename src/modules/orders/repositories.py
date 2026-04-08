@@ -287,30 +287,48 @@ class OrderRepository(BaseRepository[Order]):
     async def bulk_cancel_by_contract(
         self,
         contract_id: uuid.UUID,
-    ) -> list[tuple[uuid.UUID, int | None]]:
+    ) -> list[tuple[uuid.UUID, OrderStatus, int | None]]:
         """Отмена всех NEW/ASSIGNED заказов по договору.
-        Возвращает список (order_id, reserved_credit_amount)
-        для корректного возврата кредита.
+
+        Сначала SELECT FOR UPDATE для захвата old_status
+        и reserved_credit_amount до обновления, затем UPDATE.
+        Возвращает (order_id, old_status, reserved_credit_amount).
         """
         cancellable = [OrderStatus.NEW, OrderStatus.ASSIGNED]
-        stmt = (
-            update(self.model)
+
+        # Захватить до UPDATE — RETURNING даёт NEW-значения
+        select_stmt = (
+            select(
+                self.model.id,
+                self.model.status,
+                self.model.reserved_credit_amount,
+            )
             .where(
                 self.model.contract_id == contract_id,
                 self.model.status.in_(cancellable),
                 self.model.is_active.is_(True),
             )
+            .with_for_update(skip_locked=True)
+        )
+        rows = (
+            await self.session.execute(select_stmt)
+        ).all()
+        if not rows:
+            return []
+
+        ids = [r[0] for r in rows]
+        update_stmt = (
+            update(self.model)
+            .where(self.model.id.in_(ids))
             .values(
                 status=OrderStatus.CANCELLED,
                 reserved_credit_amount=0,
             )
-            .returning(
-                self.model.id,
-                self.model.reserved_credit_amount,
-            )
         )
-        result: Result = await self.session.execute(stmt)
-        return list(result.all())
+        await self.session.execute(update_stmt)
+        return [
+            (r[0], r[1], r[2]) for r in rows
+        ]
 
     async def count_inflight_by_contract(
         self,
@@ -339,18 +357,29 @@ class OrderRepository(BaseRepository[Order]):
         older_than: datetime,
         status: OrderStatus = OrderStatus.NEW,
         limit: int = 500,
+        by_updated: bool = False,
     ) -> Sequence[Order]:
         """Найти заказы в статусе дольше порога.
 
         Используется job-ом автоматической экспирации.
         FOR UPDATE SKIP LOCKED — безопасно для параллельных
         запусков (Railway cron / ручной вызов).
+
+        Args:
+            by_updated: если True, сравнивает ``updated_at``
+                вместо ``created_at``. Для ASSIGNED —
+                ориентир на момент назначения.
         """
+        date_col = (
+            self.model.updated_at
+            if by_updated
+            else self.model.created_at
+        )
         query = (
             select(self.model)
             .where(
                 self.model.status == status,
-                self.model.created_at < older_than,
+                date_col < older_than,
                 self.model.is_active.is_(True),
             )
             .with_for_update(skip_locked=True)
