@@ -9,7 +9,7 @@
 | Реквизит            | Значение                                           |
 | ------------------- | -------------------------------------------------- |
 | **Идентификатор**   | `HOD-FE-SPEC-001`                                  |
-| **Версия**          | 3.2.0                                              |
+| **Версия**          | 3.3.0                                              |
 | **Статус**          | APPROVED                                           |
 | **Классификация**   | INTERNAL — Frontend Engineering                    |
 | **Аудитория**       | Frontend-разработчики, QA-инженеры, Tech Lead      |
@@ -53,6 +53,7 @@ frontend-интеграцию. См. §19.26–19.28 и §20.9.
 
 | Версия | Описание                                                           |
 | ------ | ------------------------------------------------------------------ |
+| 3.3.0  | Сверка SPEC↔OpenAPI: 33 расхождения исправлены (пути, типы, схемы) |
 | 3.2.0  | Платформенные изменения API, новые типы, B2B-дебиторка, фильтры    |
 | 3.1.0  | Валютная конвенция — удалены тийины, все суммы в целых сумах (UZS) |
 | 3.0.0  | Заказы, отмена клиентом, тара, курьерский инвентарь, jobs          |
@@ -670,7 +671,7 @@ JWT содержит:
 | Аудитория      | Base Path                      | Авторизация        |
 | -------------- | ------------------------------ | ------------------ |
 | **Backoffice** | `/api/v1/backoffice/contracts` | Admin / Accountant |
-| **Client B2B** | `/api/v1/client/contracts`     | CLIENT_B2B         |
+| **Client B2B** | `/api/v1/client`               | CLIENT_B2B         |
 
 ### Среды
 
@@ -789,9 +790,19 @@ const display = amount.toFixed(2) + " сум";
 // ❌ НЕПРАВИЛЬНО — не использовать parseFloat
 const parsed = parseFloat(response.price);
 
+// ❌ НЕПРАВИЛЬНО — отправлять дробные значения
+await api.post("/orders", { total_amount: 1234.56 }); // → 422
+
 // ✅ ПРАВИЛЬНО — значение уже в сумах, целое число
 const display = formatMoney(response.price);
 ```
+
+> **⚠️ Примечание:** В TypeScript-типах данного документа денежные поля
+> обозначены как `number` (JavaScript не различает `int` / `float`).
+> Однако **OpenAPI-схема определяет все денежные поля как `integer`**.
+> При отправке дробного значения API вернёт ошибку валидации (422).
+> Для `<input>` используйте `type="number" step="1"` и `parseInt()`
+> перед отправкой.
 
 ---
 
@@ -811,16 +822,17 @@ enum ContractStatus {
 
 /**
  * Статус счёта-фактуры.
- * ⚠️ PARTIALLY_PAID существует в backend enum,
- *    но НЕ РЕАЛИЗОВАН. Не использовать в UI.
+ * ⚠️ PARTIALLY_PAID существует в backend enum и OpenAPI-схеме,
+ *    но не реализован в бизнес-логике. Включён для совместимости.
+ *    Фронтенд SHOULD обрабатывать его как read-only значение.
  */
 enum InvoiceStatus {
   DRAFT = "draft",
   ISSUED = "issued",
+  PARTIALLY_PAID = "partially_paid", // в enum, но НЕ используется бизнес-логикой
   PAID = "paid",
   OVERDUE = "overdue",
   CANCELLED = "cancelled",
-  // PARTIALLY_PAID = 'partially_paid' — NOT IMPLEMENTED
 }
 
 /** Статус заказа. NEW v3.0 */
@@ -830,7 +842,6 @@ enum OrderStatus {
   IN_TRANSIT = "in_transit",
   ARRIVED = "arrived",
   DELIVERED = "delivered",
-  PICKUP_READY = "pickup_ready",
   PICKUP_COMPLETED = "pickup_completed",
   CANCELLED = "cancelled",
 }
@@ -875,6 +886,13 @@ enum TransferStatus {
   DRAFT = "DRAFT",
   COMPLETED = "COMPLETED",
   CANCELLED = "CANCELLED",
+}
+
+/** Тип продукта. NEW v3.3 */
+enum ProductType {
+  WATER = "water",
+  CONTAINER = "container",
+  EQUIPMENT = "equipment",
 }
 ```
 
@@ -976,7 +994,7 @@ interface ReconciliationPaymentItem {
   transaction_id: string;
   created_at: string;
   amount: number;
-  reason: string | null;
+  reason?: string | null; // необязательное поле
 }
 
 /** Полный акт сверки */
@@ -1003,27 +1021,31 @@ interface JobResponse {
  * ⚠️ Используется в интеграции Contracts ↔ Orders.
  * Поля contract_id и reserved_credit_amount присутствуют
  * только при payment_method === 'contract'.
+ *
+ * Note: capitalization_applied (default: false), sale_type (default: "delivery"),
+ * stock_transfers (default: []) имеют дефолтные значения и всегда
+ * присутствуют в ответе, но формально не входят в required-массив OpenAPI.
  */
 interface OrderResponse {
   id: string;
   client_id: string;
   client: UserResponse;
   client_inventory_id: string;
-  client_inventory: InventoryResponse;
+  client_inventory: OrderInventoryResponse;
   courier_id: string | null;
   courier: UserResponse | null;
   status: OrderStatus;
   payment_method: PaymentMethod;
-  total_amount: number; // сум (UZS)
-  capitalization_applied: boolean;
-  sale_type: SaleType;
+  total_amount: number; // целое сум (UZS)
+  capitalization_applied: boolean; // default: false
+  sale_type: SaleType; // default: "delivery"
   warehouse_id: string | null;
   contract_id: string | null; // NEW v3.0 — ID договора
-  reserved_credit_amount: number | null; // сум (UZS), NEW v3.0
+  reserved_credit_amount: number | null; // целое сум (UZS), NEW v3.0
   notes: string | null; // NEW v3.0 — заметки к доставке
   cancellation_reason: string | null; // NEW v3.0 — причина отмены
   items: OrderItemResponse[];
-  stock_transfers: TransferResponse[];
+  stock_transfers: TransferResponse[]; // default: []
   created_at: string; // ISO datetime
   updated_at: string; // ISO datetime
 }
@@ -1043,8 +1065,46 @@ interface OrderItemResponse {
   product_id: string;
   product: ProductResponse;
   quantity: number;
-  unit_price: number; // сум (UZS), историческая цена
-  total: number; // сум (UZS), quantity × unit_price
+  unit_price: number; // целое сум (UZS), историческая цена
+  total: number; // целое сум (UZS), quantity × unit_price
+}
+
+/**
+ * Инвентарь клиента в контексте заказа. NEW v3.3
+ * ⚠️ Упрощённая версия — НЕ содержит поле `user`.
+ *    Не путать с inventory-модульным InventoryResponse.
+ */
+interface OrderInventoryResponse {
+  id: string;
+  name: string;
+  type: InventoryType;
+  is_active: boolean;
+}
+
+/**
+ * Полная модель продукта. NEW v3.3
+ * Используется в OrderItemResponse.product.
+ */
+interface ProductResponse {
+  id: string;
+  name: string;
+  type: ProductType;
+  price: number; // целое сум (UZS)
+  attributes: Record<string, unknown> | null;
+  returnable_item_id: string | null;
+  is_active: boolean;
+  created_at: string; // ISO datetime
+  updated_at: string; // ISO datetime
+}
+
+/**
+ * Остаток товара на инвентаре. NEW v3.3
+ * Используется в §20.7 (баланс тары клиента)
+ * и §20.8 (остатки курьера).
+ */
+interface BalanceResponse {
+  product: ProductSimpleResponse;
+  quantity: number;
 }
 
 // ─── Платформенные типы (NEW v3.2) ──────────────────────────
@@ -1070,9 +1130,9 @@ interface InventoryShortResponse {
 interface ProductSimpleResponse {
   id: string;
   name: string;
-  type: string; // ProductType
-  price: number; // сум (UZS), NEW v3.2
-  is_active: boolean;
+  type: ProductType;
+  price: number; // целое сум (UZS), default: 0, NEW v3.2
+  is_active: boolean; // default: true
 }
 
 /** Позиция накладной */
@@ -1086,18 +1146,18 @@ interface TransferResponse {
   id: string;
   from_id: string;
   to_id: string;
-  from_inventory: InventoryShortResponse | null;
-  to_inventory: InventoryShortResponse | null;
+  from_inventory?: InventoryShortResponse | null;
+  to_inventory?: InventoryShortResponse | null;
   created_by_id: string;
-  created_by: UserShortResponse | null; // NEW v3.2
+  created_by?: UserShortResponse | null; // NEW v3.2
   accepted_by_id: string | null;
-  accepted_by: UserShortResponse | null; // NEW v3.2
+  accepted_by?: UserShortResponse | null; // NEW v3.2
   status: TransferStatus;
   type: TransferType;
-  items: TransferItemResponse[];
-  reason: string | null;
-  route_sheet_id: string | null;
-  created_at: string; // ISO datetime
+  items: TransferItemResponse[]; // default: []
+  reason?: string | null;
+  route_sheet_id?: string | null;
+  created_at: string | null; // ISO datetime, nullable
 }
 
 /** Детали склада. NEW v3.2 */
@@ -1106,7 +1166,7 @@ interface WarehouseDetailResponse {
   name: string;
   user_id: string;
   user: UserShortResponse | null; // NEW v3.2
-  balances: BalanceItem[];
+  balances: BalanceResponse[]; // default: []
 }
 
 /** Результат поиска инвентаря. NEW v3.2 */
@@ -2066,19 +2126,21 @@ POST /api/v1/backoffice/orders/jobs/expire-stale
 
 **Scope:** `orders:edit`
 
-| Параметр              | Тип     | Default | Описание                              |
-| --------------------- | ------- | ------- | ------------------------------------- |
-| `maxAgeHours`         | integer | 48      | Макс. возраст NEW заказов (часы)      |
-| `assignedMaxAgeHours` | integer | 72      | Макс. возраст ASSIGNED заказов (часы) |
+| Параметр              | Тип     | Default | Ограничения | Описание                              |
+| --------------------- | ------- | ------- | ----------- | ------------------------------------- |
+| `maxAgeHours`         | integer | 48      | 1–720       | Макс. возраст NEW заказов (часы)      |
+| `assignedMaxAgeHours` | integer | 72      | 1–720       | Макс. возраст ASSIGNED заказов (часы) |
 
 **Ответ — 200:**
 
 ```json
 {
-  "cancelled": 5,
-  "details": "Отменено NEW: 3, ASSIGNED: 2"
+  "cancelled": 5
 }
 ```
+
+> **Note:** Ответ содержит только количество отменённых заказов.
+> Тип ответа отличается от `JobResponse` (`{ updated }`).
 
 **Бизнес-логика:**
 
@@ -2202,7 +2264,7 @@ GET /api/v1/backoffice/transfers/
 ### 20.1 Мой активный договор
 
 ```
-GET /api/v1/client/contracts/my-contract
+GET /api/v1/client/my-contract
 ```
 
 **Scope:** `contracts:read`
@@ -2220,7 +2282,7 @@ GET /api/v1/client/contracts/my-contract
 ### 20.2 Мой прайс-лист
 
 ```
-GET /api/v1/client/contracts/my-contract/prices
+GET /api/v1/client/my-contract/prices
 ```
 
 **Scope:** `contracts:read`
@@ -2238,7 +2300,7 @@ GET /api/v1/client/contracts/my-contract/prices
 ### 20.3 Мои счета-фактуры
 
 ```
-GET /api/v1/client/contracts/my-contract/invoices
+GET /api/v1/client/my-contract/invoices
 ```
 
 **Scope:** `contracts:read`
@@ -2256,7 +2318,7 @@ GET /api/v1/client/contracts/my-contract/invoices
 ### 20.4 Мой счёт-фактура по ID
 
 ```
-GET /api/v1/client/contracts/my-contract/invoices/{invoice_id}
+GET /api/v1/client/my-contract/invoices/{invoice_id}
 ```
 
 **Scope:** `contracts:read`
@@ -2372,14 +2434,18 @@ GET /api/v1/client/inventory/balance
     "product": {
       "id": "019...",
       "name": "Бутыль 19л",
-      "sku": "BOTTLE-19L",
-      "type": "tara",
-      "price": 0
+      "type": "container",
+      "price": 0,
+      "is_active": true
     },
     "quantity": 5
   }
 ]
 ```
+
+> **Note:** Объект `product` соответствует типу `ProductSimpleResponse`
+> (§18.2). Поле `sku` отсутствует. Значение `type` — одно из
+> `ProductType`: `"water"`, `"container"`, `"equipment"`.
 
 > Показывает остатки тары на всех адресах клиента. Отрицательное значение
 > `quantity` означает тарный долг (клиент должен вернуть бутыли).
