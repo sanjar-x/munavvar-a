@@ -188,6 +188,32 @@ class InventoryRepository(BaseRepository[Inventory]):
         result = await self.session.execute(query)
         return result.unique().scalar_one_or_none()
 
+    async def get_inventory_with_balances_by_user(
+        self,
+        user_id: uuid.UUID,
+        inv_type: InventoryType,
+    ) -> Inventory | None:
+        """Найти инвентарь пользователя по типу с балансами.
+
+        Используется для клиентского баланса тары и
+        курьерского баланса загруженного товара.
+        """
+        query = (
+            select(self.model)
+            .where(
+                self.model.user_id == user_id,
+                self.model.type == inv_type,
+                self.model.is_active.is_(True),
+            )
+            .options(
+                selectinload(self.model.balances).joinedload(
+                    Balance.product
+                ),
+            )
+        )
+        result = await self.session.execute(query)
+        return result.unique().scalars().first()
+
     async def get_all_warehouses_with_balances(
         self,
         owner_id: uuid.UUID | None = None,

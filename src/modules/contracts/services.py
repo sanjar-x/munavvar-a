@@ -3,6 +3,8 @@ import uuid
 from collections.abc import Sequence
 from datetime import UTC, date, datetime, timedelta
 
+import structlog
+
 from src.modules.contracts.enums import ContractStatus, InvoiceStatus
 from src.modules.contracts.exceptions import (
     ContractAlreadyActiveError,
@@ -30,6 +32,8 @@ from src.modules.contracts.schemas import (
     ReconciliationResponse,
 )
 from src.modules.contracts.uow import IContractUnitOfWork
+
+log = structlog.get_logger(__name__)
 
 
 class ContractService:
@@ -141,7 +145,11 @@ class ContractService:
         reason: str,
         changed_by_id: uuid.UUID | None = None,
     ) -> Contract:
-        """ACTIVE → SUSPENDED."""
+        """ACTIVE → SUSPENDED.
+        Отменяет все NEW/ASSIGNED заказы по договору и возвращает
+        зарезервированный кредит. IN_TRANSIT/ARRIVED заказы
+        завершаются штатно.
+        """
         async with self.uow:
             contract = await self.uow.contracts.get(
                 contract_id, with_for_update=True
@@ -163,6 +171,10 @@ class ContractService:
                     "suspension_reason": reason,
                 },
             )
+
+            # Отмена незавершённых заказов и возврат кредита
+            await self._cancel_inflight_orders(contract_id)
+
             await self.uow.status_logs.add(
                 {
                     "contract_id": contract_id,
@@ -230,7 +242,9 @@ class ContractService:
         reason: str,
         changed_by_id: uuid.UUID | None = None,
     ) -> Contract:
-        """ACTIVE/SUSPENDED → TERMINATED."""
+        """ACTIVE/SUSPENDED → TERMINATED.
+        Отменяет все NEW/ASSIGNED заказы по договору.
+        """
         async with self.uow:
             contract = await self.uow.contracts.get(
                 contract_id, with_for_update=True
@@ -255,6 +269,10 @@ class ContractService:
                     "termination_reason": reason,
                 },
             )
+
+            # Отмена незавершённых заказов и возврат кредита
+            await self._cancel_inflight_orders(contract_id)
+
             await self.uow.status_logs.add(
                 {
                     "contract_id": contract_id,
@@ -266,6 +284,44 @@ class ContractService:
             )
             await self.uow.commit()
             return updated
+
+    async def _cancel_inflight_orders(
+        self,
+        contract_id: uuid.UUID,
+    ) -> None:
+        """Отмена NEW/ASSIGNED заказов и возврат кредита.
+        Вызывается при suspend/terminate внутри открытого UoW.
+        IN_TRANSIT/ARRIVED заказы не отменяются (товар в пути).
+        """
+        cancelled = await self.uow.orders.bulk_cancel_by_contract(
+            contract_id
+        )
+        total_released = 0
+        for _order_id, reserved in cancelled:
+            if reserved and reserved > 0:
+                total_released += reserved
+        if total_released > 0:
+            await self.uow.contracts.decrement_credit_used(
+                contract_id, total_released
+            )
+        if cancelled:
+            log.info(
+                "inflight_orders_cancelled",
+                contract_id=str(contract_id),
+                cancelled_count=len(cancelled),
+                credit_released=total_released,
+            )
+
+        # Предупреждение о заказах в пути
+        surviving = await self.uow.orders.count_inflight_by_contract(
+            contract_id
+        )
+        if surviving > 0:
+            log.warning(
+                "surviving_inflight_orders",
+                contract_id=str(contract_id),
+                in_transit_count=surviving,
+            )
 
     async def update_contract(
         self,

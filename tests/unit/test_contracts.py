@@ -110,6 +110,8 @@ class FakeOrderRepo:
     def __init__(self):
         self.search_orders = AsyncMock(return_value=[])
         self.get_delivered_by_contract = AsyncMock(return_value=[])
+        self.bulk_cancel_by_contract = AsyncMock(return_value=[])
+        self.count_inflight_by_contract = AsyncMock(return_value=0)
 
 
 class FakeStatusLogRepo:
@@ -1292,3 +1294,113 @@ class TestAutomationJobs:
 
         assert count == 0
         contracts_repo.update.assert_not_awaited()
+
+
+# ─── Tests: suspension cancels in-flight orders ──────────
+
+
+class TestSuspensionCancelsOrders:
+    @pytest.mark.asyncio
+    async def test_suspend_cancels_new_orders(self):
+        """Suspension cancels NEW/ASSIGNED orders and releases credit."""
+        contract_id = uuid.uuid4()
+        contract = make_contract(
+            contract_id=contract_id,
+            status=ContractStatus.ACTIVE,
+            credit_used=100_000,
+        )
+
+        contracts_repo = FakeContractRepo()
+        contracts_repo.get.return_value = contract
+        contracts_repo.update.return_value = contract
+
+        orders_repo = FakeOrderRepo()
+        # Two orders cancelled, each with 50_000 reserved
+        orders_repo.bulk_cancel_by_contract.return_value = [
+            (uuid.uuid4(), 50_000),
+            (uuid.uuid4(), 50_000),
+        ]
+        orders_repo.count_inflight_by_contract.return_value = 0
+
+        uow = make_uow(
+            contracts=contracts_repo,
+            orders=orders_repo,
+        )
+        service = ContractService(uow=uow)
+
+        await service.suspend_contract(
+            contract_id=contract_id,
+            reason="Просрочка оплаты",
+        )
+
+        orders_repo.bulk_cancel_by_contract.assert_awaited_once_with(
+            contract_id
+        )
+        contracts_repo.decrement_credit_used.assert_awaited_once_with(
+            contract_id, 100_000
+        )
+
+    @pytest.mark.asyncio
+    async def test_terminate_cancels_new_orders(self):
+        """Termination cancels NEW/ASSIGNED orders."""
+        contract_id = uuid.uuid4()
+        contract = make_contract(
+            contract_id=contract_id,
+            status=ContractStatus.ACTIVE,
+            credit_used=30_000,
+        )
+
+        contracts_repo = FakeContractRepo()
+        contracts_repo.get.return_value = contract
+        contracts_repo.update.return_value = contract
+
+        orders_repo = FakeOrderRepo()
+        orders_repo.bulk_cancel_by_contract.return_value = [
+            (uuid.uuid4(), 30_000),
+        ]
+        orders_repo.count_inflight_by_contract.return_value = 0
+
+        uow = make_uow(
+            contracts=contracts_repo,
+            orders=orders_repo,
+        )
+        service = ContractService(uow=uow)
+
+        await service.terminate_contract(
+            contract_id=contract_id,
+            reason="Расторжение по инициативе клиента",
+        )
+
+        orders_repo.bulk_cancel_by_contract.assert_awaited_once_with(
+            contract_id
+        )
+
+    @pytest.mark.asyncio
+    async def test_suspend_no_orders_skips_decrement(self):
+        """If no in-flight orders, credit decrement is skipped."""
+        contract_id = uuid.uuid4()
+        contract = make_contract(
+            contract_id=contract_id,
+            status=ContractStatus.ACTIVE,
+        )
+
+        contracts_repo = FakeContractRepo()
+        contracts_repo.get.return_value = contract
+        contracts_repo.update.return_value = contract
+
+        orders_repo = FakeOrderRepo()
+        orders_repo.bulk_cancel_by_contract.return_value = []
+        orders_repo.count_inflight_by_contract.return_value = 0
+
+        uow = make_uow(
+            contracts=contracts_repo,
+            orders=orders_repo,
+        )
+        service = ContractService(uow=uow)
+
+        await service.suspend_contract(
+            contract_id=contract_id,
+            reason="Тестовая приостановка",
+        )
+
+        contracts_repo.decrement_credit_used.assert_not_awaited()

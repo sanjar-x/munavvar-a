@@ -2,7 +2,7 @@
 import uuid
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, CheckConstraint, Enum, ForeignKey
+from sqlalchemy import Boolean, CheckConstraint, Enum, ForeignKey, String
 from sqlalchemy.dialects.postgresql import BIGINT, INTEGER, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -114,6 +114,32 @@ class Order(BaseModel):
             "договор с привязанными заказами."
         ),
     )
+    reserved_credit_amount: Mapped[int | None] = mapped_column(
+        BIGINT,
+        nullable=True,
+        default=None,
+        comment=(
+            "Зарезервированная сумма кредита при создании заказа. "
+            "Используется для корректного возврата credit_used "
+            "при частичной доставке или отмене. "
+            "NULL для не-CONTRACT заказов."
+        ),
+    )
+    cancellation_reason: Mapped[str | None] = mapped_column(
+        String(500),
+        nullable=True,
+        default=None,
+        comment="Причина отмены заказа (заполняется при CANCELLED)",
+    )
+    notes: Mapped[str | None] = mapped_column(
+        String(500),
+        nullable=True,
+        default=None,
+        comment=(
+            "Заметки / инструкции по доставке "
+            "(например, код домофона, этаж)"
+        ),
+    )
     client: Mapped["User"] = relationship(
         foreign_keys=[client_id],
         back_populates="client_orders",
@@ -195,4 +221,60 @@ class OrderItem(BaseModel):
         CheckConstraint("quantity > 0", name="ck_order_item_quantity_pos"),
         CheckConstraint("unit_price >= 0", name="ck_order_item_price_pos"),
         {"comment": "Строки (позиции) конкретного заказа"},
+    )
+
+
+class OrderStatusLog(BaseModel):
+    """Лог переходов статуса заказа для аудита и аналитики."""
+
+    __tablename__ = "order_status_logs"
+
+    order_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("orders.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    old_status: Mapped[OrderStatus | None] = mapped_column(
+        Enum(
+            OrderStatus,
+            name="order_status_enum",
+            native_enum=True,
+            create_type=False,
+            values_callable=lambda e: [m.value for m in e],
+        ),
+        nullable=True,
+        comment="Статус до перехода (NULL при создании)",
+    )
+    new_status: Mapped[OrderStatus] = mapped_column(
+        Enum(
+            OrderStatus,
+            name="order_status_enum",
+            native_enum=True,
+            create_type=False,
+            values_callable=lambda e: [m.value for m in e],
+        ),
+        nullable=False,
+        comment="Статус после перехода",
+    )
+    changed_by_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        comment="Кто инициировал переход (NULL для системных)",
+    )
+    reason: Mapped[str | None] = mapped_column(
+        String(500),
+        nullable=True,
+        comment="Причина перехода (при отмене/возврате)",
+    )
+
+    order: Mapped["Order"] = relationship()
+
+    __table_args__ = (
+        {
+            "comment": (
+                "Аудит-лог всех переходов статуса заказа"
+            )
+        },
     )

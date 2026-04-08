@@ -16,6 +16,7 @@ from src.modules.inventory.repositories import (
 from src.modules.orders.repositories import (
     OrderItemRepository,
     OrderRepository,
+    OrderStatusLogRepository,
 )
 from src.modules.users.repositories import UserRepository
 
@@ -23,6 +24,7 @@ from src.modules.users.repositories import UserRepository
 class BaseOrderUnitOfWork(BaseSQLAlchemyUoW):
     orders: OrderRepository
     order_items: OrderItemRepository
+    status_logs: OrderStatusLogRepository
     users: UserRepository
     inventories: InventoryRepository
     transfers: StockTransferRepository
@@ -37,6 +39,9 @@ class BaseOrderUnitOfWork(BaseSQLAlchemyUoW):
 
         self.orders = OrderRepository(session=self.session)
         self.order_items = OrderItemRepository(session=self.session)
+        self.status_logs = OrderStatusLogRepository(
+            session=self.session
+        )
         self.users = UserRepository(session=self.session)
         self.inventories = InventoryRepository(session=self.session)
         self.transfers = StockTransferRepository(session=self.session)

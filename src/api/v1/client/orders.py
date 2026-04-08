@@ -2,15 +2,18 @@
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Body, Depends, Security
+from fastapi import APIRouter, Body, Depends, Query, Security
 
 from src.core.security.permissions import Scope
 from src.infrastructure.database.models import User
 from src.modules.auth.dependencies import get_current_user
 from src.modules.orders.dependencies import get_base_order_service
+from src.modules.orders.enums import OrderStatus
 from src.modules.orders.schemas import (
+    CancelOrderRequest,
     OrderCreate,
     OrderResponse,
+    OrdersResponse,
     TaraCheckRequest,
     TaraCheckResponse,
 )
@@ -51,16 +54,26 @@ async def create_order(
     )
 
 
-@orders_router.get("/history", response_model=list[OrderResponse])
-async def get_tasks(
+@orders_router.get("/history", response_model=OrdersResponse)
+async def get_order_history(
     client: Annotated[
         User, Security(get_current_user, scopes=[Scope.ORDERS_READ])
     ],
     base_order_service: Annotated[
         BaseOrderService, Depends(get_base_order_service)
     ],
+    skip: Annotated[int, Query(ge=0)] = 0,
+    limit: Annotated[int, Query(ge=1, le=100)] = 20,
+    status: Annotated[OrderStatus | None, Query()] = None,
 ):
-    return await base_order_service.get_client_history(client_id=client.id)
+    """История заказов клиента с пагинацией и фильтрацией."""
+    orders, total = await base_order_service.get_client_history(
+        client_id=client.id,
+        skip=skip,
+        limit=limit,
+        status=status,
+    )
+    return OrdersResponse(total_count=total, orders=orders)
 
 
 @orders_router.get("/{order_id}", response_model=OrderResponse)
@@ -77,6 +90,29 @@ async def get_order_details(
     return await base_order_service.get_order_with_details(
         order_id=order_id,
         requesting_user_id=client.id,
+    )
+
+
+@orders_router.post(
+    "/{order_id}/cancel",
+    response_model=OrderResponse,
+    summary="Отменить заказ",
+)
+async def cancel_order(
+    order_id: uuid.UUID,
+    client: Annotated[
+        User, Security(get_current_user, scopes=[Scope.ORDERS_CANCEL])
+    ],
+    base_order_service: Annotated[
+        BaseOrderService, Depends(get_base_order_service)
+    ],
+    dto: CancelOrderRequest | None = None,
+):
+    """Отмена заказа клиентом. Допускается только для NEW."""
+    return await base_order_service.cancel_order(
+        order_id=order_id,
+        requesting_user_id=client.id,
+        reason=dto.reason if dto else None,
     )
 
 

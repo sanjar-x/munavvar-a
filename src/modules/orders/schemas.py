@@ -49,6 +49,14 @@ class OrderCreate(BaseModel):
             "перед созданием заказа (INITIAL_BALANCE)."
         ),
     )
+    notes: str | None = Field(
+        default=None,
+        max_length=500,
+        title="Заметки к доставке",
+        description=(
+            "Инструкции для курьера: код домофона, этаж, время доставки и т.д."
+        ),
+    )
 
 
 class OrderAssignCourierRequest(BaseModel):
@@ -61,6 +69,17 @@ class OrderStatusUpdateRequest(BaseModel):
     """Схема для курьера: изменить статус заказа (например, на DELIVERED)."""
 
     status: OrderStatus = Field(..., title="Новый статус заказа")
+
+
+class CancelOrderRequest(BaseModel):
+    """Запрос на отмену заказа (клиент или бэкофис)."""
+
+    reason: str | None = Field(
+        default=None,
+        max_length=500,
+        title="Причина отмены",
+        description="Опциональная причина отмены заказа",
+    )
 
 
 class OrderItemActual(BaseModel):
@@ -188,6 +207,18 @@ class OrderResponse(BaseModel):
     warehouse_id: uuid.UUID | None = Field(
         default=None,
         description="ID склада (только для самовывоза)",
+    )
+    contract_id: uuid.UUID | None = Field(
+        default=None,
+        description="ID договора (только для CONTRACT оплаты)",
+    )
+    notes: str | None = Field(
+        default=None,
+        description="Инструкции по доставке",
+    )
+    cancellation_reason: str | None = Field(
+        default=None,
+        description="Причина отмены (если статус CANCELLED)",
     )
 
     items: list[OrderItemResponse]

@@ -5,6 +5,7 @@ from datetime import UTC, date, datetime
 from typing import Any
 
 import sqlalchemy as sa
+import structlog
 from sqlalchemy import select
 from sqlalchemy.orm import joinedload, selectinload
 
@@ -17,6 +18,8 @@ from src.modules.contracts.models import (
     ContractStatusLog,
     Invoice,
 )
+
+log = structlog.get_logger(__name__)
 
 
 class ContractRepository(BaseRepository[Contract]):
@@ -139,6 +142,11 @@ class ContractRepository(BaseRepository[Contract]):
             .values(credit_used=Contract.credit_used + amount)
         )
         await self.session.execute(stmt)
+        log.info(
+            "credit_reserved",
+            contract_id=str(contract_id),
+            amount=amount,
+        )
 
     async def decrement_credit_used(
         self,
@@ -148,6 +156,18 @@ class ContractRepository(BaseRepository[Contract]):
         """Уменьшение credit_used при завершении доставки/отмене.
         Долг переходит с credit_used на account.balance (через триггер).
         """
+        # Проверяем текущее значение для обнаружения аномалий
+        current = await self.session.scalar(
+            sa.select(Contract.credit_used).where(Contract.id == contract_id)
+        )
+        if current is not None and current < amount:
+            log.warning(
+                "credit_underflow_detected",
+                contract_id=str(contract_id),
+                current_credit_used=current,
+                decrement_amount=amount,
+                deficit=amount - current,
+            )
         stmt = (
             sa.update(Contract)
             .where(Contract.id == contract_id)
@@ -156,6 +176,11 @@ class ContractRepository(BaseRepository[Contract]):
             )
         )
         await self.session.execute(stmt)
+        log.info(
+            "credit_released",
+            contract_id=str(contract_id),
+            amount=amount,
+        )
 
     async def get_expirable(self) -> Sequence[Contract]:
         """ACTIVE договоры с истёкшим end_date (кандидаты → EXPIRED).

@@ -1,7 +1,7 @@
 # src/modules/orders/services.py
 import uuid
 from collections.abc import Sequence
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any, cast
 
 from src.common.service import BaseService
@@ -305,6 +305,10 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
                     "total_amount": total_amount,
                     "capitalization_applied": capitalization_applied,
                     "contract_id": contract.id if contract else None,
+                    "reserved_credit_amount": (
+                        total_amount if contract else None
+                    ),
+                    "notes": dto.notes,
                 }
             )
 
@@ -315,7 +319,15 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
             # 6. Сохраняем строки (Bulk Insert)
             await self.uow.order_items.add_many(order_items_data)
 
-            # 7. Единый коммит: оприходование + заказ атомарно
+            # 7. Лог создания заказа
+            await self.uow.status_logs.log_transition(
+                order_id=new_order.id,
+                old_status=None,
+                new_status=OrderStatus.NEW,
+                changed_by_id=client_id,
+            )
+
+            # 8. Единый коммит: оприходование + заказ атомарно
             await self.uow.commit()
 
             # 8. Перечитываем с eager-loaded relationships
@@ -605,7 +617,45 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
 
             amount_to_add = current_price * quantity
             new_total = order.total_amount + amount_to_add
-            await self.uow.orders.update(order_id, {"total_amount": new_total})
+            update_data: dict[str, Any] = {"total_amount": new_total}
+
+            # CONTRACT: синхронизируем кредитный резерв
+            if (
+                order.payment_method == PaymentMethod.CONTRACT
+                and order.contract_id is not None
+            ):
+                contract = await self.uow.contracts.get(
+                    order.contract_id, with_for_update=True
+                )
+                if not contract:
+                    raise ContractRequiredError(
+                        client_id=order.client_id,
+                    )
+                if contract.status != ContractStatus.ACTIVE:
+                    raise ContractNotActiveError(
+                        contract_id=contract.id,
+                        status=str(contract.status),
+                    )
+                await self.uow.session.refresh(
+                    contract, attribute_names=["credit_used"]
+                )
+                if contract.credit_limit != 0:
+                    new_exposure = contract.credit_used + amount_to_add
+                    if new_exposure > contract.credit_limit:
+                        raise CreditLimitExceededError(
+                            contract_id=contract.id,
+                            credit_limit=contract.credit_limit,
+                            current_exposure=contract.credit_used,
+                            order_amount=amount_to_add,
+                        )
+                await self.uow.contracts.increment_credit_used(
+                    contract.id, amount_to_add
+                )
+                update_data["reserved_credit_amount"] = (
+                    order.reserved_credit_amount or 0
+                ) + amount_to_add
+
+            await self.uow.orders.update(order_id, update_data)
 
             await self.uow.commit()
             updated_order = await self.uow.orders.get_with_details(order_id)
@@ -670,8 +720,23 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
             )
 
             new_total = max(0, order.total_amount - amount_to_subtract)
+            update_data: dict[str, Any] = {"total_amount": new_total}
 
-            await self.uow.orders.update(order_id, {"total_amount": new_total})
+            # CONTRACT: возвращаем часть кредитного резерва
+            if (
+                order.payment_method == PaymentMethod.CONTRACT
+                and order.contract_id is not None
+                and order.reserved_credit_amount
+            ):
+                await self.uow.contracts.decrement_credit_used(
+                    order.contract_id, amount_to_subtract
+                )
+                update_data["reserved_credit_amount"] = max(
+                    0,
+                    (order.reserved_credit_amount or 0) - amount_to_subtract,
+                )
+
+            await self.uow.orders.update(order_id, update_data)
 
             await self.uow.commit()
             updated_order = await self.uow.orders.get_with_details(order_id)
@@ -755,6 +820,7 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
         new_status: OrderStatus,
         actual_items: list[OrderItemActual] | None = None,
         requesting_user_id: uuid.UUID | None = None,
+        cancellation_reason: str | None = None,
     ) -> Order:
         async with self.uow:
             # Блокируем заказ для обновления статуса
@@ -765,7 +831,10 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
             if not order:
                 raise OrderNotFoundError(order_id=order_id)
 
-            if requesting_user_id and requesting_user_id != order.courier_id:
+            if requesting_user_id and (
+                requesting_user_id != order.courier_id
+                and requesting_user_id != order.client_id
+            ):
                 raise OrderAccessDeniedError(
                     user_id=requesting_user_id,
                     order_id=order_id,
@@ -796,19 +865,43 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
             # CONTRACT: возврат зарезервированного кредита при отмене.
             # decrement вызывается только если заказ ещё не был исполнен
             # (DELIVERED/PICKUP_COMPLETED уже сделали decrement в settlement).
+            # Защита от повторного вызова: проверяем reserved_credit_amount > 0
+            # и обнуляем его атомарно после декремента.
             _settled_statuses = {
                 OrderStatus.DELIVERED,
                 OrderStatus.PICKUP_COMPLETED,
             }
             if (
                 new_status == OrderStatus.CANCELLED
+                and old_status != OrderStatus.CANCELLED
                 and order.payment_method == PaymentMethod.CONTRACT
                 and order.contract_id is not None
+                and order.reserved_credit_amount
                 and old_status not in _settled_statuses
             ):
                 await self.uow.contracts.decrement_credit_used(
-                    order.contract_id, order.total_amount
+                    order.contract_id,
+                    order.reserved_credit_amount,
                 )
+                await self.uow.orders.update(
+                    order.id, {"reserved_credit_amount": 0}
+                )
+
+            # Сохраняем причину отмены
+            if new_status == OrderStatus.CANCELLED and cancellation_reason:
+                await self.uow.orders.update(
+                    order.id,
+                    {"cancellation_reason": cancellation_reason},
+                )
+
+            # Аудит-лог перехода статуса
+            await self.uow.status_logs.log_transition(
+                order_id=order_id,
+                old_status=old_status,
+                new_status=new_status,
+                changed_by_id=requesting_user_id,
+                reason=cancellation_reason,
+            )
 
             await self.uow.commit()
             return updated_order
@@ -1322,9 +1415,13 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
         if (
             order.payment_method == PaymentMethod.CONTRACT
             and order.contract_id is not None
+            and order.reserved_credit_amount
         ):
             await self.uow.contracts.decrement_credit_used(
-                order.contract_id, order.total_amount
+                order.contract_id, order.reserved_credit_amount
+            )
+            await self.uow.orders.update(
+                order.id, {"reserved_credit_amount": 0}
             )
 
     async def _process_pickup_settlement(self, order: Order) -> None:
@@ -1410,9 +1507,13 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
         if (
             order.payment_method == PaymentMethod.CONTRACT
             and order.contract_id is not None
+            and order.reserved_credit_amount
         ):
             await self.uow.contracts.decrement_credit_used(
-                order.contract_id, order.total_amount
+                order.contract_id, order.reserved_credit_amount
+            )
+            await self.uow.orders.update(
+                order.id, {"reserved_credit_amount": 0}
             )
 
     async def check_tara_availability(self, dto: TaraCheckRequest) -> dict:
@@ -1464,13 +1565,38 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
     # --- МЕТОДЫ ПОИСКА И СПИСКОВ ---
 
     async def get_client_history(
-        self, client_id: uuid.UUID, skip: int = 0, limit: int = 20
-    ) -> Sequence[Order]:
+        self,
+        client_id: uuid.UUID,
+        skip: int = 0,
+        limit: int = 20,
+        status: OrderStatus | None = None,
+    ) -> tuple[Sequence[Order], int]:
         """История заказов для мобильного приложения клиента."""
         async with self.uow:
-            return await self.uow.orders.get_client_orders(
-                client_id=client_id, skip=skip, limit=limit
+            orders = await self.uow.orders.get_client_orders(
+                client_id=client_id,
+                skip=skip,
+                limit=limit,
+                status=status,
             )
+            total = await self.uow.orders.count_client_orders(
+                client_id=client_id, status=status
+            )
+            return orders, total
+
+    async def cancel_order(
+        self,
+        order_id: uuid.UUID,
+        requesting_user_id: uuid.UUID,
+        reason: str | None = None,
+    ) -> Order:
+        """Отмена заказа клиентом (только в статусе NEW)."""
+        return await self.update_status(
+            order_id=order_id,
+            new_status=OrderStatus.CANCELLED,
+            requesting_user_id=requesting_user_id,
+            cancellation_reason=reason,
+        )
 
     async def get_courier_tasks(
         self, courier_id: uuid.UUID
@@ -1512,3 +1638,67 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
                 max_amount=max_amount,
             )
             return list(orders), total
+
+    async def expire_stale_orders(
+        self,
+        max_age_hours: int = 48,
+        admin_id: uuid.UUID | None = None,
+    ) -> int:
+        """Массовая отмена заказов в статусе NEW старше порога.
+
+        Для каждого заказа:
+        - Переводит статус в CANCELLED
+        - Возвращает зарезервированный кредит (CONTRACT)
+        - Пишет аудит-лог
+
+        Использует SKIP LOCKED — безопасен при параллельном
+        запуске (cron + ручной вызов).
+
+        Returns:
+            Количество отменённых заказов.
+        """
+        cutoff = datetime.now(UTC) - timedelta(hours=max_age_hours)
+        cancelled = 0
+
+        async with self.uow:
+            stale = await self.uow.orders.get_stale_orders(
+                older_than=cutoff,
+            )
+            reason = (
+                f"Авто-отмена: заказ не обработан"
+                f" за {max_age_hours}ч"
+            )
+            for order in stale:
+                await self.uow.orders.update_status(
+                    order.id, OrderStatus.CANCELLED
+                )
+                # CONTRACT: возврат кредита
+                if (
+                    order.payment_method == PaymentMethod.CONTRACT
+                    and order.contract_id is not None
+                    and order.reserved_credit_amount
+                ):
+                    await self.uow.contracts.decrement_credit_used(
+                        order.contract_id,
+                        order.reserved_credit_amount,
+                    )
+                    await self.uow.orders.update(
+                        order.id,
+                        {"reserved_credit_amount": 0},
+                    )
+
+                await self.uow.orders.update(
+                    order.id,
+                    {"cancellation_reason": reason},
+                )
+                await self.uow.status_logs.log_transition(
+                    order_id=order.id,
+                    old_status=OrderStatus.NEW,
+                    new_status=OrderStatus.CANCELLED,
+                    changed_by_id=admin_id,
+                    reason=reason,
+                )
+                cancelled += 1
+
+            await self.uow.commit()
+        return cancelled

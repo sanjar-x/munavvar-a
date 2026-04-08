@@ -16,7 +16,7 @@ from src.modules.inventory.models import (
     StockTransfer,
     StockTransferItem,
 )
-from src.modules.orders.models import Order, OrderItem
+from src.modules.orders.models import Order, OrderItem, OrderStatusLog
 from src.modules.users.models import Identity, User
 
 __all__ = [
@@ -36,6 +36,7 @@ __all__ = [
     "StockTransferItem",
     "Order",
     "OrderItem",
+    "OrderStatusLog",
     "Identity",
     "User",
 ]

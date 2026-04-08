@@ -404,3 +404,37 @@ async def get_courier_tasks(
 ):
     """Просмотр активных задач (заказов) конкретного курьера."""
     return await base_order_service.get_courier_tasks(courier_id=courier_id)
+
+
+@orders_router.post(
+    "/jobs/expire-stale",
+    summary="Отменить зависшие заказы в статусе NEW",
+    description=(
+        "Массово отменяет заказы в NEW старше порога "
+        "(по умолчанию 48 часов). Возвращает кредит по "
+        "контрактным заказам. Идемпотентен."
+    ),
+)
+async def run_expire_stale_orders_job(
+    admin: Annotated[
+        User,
+        Security(get_current_user, scopes=[Scope.ORDERS_EDIT]),
+    ],
+    service: Annotated[
+        BaseOrderService, Depends(get_base_order_service)
+    ],
+    max_age_hours: Annotated[
+        int, Query(ge=1, le=720, alias="maxAgeHours")
+    ] = 48,
+):
+    """Автоматическая экспирация заказов.
+
+    Вызывается по расписанию (Railway cron) или вручную
+    администратором. SKIP LOCKED — безопасен при
+    параллельном запуске.
+    """
+    cancelled = await service.expire_stale_orders(
+        max_age_hours=max_age_hours,
+        admin_id=admin.id,
+    )
+    return {"cancelled": cancelled}
