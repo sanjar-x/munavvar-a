@@ -116,7 +116,7 @@ class BillingService:
                 COALESCE(SUM(a.balance), 0)      AS settled_debt
             FROM contracts c
             JOIN accounts a ON a.user_id = c.client_id
-                AND a.type = 'CLIENT'
+                AND a.type = 'client'
             WHERE c.status = 'active'
               AND c.is_active = TRUE
             """
@@ -151,7 +151,7 @@ class BillingService:
                 FROM contracts c
                 JOIN users u ON u.id = c.client_id
                 JOIN accounts a ON a.user_id = c.client_id
-                    AND a.type = 'CLIENT'
+                    AND a.type = 'client'
                 WHERE c.status = 'active'
                   AND c.is_active = TRUE
                 ORDER BY (c.credit_used + a.balance) DESC
