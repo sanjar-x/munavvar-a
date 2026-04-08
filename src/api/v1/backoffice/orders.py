@@ -100,7 +100,10 @@ async def search_orders(
         max_amount=max_amount,
         sale_type=sale_type,
     )
-    return OrdersResponse(total_count=total, orders=orders)
+    return OrdersResponse(
+        total_count=total,
+        orders=[OrderResponse.model_validate(order) for order in orders],
+    )
 
 
 @orders_router.post("/check-tara", response_model=TaraCheckResponse)

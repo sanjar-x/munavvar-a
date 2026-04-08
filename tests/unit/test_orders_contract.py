@@ -575,12 +575,7 @@ class TestCreditDecrement:
         svc = BaseOrderService(uow=uow, catalog_service=catalog_svc)
 
         dto = OrderCreate(
-            items=[
-                {
-                    "product_id": str(uuid.uuid4()),
-                    "quantity": 1,
-                }
-            ],
+            items=[Item(product_id=uuid.uuid4(), quantity=1)],
             payment_method=PaymentMethod.CASH,
             client_inventory_id=uuid.uuid4(),
         )
