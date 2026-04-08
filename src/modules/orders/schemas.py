@@ -1,10 +1,11 @@
 # src/modules/orders/schemas.py
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from src.modules.catalog.schemas import ProductResponse
+from src.modules.contracts.enums import ContractStatus
 from src.modules.inventory.enums import InventoryType
 from src.modules.inventory.schemas import TransferResponse
 from src.modules.orders.enums import OrderStatus, PaymentMethod, SaleType
@@ -180,6 +181,21 @@ class InventoryResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class ContractBrief(BaseModel):
+    """Краткая информация о договоре в контексте заказа."""
+
+    id: uuid.UUID
+    number: str
+    status: ContractStatus
+    legal_name: str
+    credit_limit: int
+    credit_used: int
+    start_date: date
+    end_date: date | None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class OrderResponse(BaseModel):
     """Полная модель заказа для Личного Кабинета или Дашборда."""
 
@@ -212,11 +228,14 @@ class OrderResponse(BaseModel):
         default=None,
         description="ID договора (только для CONTRACT оплаты)",
     )
+    contract: ContractBrief | None = Field(
+        default=None,
+        description="Данные договора (только для CONTRACT оплаты)",
+    )
     reserved_credit_amount: int | None = Field(
         default=None,
         description=(
-            "Зарезервированная сумма кредита "
-            "(только для CONTRACT оплаты)"
+            "Зарезервированная сумма кредита (только для CONTRACT оплаты)"
         ),
     )
     notes: str | None = Field(

@@ -64,6 +64,7 @@ class OrderRepository(BaseRepository[Order]):
             joinedload(Order.client).selectinload(User.identities),
             joinedload(Order.courier).selectinload(User.identities),
             joinedload(Order.client_inventory).joinedload(Inventory.user),
+            joinedload(Order.contract),
             selectinload(Order.items).joinedload(OrderItem.product),
             selectinload(Order.stock_transfers)
             .selectinload(StockTransfer.items)
@@ -310,9 +311,7 @@ class OrderRepository(BaseRepository[Order]):
             )
             .with_for_update(skip_locked=True)
         )
-        rows = (
-            await self.session.execute(select_stmt)
-        ).all()
+        rows = (await self.session.execute(select_stmt)).all()
         if not rows:
             return []
 
@@ -326,9 +325,7 @@ class OrderRepository(BaseRepository[Order]):
             )
         )
         await self.session.execute(update_stmt)
-        return [
-            (r[0], r[1], r[2]) for r in rows
-        ]
+        return [(r[0], r[1], r[2]) for r in rows]
 
     async def count_inflight_by_contract(
         self,
@@ -371,9 +368,7 @@ class OrderRepository(BaseRepository[Order]):
                 ориентир на момент назначения.
         """
         date_col = (
-            self.model.updated_at
-            if by_updated
-            else self.model.created_at
+            self.model.updated_at if by_updated else self.model.created_at
         )
         query = (
             select(self.model)
