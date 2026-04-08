@@ -313,6 +313,19 @@ class WarehouseService:
             await self.uow.commit()
             return success
 
+    async def search_inventories(
+        self,
+        search_query: str,
+        inv_type: InventoryType | None = None,
+        limit: int = 50,
+    ) -> Sequence[Inventory]:
+        async with self.uow:
+            return await self.uow.inventories.search_inventories(
+                search_query=search_query,
+                inv_type=inv_type,
+                limit=limit,
+            )
+
 
 # Типы накладных, требующие расширенного права logistics:adjustment.
 # Кладовщик с logistics:transfer не может их создавать.
@@ -345,6 +358,7 @@ class StockTransferService:
         date_from: datetime | None = None,
         date_to: datetime | None = None,
         warehouse_owner_id: uuid.UUID | None = None,
+        warehouse_id: uuid.UUID | None = None,
     ) -> Sequence[StockTransfer]:
         async with self.uow:
             return await self.uow.transfers.search_transfers(
@@ -357,6 +371,7 @@ class StockTransferService:
                 date_from=date_from,
                 date_to=date_to,
                 warehouse_owner_id=warehouse_owner_id,
+                warehouse_id=warehouse_id,
             )
 
     async def create_transfer(

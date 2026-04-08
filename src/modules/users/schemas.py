@@ -110,6 +110,15 @@ class UserResponse(UserBase):
     model_config = ConfigDict(from_attributes=True)
 
 
+class UserShortResponse(BaseModel):
+    """Краткое представление пользователя для вложения в другие схемы."""
+
+    id: uuid.UUID
+    username: str
+    phone: str | None = None
+    model_config = ConfigDict(from_attributes=True)
+
+
 class UserResponseList(BaseModel):
     total_count: int
     users: list[UserResponse]

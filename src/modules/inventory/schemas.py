@@ -12,7 +12,7 @@ from src.modules.inventory.enums import (
     TransferStatus,
     TransferType,
 )
-from src.modules.users.schemas import UserResponse
+from src.modules.users.schemas import UserResponse, UserShortResponse
 
 
 class InventoryResponse(BaseModel):
@@ -232,6 +232,7 @@ class ProductSimpleResponse(BaseModel):
     id: uuid.UUID
     name: str
     type: ProductType
+    price: int = 0
     is_active: bool = True
 
     model_config = ConfigDict(from_attributes=True)
@@ -367,6 +368,7 @@ class WarehouseDetailResponse(BaseModel):
     id: uuid.UUID
     name: str
     user_id: uuid.UUID
+    user: UserShortResponse | None = None
     balances: list[BalanceItem] = []
 
     model_config = ConfigDict(from_attributes=True)
@@ -400,12 +402,25 @@ class TransferResponse(BaseModel):
     from_inventory: InventoryShortResponse | None = None
     to_inventory: InventoryShortResponse | None = None
     created_by_id: uuid.UUID
+    created_by: UserShortResponse | None = None
     accepted_by_id: uuid.UUID | None
+    accepted_by: UserShortResponse | None = None
     status: TransferStatus
     type: TransferType
     items: list[TransferItemResponse] = []
     reason: str | None = None
     route_sheet_id: uuid.UUID | None = None
     created_at: datetime | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class InventorySearchResult(BaseModel):
+    """Краткое описание инвентаря для поиска (например, инвентарь клиента)."""
+
+    id: uuid.UUID
+    name: str
+    type: InventoryType
+    user_id: uuid.UUID
 
     model_config = ConfigDict(from_attributes=True)

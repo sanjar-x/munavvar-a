@@ -23,7 +23,7 @@ class TestBackofficeWarehouseCreate:
         data = response.json()
 
         assert data["name"] == "Test Warehouse Create"
-        assert data["type"] == "warehouse"
+        assert data["type"] == "WAREHOUSE"
         assert data["is_active"] is True
         assert data["user"]["id"] == str(admin_user.id)
         assert data["user"]["phone"] == "+998901111111"

@@ -175,9 +175,16 @@ class InventoryRepository(BaseRepository[Inventory]):
         if with_for_update:
             query = query.with_for_update()
 
-        query = query.options(
+        # User joinedload uses LEFT OUTER JOIN which PostgreSQL forbids with
+        # FOR UPDATE — skip it when locking (user data not needed for writes)
+        options = [
             selectinload(self.model.balances).joinedload(Balance.product),
-        )
+        ]
+        if not with_for_update:
+            options.append(
+                joinedload(self.model.user).selectinload(User.identities)
+            )
+        query = query.options(*options)
         result = await self.session.execute(query)
         return result.unique().scalar_one_or_none()
 
@@ -199,6 +206,7 @@ class InventoryRepository(BaseRepository[Inventory]):
             )
             .options(
                 selectinload(self.model.balances).joinedload(Balance.product),
+                joinedload(self.model.user).selectinload(User.identities),
             )
         )
         if owner_id is not None:
@@ -251,6 +259,12 @@ class StockTransferRepository(BaseRepository[StockTransfer]):
                 selectinload(StockTransfer.items).joinedload(
                     StockTransferItem.product
                 ),
+                joinedload(StockTransfer.created_by).selectinload(
+                    User.identities
+                ),
+                joinedload(StockTransfer.accepted_by).selectinload(
+                    User.identities
+                ),
             )
         )
 
@@ -281,6 +295,7 @@ class StockTransferRepository(BaseRepository[StockTransfer]):
         date_from: datetime | None = None,
         date_to: datetime | None = None,
         warehouse_owner_id: uuid.UUID | None = None,
+        warehouse_id: uuid.UUID | None = None,
     ) -> Sequence[StockTransfer]:
         query = select(self.model)
 
@@ -296,6 +311,13 @@ class StockTransferRepository(BaseRepository[StockTransfer]):
             query = query.where(self.model.created_at >= date_from)
         if date_to:
             query = query.where(self.model.created_at <= date_to)
+        if warehouse_id is not None:
+            query = query.where(
+                or_(
+                    self.model.from_id == warehouse_id,
+                    self.model.to_id == warehouse_id,
+                )
+            )
         # Storekeeper scoping: show only transfers
         # that touch their warehouse(s)
         if warehouse_owner_id is not None:
@@ -320,6 +342,12 @@ class StockTransferRepository(BaseRepository[StockTransfer]):
                 joinedload(self.model.to_inventory),
                 selectinload(StockTransfer.items).joinedload(
                     StockTransferItem.product
+                ),
+                joinedload(StockTransfer.created_by).selectinload(
+                    User.identities
+                ),
+                joinedload(StockTransfer.accepted_by).selectinload(
+                    User.identities
                 ),
             )
             .order_by(self.model.created_at.desc())
