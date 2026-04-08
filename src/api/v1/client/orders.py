@@ -52,7 +52,6 @@ async def create_order(
     return await base_order_service.create_order(
         client_id=client.id,
         dto=dto,
-        client_role=client.role,
     )
 
 

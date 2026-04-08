@@ -154,6 +154,19 @@ def _make_catalog_service(
     return svc
 
 
+def _make_user_service(
+    role: Role = Role.CLIENT_B2C,
+) -> MagicMock:
+    svc = MagicMock()
+    client = SimpleNamespace(
+        id=uuid.uuid4(),
+        role=role,
+        is_active=True,
+    )
+    svc.get_client = AsyncMock(return_value=client)
+    return svc
+
+
 # ─── Tests: role guard ────────────────────────────────────
 
 
@@ -165,7 +178,12 @@ class TestContractRoleGuard:
         uow = _make_fake_uow()
         catalog_svc = _make_catalog_service([product])
 
-        svc = BaseOrderService(uow=uow, catalog_service=catalog_svc)
+        user_svc = _make_user_service()
+        svc = BaseOrderService(
+            uow=uow,
+            catalog_service=catalog_svc,
+            user_service=user_svc,
+        )
         dto = OrderCreate(
             items=[Item(product_id=product.id, quantity=1)],
             payment_method=PaymentMethod.CONTRACT,
@@ -176,7 +194,6 @@ class TestContractRoleGuard:
             await svc.create_order(
                 client_id=uuid.uuid4(),
                 dto=dto,
-                client_role=Role.CLIENT_B2C,
             )
         assert exc.value.error_code == "CONTRACT_PAYMENT_NOT_ALLOWED"
 
@@ -192,7 +209,12 @@ class TestContractValidation:
         uow = _make_fake_uow(contract=None)
         catalog_svc = _make_catalog_service([product])
 
-        svc = BaseOrderService(uow=uow, catalog_service=catalog_svc)
+        user_svc = _make_user_service(role=Role.CLIENT_B2B)
+        svc = BaseOrderService(
+            uow=uow,
+            catalog_service=catalog_svc,
+            user_service=user_svc,
+        )
         dto = OrderCreate(
             items=[Item(product_id=product.id, quantity=1)],
             payment_method=PaymentMethod.CONTRACT,
@@ -203,7 +225,6 @@ class TestContractValidation:
             await svc.create_order(
                 client_id=uuid.uuid4(),
                 dto=dto,
-                client_role=Role.CLIENT_B2B,
             )
         assert exc.value.error_code == "CONTRACT_REQUIRED"
 
@@ -215,7 +236,12 @@ class TestContractValidation:
         uow = _make_fake_uow(contract=suspended)
         catalog_svc = _make_catalog_service([product])
 
-        svc = BaseOrderService(uow=uow, catalog_service=catalog_svc)
+        user_svc = _make_user_service(role=Role.CLIENT_B2B)
+        svc = BaseOrderService(
+            uow=uow,
+            catalog_service=catalog_svc,
+            user_service=user_svc,
+        )
         dto = OrderCreate(
             items=[Item(product_id=product.id, quantity=1)],
             payment_method=PaymentMethod.CONTRACT,
@@ -226,7 +252,6 @@ class TestContractValidation:
             await svc.create_order(
                 client_id=uuid.uuid4(),
                 dto=dto,
-                client_role=Role.CLIENT_B2B,
             )
         assert exc.value.error_code == "CONTRACT_NOT_ACTIVE"
 
@@ -244,7 +269,12 @@ class TestContractValidation:
         uow = _make_fake_uow(contract=expired_contract)
         catalog_svc = _make_catalog_service([product])
 
-        svc = BaseOrderService(uow=uow, catalog_service=catalog_svc)
+        user_svc = _make_user_service(role=Role.CLIENT_B2B)
+        svc = BaseOrderService(
+            uow=uow,
+            catalog_service=catalog_svc,
+            user_service=user_svc,
+        )
         dto = OrderCreate(
             items=[Item(product_id=product.id, quantity=1)],
             payment_method=PaymentMethod.CONTRACT,
@@ -255,7 +285,6 @@ class TestContractValidation:
             await svc.create_order(
                 client_id=uuid.uuid4(),
                 dto=dto,
-                client_role=Role.CLIENT_B2B,
             )
         assert exc.value.error_code == "CONTRACT_EXPIRED"
 
@@ -276,7 +305,12 @@ class TestCreditLimit:
         uow = _make_fake_uow(contract=active)
         catalog_svc = _make_catalog_service([product])
 
-        svc = BaseOrderService(uow=uow, catalog_service=catalog_svc)
+        user_svc = _make_user_service(role=Role.CLIENT_B2B)
+        svc = BaseOrderService(
+            uow=uow,
+            catalog_service=catalog_svc,
+            user_service=user_svc,
+        )
         dto = OrderCreate(
             items=[
                 Item(product_id=product.id, quantity=1)
@@ -289,7 +323,6 @@ class TestCreditLimit:
             await svc.create_order(
                 client_id=uuid.uuid4(),
                 dto=dto,
-                client_role=Role.CLIENT_B2B,
             )
         assert exc.value.error_code == "CREDIT_LIMIT_EXCEEDED"
         # Ensure credit was NOT incremented (rollback scenario)
@@ -307,7 +340,12 @@ class TestCreditLimit:
         uow = _make_fake_uow(contract=active)
         catalog_svc = _make_catalog_service([product])
 
-        svc = BaseOrderService(uow=uow, catalog_service=catalog_svc)
+        user_svc = _make_user_service(role=Role.CLIENT_B2B)
+        svc = BaseOrderService(
+            uow=uow,
+            catalog_service=catalog_svc,
+            user_service=user_svc,
+        )
         dto = OrderCreate(
             items=[Item(product_id=product.id, quantity=1)],
             payment_method=PaymentMethod.CONTRACT,
@@ -318,7 +356,6 @@ class TestCreditLimit:
         await svc.create_order(
             client_id=uuid.uuid4(),
             dto=dto,
-            client_role=Role.CLIENT_B2B,
         )
         # Credit was incremented
         uow.contracts.increment_credit_used.assert_awaited_once()
@@ -335,7 +372,12 @@ class TestCreditLimit:
         uow = _make_fake_uow(contract=active)
         catalog_svc = _make_catalog_service([product])
 
-        svc = BaseOrderService(uow=uow, catalog_service=catalog_svc)
+        user_svc = _make_user_service(role=Role.CLIENT_B2B)
+        svc = BaseOrderService(
+            uow=uow,
+            catalog_service=catalog_svc,
+            user_service=user_svc,
+        )
         dto = OrderCreate(
             items=[Item(product_id=product.id, quantity=1)],
             payment_method=PaymentMethod.CONTRACT,
@@ -345,7 +387,6 @@ class TestCreditLimit:
         await svc.create_order(
             client_id=uuid.uuid4(),
             dto=dto,
-            client_role=Role.CLIENT_B2B,
         )
         uow.contracts.increment_credit_used.assert_awaited_once()
 
@@ -372,7 +413,12 @@ class TestContractPriceOverride:
         )
         catalog_svc = _make_catalog_service([product])
 
-        svc = BaseOrderService(uow=uow, catalog_service=catalog_svc)
+        user_svc = _make_user_service(role=Role.CLIENT_B2B)
+        svc = BaseOrderService(
+            uow=uow,
+            catalog_service=catalog_svc,
+            user_service=user_svc,
+        )
         dto = OrderCreate(
             items=[Item(product_id=product_id, quantity=2)],
             payment_method=PaymentMethod.CONTRACT,
@@ -382,7 +428,6 @@ class TestContractPriceOverride:
         await svc.create_order(
             client_id=uuid.uuid4(),
             dto=dto,
-            client_role=Role.CLIENT_B2B,
         )
 
         # Check order was added with total = 15_000 * 2 = 30_000
@@ -409,7 +454,12 @@ class TestContractPriceOverride:
         uow = _make_fake_uow(contract=active, price_map={})
         catalog_svc = _make_catalog_service([product])
 
-        svc = BaseOrderService(uow=uow, catalog_service=catalog_svc)
+        user_svc = _make_user_service(role=Role.CLIENT_B2B)
+        svc = BaseOrderService(
+            uow=uow,
+            catalog_service=catalog_svc,
+            user_service=user_svc,
+        )
         dto = OrderCreate(
             items=[Item(product_id=product_id, quantity=1)],
             payment_method=PaymentMethod.CONTRACT,
@@ -419,7 +469,6 @@ class TestContractPriceOverride:
         await svc.create_order(
             client_id=uuid.uuid4(),
             dto=dto,
-            client_role=Role.CLIENT_B2B,
         )
 
         order_add_call = uow.orders.add.call_args[0][0]
@@ -442,7 +491,12 @@ class TestContractPriceOverride:
         uow = _make_fake_uow(contract=active)
         catalog_svc = _make_catalog_service([product])
 
-        svc = BaseOrderService(uow=uow, catalog_service=catalog_svc)
+        user_svc = _make_user_service(role=Role.CLIENT_B2B)
+        svc = BaseOrderService(
+            uow=uow,
+            catalog_service=catalog_svc,
+            user_service=user_svc,
+        )
         dto = OrderCreate(
             items=[Item(product_id=product_id, quantity=1)],
             payment_method=PaymentMethod.CONTRACT,
@@ -452,7 +506,6 @@ class TestContractPriceOverride:
         await svc.create_order(
             client_id=uuid.uuid4(),
             dto=dto,
-            client_role=Role.CLIENT_B2B,
         )
 
         order_add_call = uow.orders.add.call_args[0][0]
@@ -471,7 +524,12 @@ class TestNonContractOrders:
         uow = _make_fake_uow(contract=None)
         catalog_svc = _make_catalog_service([product])
 
-        svc = BaseOrderService(uow=uow, catalog_service=catalog_svc)
+        user_svc = _make_user_service()
+        svc = BaseOrderService(
+            uow=uow,
+            catalog_service=catalog_svc,
+            user_service=user_svc,
+        )
         dto = OrderCreate(
             items=[Item(product_id=product.id, quantity=1)],
             payment_method=PaymentMethod.CASH,
@@ -481,7 +539,6 @@ class TestNonContractOrders:
         await svc.create_order(
             client_id=uuid.uuid4(),
             dto=dto,
-            client_role=Role.CLIENT_B2C,
         )
 
         uow.contracts.get_active_for_client.assert_not_awaited()
@@ -524,7 +581,12 @@ class TestCreditDecrement:
         uow.orders.update = AsyncMock()
 
         catalog_svc = _make_catalog_service([])
-        svc = BaseOrderService(uow=uow, catalog_service=catalog_svc)
+        user_svc = _make_user_service()
+        svc = BaseOrderService(
+            uow=uow,
+            catalog_service=catalog_svc,
+            user_service=user_svc,
+        )
 
         await svc.update_status(
             order_id=order_id,
@@ -566,7 +628,12 @@ class TestCreditDecrement:
         uow.orders.update_status = AsyncMock(return_value=order)
 
         catalog_svc = _make_catalog_service([])
-        svc = BaseOrderService(uow=uow, catalog_service=catalog_svc)
+        user_svc = _make_user_service()
+        svc = BaseOrderService(
+            uow=uow,
+            catalog_service=catalog_svc,
+            user_service=user_svc,
+        )
 
         # DELIVERED → CANCELLED is not a valid transition, but we test
         # the guard logic directly; the FSM check happens before credit
@@ -588,7 +655,12 @@ class TestCreditDecrement:
 
         uow = _make_fake_uow()
         catalog_svc = _make_catalog_service([])
-        svc = BaseOrderService(uow=uow, catalog_service=catalog_svc)
+        user_svc = _make_user_service()
+        svc = BaseOrderService(
+            uow=uow,
+            catalog_service=catalog_svc,
+            user_service=user_svc,
+        )
 
         dto = OrderCreate(
             items=[Item(product_id=uuid.uuid4(), quantity=1)],
@@ -635,7 +707,12 @@ class TestDoubleCancelProtection:
         uow.orders.update_status = AsyncMock(return_value=order)
 
         catalog_svc = _make_catalog_service([])
-        svc = BaseOrderService(uow=uow, catalog_service=catalog_svc)
+        user_svc = _make_user_service()
+        svc = BaseOrderService(
+            uow=uow,
+            catalog_service=catalog_svc,
+            user_service=user_svc,
+        )
 
         # CANCELLED → CANCELLED is a no-op (returns early)
         await svc.update_status(
@@ -674,7 +751,12 @@ class TestDoubleCancelProtection:
         uow.orders.update_status = AsyncMock(return_value=order)
 
         catalog_svc = _make_catalog_service([])
-        svc = BaseOrderService(uow=uow, catalog_service=catalog_svc)
+        user_svc = _make_user_service()
+        svc = BaseOrderService(
+            uow=uow,
+            catalog_service=catalog_svc,
+            user_service=user_svc,
+        )
 
         await svc.update_status(
             order_id=order_id,
@@ -697,7 +779,12 @@ class TestReservedCreditAmount:
         uow = _make_fake_uow(contract=active)
         catalog_svc = _make_catalog_service([product])
 
-        svc = BaseOrderService(uow=uow, catalog_service=catalog_svc)
+        user_svc = _make_user_service(role=Role.CLIENT_B2B)
+        svc = BaseOrderService(
+            uow=uow,
+            catalog_service=catalog_svc,
+            user_service=user_svc,
+        )
         dto = OrderCreate(
             items=[Item(product_id=product.id, quantity=2)],
             payment_method=PaymentMethod.CONTRACT,
@@ -707,7 +794,6 @@ class TestReservedCreditAmount:
         await svc.create_order(
             client_id=uuid.uuid4(),
             dto=dto,
-            client_role=Role.CLIENT_B2B,
         )
 
         order_add_call = uow.orders.add.call_args[0][0]
@@ -720,7 +806,12 @@ class TestReservedCreditAmount:
         uow = _make_fake_uow(contract=None)
         catalog_svc = _make_catalog_service([product])
 
-        svc = BaseOrderService(uow=uow, catalog_service=catalog_svc)
+        user_svc = _make_user_service()
+        svc = BaseOrderService(
+            uow=uow,
+            catalog_service=catalog_svc,
+            user_service=user_svc,
+        )
         dto = OrderCreate(
             items=[Item(product_id=product.id, quantity=1)],
             payment_method=PaymentMethod.CASH,
@@ -730,7 +821,6 @@ class TestReservedCreditAmount:
         await svc.create_order(
             client_id=uuid.uuid4(),
             dto=dto,
-            client_role=Role.CLIENT_B2C,
         )
 
         order_add_call = uow.orders.add.call_args[0][0]

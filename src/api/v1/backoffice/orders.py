@@ -27,7 +27,6 @@ from src.modules.orders.schemas import (
     WarehouseSaleCreate,
 )
 from src.modules.orders.services import BaseOrderService
-from src.modules.users.enums import Role
 
 orders_router = APIRouter()
 
@@ -132,22 +131,11 @@ async def create_order(
     order_service: Annotated[
         BaseOrderService, Depends(get_base_order_service)
     ],
-    client_role: Annotated[
-        Role,
-        Query(
-            alias="clientRole",
-            description=(
-                "Роль клиента (client_b2b/client_b2c). "
-                "Для B2B с CONTRACT обязательно"
-            ),
-        ),
-    ] = Role.CLIENT_B2C,
 ):
     """Создание заказа администратором от лица клиента."""
     return await order_service.create_order(
         client_id=client_id,
         dto=dto,
-        client_role=client_role,
     )
 
 
@@ -421,9 +409,7 @@ async def run_expire_stale_orders_job(
         User,
         Security(get_current_user, scopes=[Scope.ORDERS_EDIT]),
     ],
-    service: Annotated[
-        BaseOrderService, Depends(get_base_order_service)
-    ],
+    service: Annotated[BaseOrderService, Depends(get_base_order_service)],
     max_age_hours: Annotated[
         int, Query(ge=1, le=720, alias="maxAgeHours")
     ] = 48,

@@ -52,6 +52,18 @@ class UserService(BaseService[User, UserAdminCreate, UserUnitOfWork]):
     def _identity_repo(self) -> IdentityRepository:
         return self.uow.identities
 
+    async def get_client(self, client_id: uuid.UUID) -> User:
+        """Получить клиента по ID.
+
+        Проверяет, что пользователь существует, активен
+        и имеет роль CLIENT_B2B или CLIENT_B2C.
+        """
+        async with self.uow:
+            client = await self.uow.users.get_client_by_id(client_id)
+            if not client:
+                raise UserNotFoundError(user_id=client_id)
+            return client
+
     async def _ensure_courier_account(self, user: User) -> bool:
         if user.role != Role.COURIER:
             return False

@@ -50,6 +50,7 @@ from src.modules.orders.schemas import (
 )
 from src.modules.orders.uow import BaseOrderUnitOfWork
 from src.modules.users.enums import Role
+from src.modules.users.services import UserService
 
 
 class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
@@ -73,10 +74,14 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
     }
 
     def __init__(
-        self, uow: BaseOrderUnitOfWork, catalog_service: CatalogService
+        self,
+        uow: BaseOrderUnitOfWork,
+        catalog_service: CatalogService,
+        user_service: UserService,
     ):
         super().__init__(uow=uow)
         self.catalog_service = catalog_service
+        self.user_service = user_service
 
     @property
     def _repo(self) -> OrderRepository:
@@ -152,7 +157,6 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
         self,
         client_id: uuid.UUID,
         dto: OrderCreate,
-        client_role: Role = Role.CLIENT_B2C,
     ) -> Order:
         """
         Процесс Checkout'а.
@@ -186,6 +190,9 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
         if missing_ids:
             raise ProductsUnavailableError(missing_product_ids=missing_ids)
 
+        # 1.2 Получаем клиента из БД (собственный UoW UserService)
+        client = await self.user_service.get_client(client_id)
+
         # 1.1 Товары, требующие возврата тары
         dto_map = {i.product_id: i for i in dto.items}
         exchange_items = [
@@ -207,7 +214,7 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
             if dto.payment_method == PaymentMethod.CONTRACT:
                 contract = await self._get_and_validate_contract_locked(
                     client_id=client_id,
-                    client_role=client_role,
+                    client_role=client.role,
                 )
                 # Переопределяем каталожные цены договорными ценами
                 contract_prices = (
@@ -1651,8 +1658,7 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
                     current_status=order.status,
                     expected_status=OrderStatus.NEW,
                     message=(
-                        "Клиент может отменить заказ "
-                        "только в статусе NEW"
+                        "Клиент может отменить заказ только в статусе NEW"
                     ),
                 )
         return await self.update_status(
@@ -1743,19 +1749,15 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
         """
         cancelled = 0
 
-        batches: list[
-            tuple[OrderStatus, datetime, str]
-        ] = [
+        batches: list[tuple[OrderStatus, datetime, str]] = [
             (
                 OrderStatus.NEW,
                 datetime.now(UTC) - timedelta(hours=max_age_hours),
-                f"Авто-отмена: заказ не обработан"
-                f" за {max_age_hours}ч",
+                f"Авто-отмена: заказ не обработан за {max_age_hours}ч",
             ),
             (
                 OrderStatus.ASSIGNED,
-                datetime.now(UTC)
-                - timedelta(hours=assigned_max_age_hours),
+                datetime.now(UTC) - timedelta(hours=assigned_max_age_hours),
                 f"Авто-отмена: заказ не доставлен"
                 f" за {assigned_max_age_hours}ч",
             ),
@@ -1766,17 +1768,14 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
                 stale = await self.uow.orders.get_stale_orders(
                     older_than=cutoff,
                     status=status,
-                    by_updated=(
-                        status != OrderStatus.NEW
-                    ),
+                    by_updated=(status != OrderStatus.NEW),
                 )
                 for order in stale:
                     await self.uow.orders.update_status(
                         order.id, OrderStatus.CANCELLED
                     )
                     if (
-                        order.payment_method
-                        == PaymentMethod.CONTRACT
+                        order.payment_method == PaymentMethod.CONTRACT
                         and order.contract_id is not None
                         and order.reserved_credit_amount
                     ):
