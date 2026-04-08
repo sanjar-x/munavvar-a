@@ -36,7 +36,7 @@ class IClientUnitOfWork(IUnitOfWork):
 
 
 class ClientUnitOfWork(BaseSQLAlchemyUoW, IClientUnitOfWork):
-    async def __aenter__(self) -> "ClientUnitOfWork":
+    async def __aenter__(self) -> ClientUnitOfWork:
         await super().__aenter__()
         self.products = ProductRepository(session=self.session)
         self.identities = IdentityRepository(session=self.session)

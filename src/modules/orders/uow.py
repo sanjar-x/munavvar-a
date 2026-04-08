@@ -32,7 +32,7 @@ class BaseOrderUnitOfWork(BaseSQLAlchemyUoW):
     financial_transactions: FinancialTransactionRepository
     contracts: ContractRepository
 
-    async def __aenter__(self) -> "BaseOrderUnitOfWork":
+    async def __aenter__(self) -> BaseOrderUnitOfWork:
         await super().__aenter__()
 
         self.orders = OrderRepository(session=self.session)

@@ -46,6 +46,7 @@ ignore = [
     "N818",   # AppException base class intentionally named with *Exception suffix
     "N805",   # `cls` in declared_attr.directive — SQLAlchemy false positive
     "RET504", # Assignment before return — improves readability / debuggability
+    "C901",
 ]
 unfixable = [
     "F841", # Local variable assigned but never used — dev should review, not auto-remove

@@ -83,7 +83,7 @@ class ContractResponse(BaseModel):
 class ContractDetailResponse(ContractResponse):
     """Расширенный ответ с прайс-листом."""
 
-    price_items: list["PriceItemResponse"] = []
+    price_items: list[PriceItemResponse] = []
 
 
 # ─── PRICE ITEM SCHEMAS ───────────────────────────────────────────

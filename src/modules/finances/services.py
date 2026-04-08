@@ -1,6 +1,6 @@
 # src/modules/finances/services.py
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 
 from sqlalchemy import text
 
@@ -305,7 +305,7 @@ class BillingService:
             if not account:
                 raise AccountNotFoundError(account_id=account_id)
 
-            now = datetime.now()
+            now = datetime.now(tz=UTC)
             if date_from is None:
                 date_from = now.replace(
                     day=1,

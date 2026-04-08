@@ -17,7 +17,7 @@ class IInventoryUnitOfWork(IUnitOfWork):
 
 
 class InventoryUnitOfWork(BaseSQLAlchemyUoW, IInventoryUnitOfWork):
-    async def __aenter__(self) -> "InventoryUnitOfWork":
+    async def __aenter__(self) -> InventoryUnitOfWork:
         await super().__aenter__()
 
         self.inventories = InventoryRepository(session=self.session)

@@ -25,7 +25,7 @@ class IUserUnitOfWork(IUnitOfWork):
 
 # 2. Доменная реализация (Связывает инфраструктуру и домен)
 class UserUnitOfWork(BaseSQLAlchemyUoW, IUserUnitOfWork):
-    async def __aenter__(self) -> "UserUnitOfWork":
+    async def __aenter__(self) -> UserUnitOfWork:
         await super().__aenter__()
 
         self.users = UserRepository(session=self.session)

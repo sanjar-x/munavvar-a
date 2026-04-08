@@ -1,6 +1,6 @@
 import uuid
 from collections.abc import Sequence
-from datetime import datetime
+from datetime import UTC, datetime
 
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -453,7 +453,7 @@ class TransactionRepository(BaseRepository[Transaction]):
         account_id: uuid.UUID,
     ) -> Sequence[Transaction]:
         """Все COMPLETED-транзакции за сегодня для счета."""
-        today_start = datetime.now().replace(
+        today_start = datetime.now(tz=UTC).replace(
             hour=0,
             minute=0,
             second=0,

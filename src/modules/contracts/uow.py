@@ -27,7 +27,7 @@ class IContractUnitOfWork(IUnitOfWork):
 
 
 class ContractUnitOfWork(BaseSQLAlchemyUoW, IContractUnitOfWork):
-    async def __aenter__(self) -> "ContractUnitOfWork":
+    async def __aenter__(self) -> ContractUnitOfWork:
         await super().__aenter__()
         self.contracts = ContractRepository(session=self.session)
         self.price_items = ContractPriceItemRepository(session=self.session)

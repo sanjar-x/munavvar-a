@@ -301,6 +301,7 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
                     "client_id": client_id,
                     "client_inventory_id": dto.client_inventory_id,
                     "payment_method": dto.payment_method,
+                    "sale_type": SaleType.DELIVERY,
                     "status": OrderStatus.NEW,
                     "total_amount": total_amount,
                     "capitalization_applied": capitalization_applied,
@@ -1206,7 +1207,11 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
             )
 
         # 5. Cleanup: списание товара с Walk-in inventory
-        # Анонимный покупатель забрал товар и ушёл — обнуляем его inventory
+        # Анонимный покупатель забрал товар и ушёл — обнуляем его inventory.
+        # Тара включается в cleanup: в шаге 2 из VENDOR была выдана новая тара
+        # (полная бутыль), которую анонимный покупатель забрал. Она списывается
+        # в VIRTUAL_LOSS. Старая тара (из create_warehouse_sale) уже
+        # возвращена на склад в шаге 3.
         if order.client_id == WALKIN_USER_ID:
             loss_inv = await self.uow.inventories.get_loss_inventory()
             cleanup_items = [
@@ -1415,7 +1420,9 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
                 order.contract_id, order.total_amount
             )
 
-    async def check_tara_availability(self, dto: TaraCheckRequest) -> dict:
+    async def check_tara_availability(
+        self, dto: TaraCheckRequest, client_id: uuid.UUID | None = None
+    ) -> dict:
         """
         Предварительная проверка тары перед оформлением заказа.
         Возвращает can_order и список нехваток.
@@ -1439,6 +1446,17 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
             if not inventory:
                 raise ClientInventoryNotFoundError(
                     inventory_id=dto.client_inventory_id
+                )
+
+            if client_id is not None and inventory.user_id != client_id:
+                from src.core.exceptions import ForbiddenError
+
+                raise ForbiddenError(
+                    message=("У вас нет доступа к данному складу клиента"),
+                    error_code="INVENTORY_ACCESS_DENIED",
+                    details={
+                        "client_inventory_id": str(dto.client_inventory_id)
+                    },
                 )
 
             balances = {b.product_id: b.quantity for b in inventory.balances}
@@ -1496,6 +1514,21 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
         min_amount: int | None = None,
         max_amount: int | None = None,
     ) -> tuple[list[Order], int]:
+        if (
+            date_from is not None
+            and date_to is not None
+            and date_from > date_to
+        ):
+            raise BadRequestError(
+                message=(
+                    "Дата начала периода не может быть позже даты окончания"
+                ),
+                error_code="INVALID_DATE_RANGE",
+                details={
+                    "date_from": date_from.isoformat(),
+                    "date_to": date_to.isoformat(),
+                },
+            )
         async with self.uow:
             orders, total = await self.uow.orders.search_orders(
                 skip=skip,

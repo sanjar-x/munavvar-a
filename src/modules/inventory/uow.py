@@ -25,7 +25,7 @@ class IInventoryUnitOfWork(IUnitOfWork):
 
 # 2. Доменная реализация (DomainSQLAlchemyUoW)
 class InventoryUnitOfWork(BaseSQLAlchemyUoW, IInventoryUnitOfWork):
-    async def __aenter__(self) -> "InventoryUnitOfWork":
+    async def __aenter__(self) -> InventoryUnitOfWork:
         # Вызываем __aenter__ базового класса,
         # чтобы инициализировать self.session
         await super().__aenter__()

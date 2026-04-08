@@ -33,7 +33,7 @@ class IOrderUnitOfWork(IUnitOfWork):
 
 
 class OrderUnitOfWork(BaseSQLAlchemyUoW, IOrderUnitOfWork):
-    async def __aenter__(self) -> "OrderUnitOfWork":
+    async def __aenter__(self) -> OrderUnitOfWork:
         await super().__aenter__()
         self.products = ProductRepository(session=self.session)
         self.accounts = AccountRepository(session=self.session)

@@ -11,7 +11,6 @@ from src.api.v1.backoffice.finances import finances_router
 from src.api.v1.backoffice.inventories import inventories_router
 from src.api.v1.backoffice.orders import orders_router
 from src.api.v1.backoffice.profile import profile_router
-from src.api.v1.backoffice.shifts import shifts_router
 from src.api.v1.backoffice.system import system_router
 from src.api.v1.backoffice.transfers import transfers_router
 from src.api.v1.backoffice.transport import transport_router
@@ -56,9 +55,6 @@ backoffice.include_router(
     finances_router,
     prefix="/finances",
     tags=["Backoffice | Finances"],
-)
-backoffice.include_router(
-    shifts_router, prefix="/shifts", tags=["Backoffice | Shifts"]
 )
 backoffice.include_router(
     dashboard_router,

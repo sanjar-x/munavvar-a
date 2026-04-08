@@ -23,7 +23,7 @@ class BaseSQLAlchemyUoW(IUnitOfWork):
             )
         return self._session
 
-    async def __aenter__(self) -> "BaseSQLAlchemyUoW":
+    async def __aenter__(self) -> BaseSQLAlchemyUoW:
         self._session = self._session_factory()
         return self
 

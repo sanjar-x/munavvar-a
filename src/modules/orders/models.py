@@ -114,25 +114,25 @@ class Order(BaseModel):
             "договор с привязанными заказами."
         ),
     )
-    client: Mapped["User"] = relationship(
+    client: Mapped[User] = relationship(
         foreign_keys=[client_id],
         back_populates="client_orders",
     )
-    client_inventory: Mapped["Inventory"] = relationship(
+    client_inventory: Mapped[Inventory] = relationship(
         foreign_keys=[client_inventory_id]
     )
-    warehouse: Mapped["Inventory | None"] = relationship(
+    warehouse: Mapped[Inventory | None] = relationship(
         foreign_keys=[warehouse_id],
     )
-    courier: Mapped["User | None"] = relationship(
+    courier: Mapped[User | None] = relationship(
         foreign_keys=[courier_id],
         back_populates="courier_orders",
     )
-    items: Mapped[list["OrderItem"]] = relationship(
+    items: Mapped[list[OrderItem]] = relationship(
         back_populates="order", cascade="all, delete-orphan"
     )
 
-    stock_transfers: Mapped[list["StockTransfer"]] = relationship(
+    stock_transfers: Mapped[list[StockTransfer]] = relationship(
         "StockTransfer",
         back_populates="order",
         # No cascade: StockTransfer.order_id is RESTRICT — stock ledger
@@ -140,7 +140,7 @@ class Order(BaseModel):
         passive_deletes=True,
         lazy="raise",
     )
-    transactions: Mapped[list["Transaction"]] = relationship(
+    transactions: Mapped[list[Transaction]] = relationship(
         "Transaction",
         back_populates="order",
         # No cascade: financial ledger is append-only; transactions
@@ -148,7 +148,7 @@ class Order(BaseModel):
         passive_deletes=True,
         lazy="raise",
     )
-    contract: Mapped["Contract | None"] = relationship(
+    contract: Mapped[Contract | None] = relationship(
         foreign_keys=[contract_id],
         back_populates="orders",
         lazy="raise",
@@ -188,8 +188,8 @@ class OrderItem(BaseModel):
         return self.quantity * self.unit_price
 
     # --- Связи ---
-    order: Mapped["Order"] = relationship(back_populates="items")
-    product: Mapped["Product"] = relationship()
+    order: Mapped[Order] = relationship(back_populates="items")
+    product: Mapped[Product] = relationship()
 
     __table_args__ = (
         CheckConstraint("quantity > 0", name="ck_order_item_quantity_pos"),

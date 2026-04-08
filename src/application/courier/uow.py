@@ -26,7 +26,7 @@ class ICourierUnitOfWork(IUnitOfWork):
 
 
 class CourierUnitOfWork(BaseSQLAlchemyUoW, ICourierUnitOfWork):
-    async def __aenter__(self) -> "CourierUnitOfWork":
+    async def __aenter__(self) -> CourierUnitOfWork:
         await super().__aenter__()
         self.products = ProductRepository(session=self.session)
         self.identities = IdentityRepository(session=self.session)
