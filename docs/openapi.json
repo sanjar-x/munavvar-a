@@ -7232,13 +7232,6 @@
             "minLength": 9,
             "title": "Inn"
           },
-          "legal_address": {
-            "anyOf": [
-              { "type": "string", "maxLength": 500 },
-              { "type": "null" }
-            ],
-            "title": "Legal Address"
-          },
           "notes": {
             "anyOf": [
               { "type": "string", "maxLength": 2000 },
@@ -7281,10 +7274,6 @@
           },
           "legal_name": { "type": "string", "title": "Legal Name" },
           "inn": { "type": "string", "title": "Inn" },
-          "legal_address": {
-            "anyOf": [{ "type": "string" }, { "type": "null" }],
-            "title": "Legal Address"
-          },
           "notes": {
             "anyOf": [{ "type": "string" }, { "type": "null" }],
             "title": "Notes"
@@ -7356,7 +7345,6 @@
           "payment_due_days",
           "legal_name",
           "inn",
-          "legal_address",
           "notes",
           "signed_at",
           "signed_by_id",
@@ -7401,10 +7389,6 @@
           },
           "legal_name": { "type": "string", "title": "Legal Name" },
           "inn": { "type": "string", "title": "Inn" },
-          "legal_address": {
-            "anyOf": [{ "type": "string" }, { "type": "null" }],
-            "title": "Legal Address"
-          },
           "notes": {
             "anyOf": [{ "type": "string" }, { "type": "null" }],
             "title": "Notes"
@@ -7470,7 +7454,6 @@
           "payment_due_days",
           "legal_name",
           "inn",
-          "legal_address",
           "notes",
           "signed_at",
           "signed_by_id",
@@ -7582,2935 +7565,2843 @@
             ],
             "title": "End Date"
           },
-          "legal_address": {
-            "anyOf": [
-              { "type": "string", "maxLength": 500 },
-              { "type": "null" }
-            ],
-            "title": "Legal Address"
-          },
-            "title": "Bank Name"
-          },
-          "notes": {
-            "anyOf": [
-              { "type": "string", "maxLength": 2000 },
-              { "type": "null" }
-            ],
-            "title": "Notes"
-          }
-        },
-        "type": "object",
-        "title": "ContractUpdate",
-        "description": "Частичное обновление условий договора (только DRAFT/ACTIVE)."
-      },
-      "CourierBalanceResponse": {
-        "properties": {
-          "account_id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Account Id"
-          },
-          "balance": { "type": "integer", "title": "Balance" },
-          "today_collected": { "type": "integer", "title": "Today Collected" },
-          "today_deposited": { "type": "integer", "title": "Today Deposited" },
-          "transactions_today": {
-            "items": { "$ref": "#/components/schemas/CourierTransactionEntry" },
-            "type": "array",
-            "title": "Transactions Today"
-          }
-        },
-        "type": "object",
-        "required": [
-          "account_id",
-          "balance",
-          "today_collected",
-          "today_deposited",
-          "transactions_today"
-        ],
-        "title": "CourierBalanceResponse"
-      },
-      "CourierCreate": {
-        "properties": {
-          "username": {
-            "type": "string",
-            "title": "Username",
-            "description": "ФИО курьера"
-          },
-          "phone": {
-            "type": "string",
-            "title": "Phone",
-            "description": "Номер телефона курьера (будет Identity)"
-          },
-          "password": {
-            "type": "string",
-            "minLength": 8,
-            "title": "Password",
-            "description": "Пароль курьера (минимум 8 символов, будет захэширован)"
-          }
-        },
-        "type": "object",
-        "required": ["username", "phone", "password"],
-        "title": "CourierCreate"
-      },
-      "CourierDayLoad": {
-        "properties": {
-          "date": { "type": "string", "title": "Date" },
-          "courier_id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Courier Id"
-          },
-          "courier_name": { "type": "string", "title": "Courier Name" },
-          "deliveries_count": { "type": "integer", "title": "Deliveries Count" }
-        },
-        "type": "object",
-        "required": ["date", "courier_id", "courier_name", "deliveries_count"],
-        "title": "CourierDayLoad"
-      },
-      "CourierFinanceSummary": {
-        "properties": {
-          "courier_id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Courier Id"
-          },
-          "courier_name": { "type": "string", "title": "Courier Name" },
-          "account_id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Account Id"
-          },
-          "cash_balance": { "type": "integer", "title": "Cash Balance" },
-          "today_collected": { "type": "integer", "title": "Today Collected" },
-          "today_deposited": { "type": "integer", "title": "Today Deposited" },
-          "pending_deposit": { "type": "integer", "title": "Pending Deposit" }
-        },
-        "type": "object",
-        "required": [
-          "courier_id",
-          "courier_name",
-          "account_id",
-          "cash_balance",
-          "today_collected",
-          "today_deposited",
-          "pending_deposit"
-        ],
-        "title": "CourierFinanceSummary"
-      },
-      "CourierFleetCard": {
-        "properties": {
-          "courier_id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Courier Id"
-          },
-          "courier_name": { "type": "string", "title": "Courier Name" },
-          "vehicle_id": {
-            "anyOf": [
-              { "type": "string", "format": "uuid" },
-              { "type": "null" }
-            ],
-            "title": "Vehicle Id"
-          },
-          "vehicle_name": {
-            "anyOf": [{ "type": "string" }, { "type": "null" }],
-            "title": "Vehicle Name"
-          },
-          "is_active": {
-            "type": "boolean",
-            "title": "Is Active",
-            "description": "Есть ли активный транспорт"
-          },
-          "vehicle_balances": {
-            "items": { "$ref": "#/components/schemas/CourierVehicleBalance" },
-            "type": "array",
-            "title": "Vehicle Balances"
-          },
-          "orders_assigned_today": {
-            "type": "integer",
-            "title": "Orders Assigned Today",
-            "default": 0
-          },
-          "orders_delivered_today": {
-            "type": "integer",
-            "title": "Orders Delivered Today",
-            "default": 0
-          },
-          "cash_balance": {
-            "type": "integer",
-            "title": "Cash Balance",
-            "description": "сум — баланс кассы курьера",
-            "default": 0
-          },
-          "cash_collected_today": {
-            "type": "integer",
-            "title": "Cash Collected Today",
-            "description": "сум — собрано за сегодня",
-            "default": 0
-          },
-          "containers_collected_today": {
-            "type": "integer",
-            "title": "Containers Collected Today",
-            "description": "Тара, собранная у клиентов сегодня",
-            "default": 0
-          }
-        },
-        "type": "object",
-        "required": ["courier_id", "courier_name", "is_active"],
-        "title": "CourierFleetCard",
-        "description": "Карточка одного курьера."
-      },
-      "CourierFleetResponse": {
-        "properties": {
-          "couriers": {
-            "items": { "$ref": "#/components/schemas/CourierFleetCard" },
-            "type": "array",
-            "title": "Couriers"
-          },
-          "total_active": { "type": "integer", "title": "Total Active" },
-          "total_stock_on_couriers": {
-            "type": "integer",
-            "title": "Total Stock On Couriers"
-          },
-          "total_courier_cash": {
-            "type": "integer",
-            "title": "Total Courier Cash",
-            "description": "сум"
-          }
-        },
-        "type": "object",
-        "required": [
-          "couriers",
-          "total_active",
-          "total_stock_on_couriers",
-          "total_courier_cash"
-        ],
-        "title": "CourierFleetResponse",
-        "description": "EP-17: Карточки всех курьеров."
-      },
-      "CourierInventoryWithBalancesDTO": {
-        "properties": {
-          "id": { "type": "string", "format": "uuid", "title": "Id" },
-          "name": { "type": "string", "title": "Name" },
-          "balances": {
-            "items": { "$ref": "#/components/schemas/BalanceResponse" },
-            "type": "array",
-            "title": "Balances"
-          }
-        },
-        "type": "object",
-        "required": ["id", "name", "balances"],
-        "title": "CourierInventoryWithBalancesDTO"
-      },
-      "CourierLoadResponse": {
-        "properties": {
-          "data": {
-            "items": { "$ref": "#/components/schemas/CourierDayLoad" },
-            "type": "array",
-            "title": "Data"
-          },
-          "total_deliveries": {
-            "type": "integer",
-            "title": "Total Deliveries"
-          },
-          "avg_per_courier": { "type": "number", "title": "Avg Per Courier" },
-          "max_load": { "type": "integer", "title": "Max Load" }
-        },
-        "type": "object",
-        "required": ["data", "total_deliveries", "avg_per_courier", "max_load"],
-        "title": "CourierLoadResponse",
-        "description": "EP-20: Загрузка курьеров по дням."
-      },
-      "CourierOrderDTO": {
-        "properties": {
-          "id": { "type": "string", "format": "uuid", "title": "Id" },
-          "status": { "$ref": "#/components/schemas/OrderStatus" },
-          "payment_method": { "$ref": "#/components/schemas/PaymentMethod" },
-          "sale_type": { "$ref": "#/components/schemas/SaleType" },
-          "total_amount": { "type": "integer", "title": "Total Amount" },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Created At"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "status",
-          "payment_method",
-          "sale_type",
-          "total_amount",
-          "created_at"
-        ],
-        "title": "CourierOrderDTO",
-        "description": "Заказ в карточке курьера"
-      },
-      "CourierResponse": {
-        "properties": {
-          "id": { "type": "string", "format": "uuid", "title": "Id" },
-          "username": { "type": "string", "title": "Username" },
-          "phone": {
-            "anyOf": [{ "type": "string" }, { "type": "null" }],
-            "title": "Phone"
-          },
-          "is_active": { "type": "boolean", "title": "Is Active" },
-          "account": {
-            "anyOf": [
-              { "$ref": "#/components/schemas/AccountShortDTO" },
-              { "type": "null" }
-            ]
-          },
-          "inventory": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/CourierInventoryWithBalancesDTO"
-              },
-              { "type": "null" }
-            ]
-          },
-          "orders": {
-            "items": { "$ref": "#/components/schemas/CourierOrderDTO" },
-            "type": "array",
-            "title": "Orders"
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Created At"
-          },
-          "updated_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Updated At"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "username",
-          "phone",
-          "is_active",
-          "account",
-          "inventory",
-          "orders",
-          "created_at",
-          "updated_at"
-        ],
-        "title": "CourierResponse",
-        "description": "Полная карточка курьера для детального просмотра"
-      },
-      "CourierTransactionEntry": {
-        "properties": {
-          "direction": { "type": "string", "title": "Direction" },
-          "amount": { "type": "integer", "title": "Amount" },
-          "reason": { "type": "string", "title": "Reason" },
-          "order_id": {
-            "anyOf": [
-              { "type": "string", "format": "uuid" },
-              { "type": "null" }
-            ],
-            "title": "Order Id"
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Created At"
-          }
-        },
-        "type": "object",
-        "required": ["direction", "amount", "reason", "order_id", "created_at"],
-        "title": "CourierTransactionEntry"
-      },
-      "CourierVehicleBalance": {
-        "properties": {
-          "product_id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Product Id"
-          },
-          "product_name": { "type": "string", "title": "Product Name" },
-          "quantity": { "type": "integer", "title": "Quantity" }
-        },
-        "type": "object",
-        "required": ["product_id", "product_name", "quantity"],
-        "title": "CourierVehicleBalance"
-      },
-      "CouriersResponse": {
-        "properties": {
-          "total_count": { "type": "integer", "title": "Total Count" },
-          "couriers": {
-            "items": {
-              "$ref": "#/components/schemas/src__application__courier__schemas__Courier"
-            },
-            "type": "array",
-            "title": "Couriers"
-          }
-        },
-        "type": "object",
-        "required": ["total_count", "couriers"],
-        "title": "CouriersResponse",
-        "description": "Схема ответа для эндпоинта списка курьеров с пагинацией"
-      },
-      "CouriersSummaryResponse": {
-        "properties": {
-          "couriers": {
-            "items": { "$ref": "#/components/schemas/CourierFinanceSummary" },
-            "type": "array",
-            "title": "Couriers"
-          },
-          "total_courier_cash": {
-            "type": "integer",
-            "title": "Total Courier Cash"
-          },
-          "total_pending_deposit": {
-            "type": "integer",
-            "title": "Total Pending Deposit"
-          }
-        },
-        "type": "object",
-        "required": ["couriers", "total_courier_cash", "total_pending_deposit"],
-        "title": "CouriersSummaryResponse"
-      },
-      "CreateTransferRequest": {
-        "properties": {
-          "type": { "$ref": "#/components/schemas/TransferType" },
-          "from_id": {
-            "anyOf": [
-              { "type": "string", "format": "uuid" },
-              { "type": "null" }
-            ],
-            "title": "From Id",
-            "description": "ID склада-отправителя (авто для INVENTORY_FINDING, INITIAL_BALANCE)"
-          },
-          "to_id": {
-            "anyOf": [
-              { "type": "string", "format": "uuid" },
-              { "type": "null" }
-            ],
-            "title": "To Id",
-            "description": "ID склада-получателя (авто для LOSS_WRITE_OFF)"
-          },
-          "items": {
-            "items": {
-              "$ref": "#/components/schemas/src__modules__inventory__schemas__Item"
-            },
-            "type": "array",
-            "minItems": 1,
-            "title": "Items",
-            "description": "Список товаров"
-          },
-          "reason": {
-            "anyOf": [
-              { "type": "string", "maxLength": 255, "minLength": 3 },
-              { "type": "null" }
-            ],
-            "title": "Reason",
-            "description": "Причина списания (обязательно для LOSS_WRITE_OFF)"
-          },
-          "route_sheet_id": {
-            "anyOf": [
-              { "type": "string", "format": "uuid" },
-              { "type": "null" }
-            ],
-            "title": "Route Sheet Id",
-            "description": "ID маршрутного листа (для COURIER_LOAD)"
-          }
-        },
-        "type": "object",
-        "required": ["type", "items"],
-        "title": "CreateTransferRequest",
-        "description": "Единый запрос на создание и проведение накладной (single-step)."
-      },
-      "DashboardTotals": {
-        "properties": {
-          "total_revenue": { "type": "integer", "title": "Total Revenue" },
-          "total_cash_in_hand": {
-            "type": "integer",
-            "title": "Total Cash In Hand"
-          },
-          "total_card_pending": {
-            "type": "integer",
-            "title": "Total Card Pending"
-          },
-          "total_client_debt": {
-            "type": "integer",
-            "title": "Total Client Debt"
-          },
-          "total_courier_cash": {
-            "type": "integer",
-            "title": "Total Courier Cash"
-          },
-          "total_b2b_credit_used": {
-            "type": "integer",
-            "title": "Total B2B Credit Used",
-            "default": 0
-          },
-          "total_b2b_settled_debt": {
-            "type": "integer",
-            "title": "Total B2B Settled Debt",
-            "default": 0
-          }
-        },
-        "type": "object",
-        "required": [
-          "total_revenue",
-          "total_cash_in_hand",
-          "total_card_pending",
-          "total_client_debt",
-          "total_courier_cash"
-        ],
-        "title": "DashboardTotals"
-      },
-      "DebtAgingResponse": {
-        "properties": {
-          "buckets": {
-            "items": { "$ref": "#/components/schemas/AgingBucket" },
-            "type": "array",
-            "title": "Buckets"
-          },
-          "total_debt": { "type": "integer", "title": "Total Debt" },
-          "total_debtors": { "type": "integer", "title": "Total Debtors" }
-        },
-        "type": "object",
-        "required": ["buckets", "total_debt", "total_debtors"],
-        "title": "DebtAgingResponse",
-        "description": "EP-9: Aging-бакеты."
-      },
-      "FinanceDashboard": {
-        "properties": {
-          "system_accounts": {
-            "additionalProperties": {
-              "$ref": "#/components/schemas/SystemAccountSummary"
-            },
-            "type": "object",
-            "title": "System Accounts"
-          },
-          "totals": { "$ref": "#/components/schemas/DashboardTotals" },
-          "pending_transactions_count": {
-            "type": "integer",
-            "title": "Pending Transactions Count"
-          }
-        },
-        "type": "object",
-        "required": ["system_accounts", "totals", "pending_transactions_count"],
-        "title": "FinanceDashboard"
-      },
-      "FinanceSummaryKPIs": {
-        "properties": {
-          "avg_order_value": {
-            "type": "integer",
-            "title": "Avg Order Value",
-            "description": "сум (AOV)"
-          },
-          "total_orders": { "type": "integer", "title": "Total Orders" },
-          "total_revenue": {
-            "type": "integer",
-            "title": "Total Revenue",
-            "description": "сум"
-          },
-          "card_confirmation_rate": {
-            "type": "number",
-            "title": "Card Confirmation Rate",
-            "description": "0.0-1.0"
-          },
-          "card_rejection_rate": {
-            "type": "number",
-            "title": "Card Rejection Rate",
-            "description": "0.0-1.0"
-          },
-          "avg_card_confirmation_hours": {
-            "anyOf": [{ "type": "number" }, { "type": "null" }],
-            "title": "Avg Card Confirmation Hours"
-          },
-          "collection_rate": {
-            "type": "number",
-            "title": "Collection Rate",
-            "description": "0.0-1.0 сдано/собрано"
-          },
-          "overdue_debt_ratio": {
-            "type": "number",
-            "title": "Overdue Debt Ratio",
-            "description": "0.0-1.0 долг>7д / общий долг"
-          }
-        },
-        "type": "object",
-        "required": [
-          "avg_order_value",
-          "total_orders",
-          "total_revenue",
-          "card_confirmation_rate",
-          "card_rejection_rate",
-          "collection_rate",
-          "overdue_debt_ratio"
-        ],
-        "title": "FinanceSummaryKPIs",
-        "description": "EP-12: Расчётные финансовые метрики."
-      },
-      "HTTPValidationError": {
-        "properties": {
-          "detail": {
-            "items": { "$ref": "#/components/schemas/ValidationError" },
-            "type": "array",
-            "title": "Detail"
-          }
-        },
-        "type": "object",
-        "title": "HTTPValidationError"
-      },
-      "HeatmapCell": {
-        "properties": {
-          "day_of_week": {
-            "type": "integer",
-            "title": "Day Of Week",
-            "description": "1=Пн..7=Вс (ISO 8601)"
-          },
-          "hour": { "type": "integer", "title": "Hour", "description": "0-23" },
-          "count": { "type": "integer", "title": "Count" }
-        },
-        "type": "object",
-        "required": ["day_of_week", "hour", "count"],
-        "title": "HeatmapCell"
-      },
-      "Inventory": {
-        "properties": {
-          "id": { "type": "string", "format": "uuid", "title": "Id" },
-          "type": { "$ref": "#/components/schemas/InventoryType" },
-          "name": { "type": "string", "title": "Name" },
-          "balances": {
-            "items": { "$ref": "#/components/schemas/Balance" },
-            "type": "array",
-            "title": "Balances"
-          }
-        },
-        "type": "object",
-        "required": ["id", "type", "name", "balances"],
-        "title": "Inventory"
-      },
-      "InventoryCreate": {
-        "properties": {
-          "name": {
-            "type": "string",
-            "title": "Name",
-            "description": "Название склада/машины"
-          }
-        },
-        "type": "object",
-        "required": ["name"],
-        "title": "InventoryCreate"
-      },
-      "InventorySearchResult": {
-        "properties": {
-          "id": { "type": "string", "format": "uuid", "title": "Id" },
-          "name": { "type": "string", "title": "Name" },
-          "type": { "$ref": "#/components/schemas/InventoryType" },
-          "user_id": { "type": "string", "format": "uuid", "title": "User Id" }
-        },
-        "type": "object",
-        "required": ["id", "name", "type", "user_id"],
-        "title": "InventorySearchResult",
-        "description": "Краткое описание инвентаря для поиска (например, инвентарь клиента)."
-      },
-      "InventoryShortDTO": {
-        "properties": {
-          "id": { "type": "string", "format": "uuid", "title": "Id" },
-          "name": { "type": "string", "title": "Name" }
-        },
-        "type": "object",
-        "required": ["id", "name"],
-        "title": "InventoryShortDTO",
-        "description": "Схема для сериализации инвентаря (машины)"
-      },
-      "InventoryShortResponse": {
-        "properties": {
-          "id": { "type": "string", "format": "uuid", "title": "Id" },
-          "name": { "type": "string", "title": "Name" },
-          "type": { "$ref": "#/components/schemas/InventoryType" }
-        },
-        "type": "object",
-        "required": ["id", "name", "type"],
-        "title": "InventoryShortResponse",
-        "description": "Краткое описание склада/инвентаря для вложения в накладную."
-      },
-      "InventorySummary": {
-        "properties": {
-          "total_water_stock": {
-            "type": "integer",
-            "title": "Total Water Stock",
-            "description": "Полные бутыли на складах + курьерах"
-          },
-          "total_container_stock": {
-            "type": "integer",
-            "title": "Total Container Stock",
-            "description": "Пустые бутыли на складах + курьерах"
-          },
-          "total_equipment_stock": {
-            "type": "integer",
-            "title": "Total Equipment Stock",
-            "description": "Оборудование на складах + курьерах"
-          },
-          "containers_at_clients": {
-            "type": "integer",
-            "title": "Containers At Clients",
-            "description": "Тара у клиентов"
-          },
-          "stock_on_couriers": {
-            "type": "integer",
-            "title": "Stock On Couriers",
-            "description": "Всего единиц товара на курьерах"
-          },
-          "losses_today": {
-            "type": "integer",
-            "title": "Losses Today",
-            "description": "Списания за сегодня (единиц)"
-          },
-          "active_couriers_count": {
-            "type": "integer",
-            "title": "Active Couriers Count"
-          }
-        },
-        "type": "object",
-        "required": [
-          "total_water_stock",
-          "total_container_stock",
-          "total_equipment_stock",
-          "containers_at_clients",
-          "stock_on_couriers",
-          "losses_today",
-          "active_couriers_count"
-        ],
-        "title": "InventorySummary",
-        "description": "EP-13: Агрегированные KPI по складскому учёту."
-      },
-      "InventoryTrendPoint": {
-        "properties": {
-          "date": { "type": "string", "title": "Date" },
-          "water_stock": { "type": "integer", "title": "Water Stock" },
-          "container_stock": { "type": "integer", "title": "Container Stock" },
-          "containers_at_clients": {
-            "type": "integer",
-            "title": "Containers At Clients"
-          }
-        },
-        "type": "object",
-        "required": [
-          "date",
-          "water_stock",
-          "container_stock",
-          "containers_at_clients"
-        ],
-        "title": "InventoryTrendPoint"
-      },
-      "InventoryTrendResponse": {
-        "properties": {
-          "points": {
-            "items": { "$ref": "#/components/schemas/InventoryTrendPoint" },
-            "type": "array",
-            "title": "Points"
-          }
-        },
-        "type": "object",
-        "required": ["points"],
-        "title": "InventoryTrendResponse",
-        "description": "EP-18: Временной ряд остатков."
-      },
-      "InventoryType": {
-        "type": "string",
-        "enum": [
-          "WAREHOUSE",
-          "COURIER",
-          "CLIENT",
-          "VIRTUAL_LOSS",
-          "VIRTUAL_VENDOR"
-        ],
-        "title": "InventoryType"
-      },
-      "InvoiceGenerateRequest": {
-        "properties": {
-          "period_from": {
-            "type": "string",
-            "format": "date",
-            "title": "Period From"
-          },
-          "period_to": {
-            "type": "string",
-            "format": "date",
-            "title": "Period To"
-          }
-        },
-        "type": "object",
-        "required": ["period_from", "period_to"],
-        "title": "InvoiceGenerateRequest"
-      },
-      "InvoiceResponse": {
-        "properties": {
-          "id": { "type": "string", "format": "uuid", "title": "Id" },
-          "contract_id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Contract Id"
-          },
-          "number": { "type": "string", "title": "Number" },
-          "status": { "$ref": "#/components/schemas/InvoiceStatus" },
-          "period_from": {
-            "type": "string",
-            "format": "date",
-            "title": "Period From"
-          },
-          "period_to": {
-            "type": "string",
-            "format": "date",
-            "title": "Period To"
-          },
-          "amount": { "type": "integer", "title": "Amount" },
-          "due_date": {
-            "anyOf": [
-              { "type": "string", "format": "date" },
-              { "type": "null" }
-            ],
-            "title": "Due Date"
-          },
-          "issued_at": {
-            "anyOf": [
-              { "type": "string", "format": "date-time" },
-              { "type": "null" }
-            ],
-            "title": "Issued At"
-          },
-          "paid_at": {
-            "anyOf": [
-              { "type": "string", "format": "date-time" },
-              { "type": "null" }
-            ],
-            "title": "Paid At"
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Created At"
-          },
-          "updated_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Updated At"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "contract_id",
-          "number",
-          "status",
-          "period_from",
-          "period_to",
-          "amount",
-          "due_date",
-          "issued_at",
-          "paid_at",
-          "created_at",
-          "updated_at"
-        ],
-        "title": "InvoiceResponse"
-      },
-      "InvoiceStatus": {
-        "type": "string",
-        "enum": [
-          "draft",
-          "issued",
-          "partially_paid",
-          "paid",
-          "overdue",
-          "cancelled"
-        ],
-        "title": "InvoiceStatus"
-      },
-      "Item-Output": {
-        "properties": {
-          "quantity": { "type": "integer", "title": "Quantity" },
-          "unit_price": { "type": "integer", "title": "Unit Price" },
-          "product": { "$ref": "#/components/schemas/Product" },
-          "subtotal": {
-            "type": "integer",
-            "title": "Subtotal",
-            "readOnly": true
-          }
-        },
-        "type": "object",
-        "required": ["quantity", "unit_price", "product", "subtotal"],
-        "title": "Item"
-      },
-      "JobResponse": {
-        "properties": { "updated": { "type": "integer", "title": "Updated" } },
-        "type": "object",
-        "required": ["updated"],
-        "title": "JobResponse"
-      },
-      "LocalLogin": {
-        "properties": {
-          "phone": { "type": "string", "title": "Phone" },
-          "password": {
-            "type": "string",
-            "minLength": 1,
-            "title": "Password",
-            "description": "Пароль пользователя"
-          }
-        },
-        "type": "object",
-        "required": ["phone", "password"],
-        "title": "LocalLogin"
-      },
-      "LossTrendPoint": {
-        "properties": {
-          "date": { "type": "string", "title": "Date" },
-          "quantity": { "type": "integer", "title": "Quantity" }
-        },
-        "type": "object",
-        "required": ["date", "quantity"],
-        "title": "LossTrendPoint"
-      },
-      "MovementStatsResponse": {
-        "properties": {
-          "types": {
-            "items": { "$ref": "#/components/schemas/MovementTypeStats" },
-            "type": "array",
-            "title": "Types"
-          },
-          "total_transfers": { "type": "integer", "title": "Total Transfers" },
-          "total_items": { "type": "integer", "title": "Total Items" }
-        },
-        "type": "object",
-        "required": ["types", "total_transfers", "total_items"],
-        "title": "MovementStatsResponse",
-        "description": "EP-16: Статистика перемещений."
-      },
-      "MovementTypeStats": {
-        "properties": {
-          "transfer_type": { "type": "string", "title": "Transfer Type" },
-          "transfers_count": { "type": "integer", "title": "Transfers Count" },
-          "total_items": { "type": "integer", "title": "Total Items" }
-        },
-        "type": "object",
-        "required": ["transfer_type", "transfers_count", "total_items"],
-        "title": "MovementTypeStats"
-      },
-      "OnboardingOrderItemSchema": {
-        "properties": {
-          "product_id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Product Id"
-          },
-          "quantity": { "type": "integer", "title": "Quantity" }
-        },
-        "type": "object",
-        "required": ["product_id", "quantity"],
-        "title": "OnboardingOrderItemSchema"
-      },
-      "OnboardingOrderSchema": {
-        "properties": {
-          "items": {
-            "items": {
-              "$ref": "#/components/schemas/OnboardingOrderItemSchema"
-            },
-            "type": "array",
-            "title": "Items"
-          },
-          "payment_method": { "$ref": "#/components/schemas/PaymentMethod" }
-        },
-        "type": "object",
-        "required": ["items", "payment_method"],
-        "title": "OnboardingOrderSchema"
-      },
-      "Order": {
-        "properties": {
-          "payment_method": { "$ref": "#/components/schemas/PaymentMethod" },
-          "status": { "$ref": "#/components/schemas/OrderStatus" },
-          "total_amount": { "type": "integer", "title": "Total Amount" },
-          "client_inventory": {
-            "$ref": "#/components/schemas/ClientInventory"
-          },
-          "courier": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/src__application__client__schemas__Courier"
-              },
-              { "type": "null" }
-            ]
-          },
-          "items": {
-            "items": { "$ref": "#/components/schemas/Item-Output" },
-            "type": "array",
-            "title": "Items"
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Created At"
-          }
-        },
-        "type": "object",
-        "required": [
-          "payment_method",
-          "status",
-          "total_amount",
-          "client_inventory",
-          "items",
-          "created_at"
-        ],
-        "title": "Order"
-      },
-      "OrderCreate": {
-        "properties": {
-          "items": {
-            "items": {
-              "$ref": "#/components/schemas/src__modules__orders__schemas__Item"
-            },
-            "type": "array",
-            "minItems": 1,
-            "title": "Корзина товаров"
-          },
-          "payment_method": {
-            "$ref": "#/components/schemas/PaymentMethod",
-            "title": "Способ оплаты",
-            "description": "Намерение клиента по оплате: Наличные, Карта ",
-            "examples": ["cash"]
-          },
-          "client_inventory_id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "ID адреса клиента",
-            "description": "Инвентарь клиента, куда будет доставлен заказ"
-          },
-          "capitalize_missing_tara": {
-            "type": "boolean",
-            "title": "Оприходовать недостающую тару",
-            "description": "Если True — система автоматически оприходует дефицит тары перед созданием заказа (INITIAL_BALANCE).",
-            "default": false
-          },
-          "notes": {
-            "anyOf": [
-              { "type": "string", "maxLength": 500 },
-              { "type": "null" }
-            ],
-            "title": "Заметки к доставке",
-            "description": "Инструкции для курьера: код домофона, этаж, время доставки и т.д."
-          }
-        },
-        "type": "object",
-        "required": ["items", "payment_method", "client_inventory_id"],
-        "title": "OrderCreate"
-      },
-      "OrderDeliverRequest": {
-        "properties": {
-          "actual_items": {
-            "anyOf": [
-              {
-                "items": { "$ref": "#/components/schemas/OrderItemActual" },
-                "type": "array"
-              },
-              { "type": "null" }
-            ],
-            "title": "Actual Items",
-            "description": "Фактический состав (если отличается от заказа)"
-          }
-        },
-        "type": "object",
-        "title": "OrderDeliverRequest",
-        "description": "Запрос курьера на завершение доставки с возможной корректировкой."
-      },
-      "OrderFunnelResponse": {
-        "properties": {
-          "total": { "type": "integer", "title": "Total" },
-          "statuses": {
-            "items": { "$ref": "#/components/schemas/StatusFunnelItem" },
-            "type": "array",
-            "title": "Statuses"
-          }
-        },
-        "type": "object",
-        "required": ["total", "statuses"],
-        "title": "OrderFunnelResponse",
-        "description": "EP-3: Распределение по текущему статусу."
-      },
-      "OrderHeatmapResponse": {
-        "properties": {
-          "cells": {
-            "items": { "$ref": "#/components/schemas/HeatmapCell" },
-            "type": "array",
-            "title": "Cells"
-          },
-          "max_count": { "type": "integer", "title": "Max Count" }
-        },
-        "type": "object",
-        "required": ["cells", "max_count"],
-        "title": "OrderHeatmapResponse",
-        "description": "EP-4: Тепловая карта заказов."
-      },
-      "OrderItemActual": {
-        "properties": {
-          "product_id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Product Id"
-          },
-          "quantity": { "type": "integer", "minimum": 0.0, "title": "Quantity" }
-        },
-        "type": "object",
-        "required": ["product_id", "quantity"],
-        "title": "OrderItemActual",
-        "description": "Фактически доставленное количество товара."
-      },
-      "OrderItemResponse": {
-        "properties": {
-          "id": { "type": "string", "format": "uuid", "title": "Id" },
-          "product_id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Product Id"
-          },
-          "product": { "$ref": "#/components/schemas/ProductResponse" },
-          "quantity": {
-            "type": "integer",
-            "title": "Quantity",
-            "description": "Количество"
-          },
-          "unit_price": {
-            "type": "integer",
-            "title": "Unit Price",
-            "description": "Историческая цена на момент покупки"
-          },
-          "total": {
-            "type": "integer",
-            "title": "Total",
-            "description": "quantity * unit_price"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "product_id",
-          "product",
-          "quantity",
-          "unit_price",
-          "total"
-        ],
-        "title": "OrderItemResponse",
-        "description": "Как выглядит одна позиция в заказе при выдаче клиенту."
-      },
-      "OrderResponse": {
-        "properties": {
-          "id": { "type": "string", "format": "uuid", "title": "Id" },
-          "client_id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Client Id"
-          },
-          "client": { "$ref": "#/components/schemas/UserResponse" },
-          "client_inventory_id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Client Inventory Id"
-          },
-          "client_inventory": {
-            "$ref": "#/components/schemas/src__modules__orders__schemas__InventoryResponse"
-          },
-          "courier_id": {
-            "anyOf": [
-              { "type": "string", "format": "uuid" },
-              { "type": "null" }
-            ],
-            "title": "Courier Id"
-          },
-          "courier": {
-            "anyOf": [
-              { "$ref": "#/components/schemas/UserResponse" },
-              { "type": "null" }
-            ]
-          },
-          "status": { "$ref": "#/components/schemas/OrderStatus" },
-          "payment_method": { "$ref": "#/components/schemas/PaymentMethod" },
-          "total_amount": { "type": "integer", "title": "Total Amount" },
-          "capitalization_applied": {
-            "type": "boolean",
-            "title": "Capitalization Applied",
-            "description": "True, если при создании заказа было выполнено авто-оприходование недостающей тары (INITIAL_BALANCE).",
-            "default": false
-          },
-          "sale_type": {
-            "$ref": "#/components/schemas/SaleType",
-            "description": "Тип продажи: delivery или warehouse_pickup",
-            "default": "delivery"
-          },
-          "warehouse_id": {
-            "anyOf": [
-              { "type": "string", "format": "uuid" },
-              { "type": "null" }
-            ],
-            "title": "Warehouse Id",
-            "description": "ID склада (только для самовывоза)"
-          },
-          "contract_id": {
-            "anyOf": [
-              { "type": "string", "format": "uuid" },
-              { "type": "null" }
-            ],
-            "title": "Contract Id",
-            "description": "ID договора (только для CONTRACT оплаты)"
-          },
-          "reserved_credit_amount": {
-            "anyOf": [{ "type": "integer" }, { "type": "null" }],
-            "title": "Reserved Credit Amount",
-            "description": "Зарезервированная сумма кредита (только для CONTRACT оплаты)"
-          },
-          "notes": {
-            "anyOf": [{ "type": "string" }, { "type": "null" }],
-            "title": "Notes",
-            "description": "Инструкции по доставке"
-          },
-          "cancellation_reason": {
-            "anyOf": [{ "type": "string" }, { "type": "null" }],
-            "title": "Cancellation Reason",
-            "description": "Причина отмены (если статус CANCELLED)"
-          },
-          "items": {
-            "items": { "$ref": "#/components/schemas/OrderItemResponse" },
-            "type": "array",
-            "title": "Items"
-          },
-          "stock_transfers": {
-            "items": { "$ref": "#/components/schemas/TransferResponse" },
-            "type": "array",
-            "title": "Stock Transfers",
-            "default": []
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Created At"
-          },
-          "updated_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Updated At"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "client_id",
-          "client",
-          "client_inventory_id",
-          "client_inventory",
-          "status",
-          "payment_method",
-          "total_amount",
-          "items",
-          "created_at",
-          "updated_at"
-        ],
-        "title": "OrderResponse",
-        "description": "Полная модель заказа для Личного Кабинета или Дашборда."
-      },
-      "OrderStatus": {
-        "type": "string",
-        "enum": [
-          "new",
-          "assigned",
-          "in_transit",
-          "arrived",
-          "delivered",
-          "pickup_completed",
-          "cancelled"
-        ],
-        "title": "OrderStatus"
-      },
-      "OrderStatusCount": {
-        "properties": {
-          "status": {
-            "type": "string",
-            "title": "Status",
-            "description": "OrderStatus value"
-          },
-          "count": { "type": "integer", "title": "Count" }
-        },
-        "type": "object",
-        "required": ["status", "count"],
-        "title": "OrderStatusCount"
-      },
-      "OrderTrendPoint": {
-        "properties": {
-          "period": { "type": "string", "title": "Period" },
-          "orders_count": { "type": "integer", "title": "Orders Count" },
-          "revenue": {
-            "type": "integer",
-            "title": "Revenue",
-            "description": "сум"
-          },
-          "avg_order_value": {
-            "type": "integer",
-            "title": "Avg Order Value",
-            "description": "сум"
-          }
-        },
-        "type": "object",
-        "required": ["period", "orders_count", "revenue", "avg_order_value"],
-        "title": "OrderTrendPoint"
-      },
-      "OrderTrendResponse": {
-        "properties": {
-          "points": {
-            "items": { "$ref": "#/components/schemas/OrderTrendPoint" },
-            "type": "array",
-            "title": "Points"
-          },
-          "total_orders": { "type": "integer", "title": "Total Orders" },
-          "total_revenue": { "type": "integer", "title": "Total Revenue" }
-        },
-        "type": "object",
-        "required": ["points", "total_orders", "total_revenue"],
-        "title": "OrderTrendResponse",
-        "description": "EP-2: Временной ряд заказов."
-      },
-      "OrdersResponse": {
-        "properties": {
-          "total_count": { "type": "integer", "title": "Total Count" },
-          "orders": {
-            "items": { "$ref": "#/components/schemas/OrderResponse" },
-            "type": "array",
-            "title": "Orders"
-          }
-        },
-        "type": "object",
-        "required": ["total_count", "orders"],
-        "title": "OrdersResponse",
-        "description": "Постраничный список заказов с общим количеством."
-      },
-      "OrdersSummary": {
-        "properties": {
-          "active_by_status": {
-            "items": { "$ref": "#/components/schemas/OrderStatusCount" },
-            "type": "array",
-            "title": "Active By Status",
-            "description": "Количество заказов в незавершённых статусах: new, assigned, in_transit, arrived"
-          },
-          "unassigned_orders": {
-            "type": "integer",
-            "title": "Unassigned Orders",
-            "description": "NEW delivery-заказы без курьера — ключевой показатель для диспетчера"
-          },
-          "total_today": { "type": "integer", "title": "Total Today" },
-          "delivered_today": { "type": "integer", "title": "Delivered Today" },
-          "cancelled_today": { "type": "integer", "title": "Cancelled Today" },
-          "revenue_today": {
-            "type": "integer",
-            "title": "Revenue Today",
-            "description": "сум, сумма завершённых сегодня"
-          },
-          "by_sale_type": {
-            "additionalProperties": { "type": "integer" },
-            "type": "object",
-            "title": "By Sale Type",
-            "description": "{\"delivery\": N, \"warehouse_pickup\": N}"
-          },
-          "active_couriers": { "type": "integer", "title": "Active Couriers" }
-        },
-        "type": "object",
-        "required": [
-          "active_by_status",
-          "unassigned_orders",
-          "total_today",
-          "delivered_today",
-          "cancelled_today",
-          "revenue_today",
-          "by_sale_type",
-          "active_couriers"
-        ],
-        "title": "OrdersSummary",
-        "description": "EP-1: Операционная сводка (BR-1)."
-      },
-      "PaymentBreakdownResponse": {
-        "properties": {
-          "methods": {
-            "items": { "$ref": "#/components/schemas/PaymentMethodStats" },
-            "type": "array",
-            "title": "Methods"
-          },
-          "total_orders": { "type": "integer", "title": "Total Orders" },
-          "total_amount": { "type": "integer", "title": "Total Amount" }
-        },
-        "type": "object",
-        "required": ["methods", "total_orders", "total_amount"],
-        "title": "PaymentBreakdownResponse",
-        "description": "EP-5: Разбивка по способам оплаты."
-      },
-      "PaymentMethod": {
-        "type": "string",
-        "enum": ["cash", "card", "contract"],
-        "title": "PaymentMethod"
-      },
-      "PaymentMethodFinanceStats": {
-        "properties": {
-          "method": {
-            "type": "string",
-            "title": "Method",
-            "description": "cash | card | contract"
-          },
-          "transactions_count": {
-            "type": "integer",
-            "title": "Transactions Count"
-          },
-          "total_amount": {
-            "type": "integer",
-            "title": "Total Amount",
-            "description": "сум"
-          }
-        },
-        "type": "object",
-        "required": ["method", "transactions_count", "total_amount"],
-        "title": "PaymentMethodFinanceStats"
-      },
-      "PaymentMethodStats": {
-        "properties": {
-          "method": {
-            "type": "string",
-            "title": "Method",
-            "description": "cash | card | contract"
-          },
-          "orders_count": { "type": "integer", "title": "Orders Count" },
-          "total_amount": {
-            "type": "integer",
-            "title": "Total Amount",
-            "description": "сум"
-          }
-        },
-        "type": "object",
-        "required": ["method", "orders_count", "total_amount"],
-        "title": "PaymentMethodStats"
-      },
-      "PaymentMethodsFinanceResponse": {
-        "properties": {
-          "methods": {
-            "items": {
-              "$ref": "#/components/schemas/PaymentMethodFinanceStats"
-            },
-            "type": "array",
-            "title": "Methods"
-          }
-        },
-        "type": "object",
-        "required": ["methods"],
-        "title": "PaymentMethodsFinanceResponse",
-        "description": "EP-11: Финансовая разбивка по способам оплаты."
-      },
-      "PriceItemCreate": {
-        "properties": {
-          "price": {
-            "type": "integer",
-            "minimum": 0.0,
-            "title": "Price",
-            "description": "Договорная цена в сумах"
-          }
-        },
-        "type": "object",
-        "required": ["price"],
-        "title": "PriceItemCreate"
-      },
-      "PriceItemResponse": {
-        "properties": {
-          "id": { "type": "string", "format": "uuid", "title": "Id" },
-          "contract_id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Contract Id"
-          },
-          "product_id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Product Id"
-          },
-          "price": { "type": "integer", "title": "Price" },
-          "is_active": { "type": "boolean", "title": "Is Active" },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Created At"
-          },
-          "updated_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Updated At"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "contract_id",
-          "product_id",
-          "price",
-          "is_active",
-          "created_at",
-          "updated_at"
-        ],
-        "title": "PriceItemResponse"
-      },
-      "Product": {
-        "properties": {
-          "type": { "$ref": "#/components/schemas/ProductType" },
-          "name": { "type": "string", "title": "Name" },
-          "price": { "type": "integer", "title": "Price" },
-          "attributes": {
-            "additionalProperties": true,
-            "type": "object",
-            "title": "Attributes"
-          }
-        },
-        "type": "object",
-        "required": ["type", "name", "price"],
-        "title": "Product"
-      },
-      "ProductCreate": {
-        "properties": {
-          "name": {
-            "type": "string",
-            "maxLength": 255,
-            "minLength": 1,
-            "title": "Название товара",
-            "examples": ["Вода Завод А 19Л ПК"]
-          },
-          "price": {
-            "type": "integer",
-            "minimum": 0.0,
-            "title": "Цена",
-            "description": "Цена в сумах (UZS), целое число",
-            "default": 0,
-            "examples": [20000]
-          },
-          "attributes": {
-            "additionalProperties": true,
-            "type": "object",
-            "title": "Характеристики",
-            "description": "JSON с физическими свойствами (volume, material)",
-            "examples": [{ "material": "PC", "volume": 18.9 }]
-          },
-          "returnable_item_id": {
-            "anyOf": [
-              { "type": "string", "format": "uuid" },
-              { "type": "null" }
-            ],
-            "title": "ID возвратной тары",
-            "description": "Указывается для воды, требующей обмена пустой бутылки"
-          },
-          "type": {
-            "$ref": "#/components/schemas/ProductType",
-            "title": "Тип товара",
-            "examples": ["water"]
-          }
-        },
-        "type": "object",
-        "required": ["name", "type"],
-        "title": "ProductCreate"
-      },
-      "ProductResponse": {
-        "properties": {
-          "name": {
-            "type": "string",
-            "maxLength": 255,
-            "minLength": 1,
-            "title": "Название товара",
-            "examples": ["Вода Завод А 19Л ПК"]
-          },
-          "price": {
-            "type": "integer",
-            "minimum": 0.0,
-            "title": "Цена",
-            "description": "Цена в сумах (UZS), целое число",
-            "default": 0,
-            "examples": [20000]
-          },
-          "attributes": {
-            "additionalProperties": true,
-            "type": "object",
-            "title": "Характеристики",
-            "description": "JSON с физическими свойствами (volume, material)",
-            "examples": [{ "material": "PC", "volume": 18.9 }]
-          },
-          "returnable_item_id": {
-            "anyOf": [
-              { "type": "string", "format": "uuid" },
-              { "type": "null" }
-            ],
-            "title": "ID возвратной тары",
-            "description": "Указывается для воды, требующей обмена пустой бутылки"
-          },
-          "id": { "type": "string", "format": "uuid", "title": "Id" },
-          "type": { "$ref": "#/components/schemas/ProductType" },
-          "is_active": { "type": "boolean", "title": "Is Active" },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Created At"
-          },
-          "updated_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Updated At"
-          }
-        },
-        "type": "object",
-        "required": [
-          "name",
-          "id",
-          "type",
-          "is_active",
-          "created_at",
-          "updated_at"
-        ],
-        "title": "ProductResponse"
-      },
-      "ProductSimpleResponse": {
-        "properties": {
-          "id": { "type": "string", "format": "uuid", "title": "Id" },
-          "name": { "type": "string", "title": "Name" },
-          "type": { "$ref": "#/components/schemas/ProductType" },
-          "price": { "type": "integer", "title": "Price", "default": 0 },
-          "is_active": {
-            "type": "boolean",
-            "title": "Is Active",
-            "default": true
-          }
-        },
-        "type": "object",
-        "required": ["id", "name", "type"],
-        "title": "ProductSimpleResponse"
-      },
-      "ProductType": {
-        "type": "string",
-        "enum": ["water", "container", "equipment"],
-        "title": "ProductType"
-      },
-      "ProductUpdate": {
-        "properties": {
-          "name": {
-            "anyOf": [
-              { "type": "string", "maxLength": 255, "minLength": 1 },
-              { "type": "null" }
-            ],
-            "title": "Name"
-          },
-          "type": {
-            "anyOf": [
-              { "$ref": "#/components/schemas/ProductType" },
-              { "type": "null" }
-            ]
-          },
-          "price": {
-            "anyOf": [
-              { "type": "integer", "minimum": 0.0 },
-              { "type": "null" }
-            ],
-            "title": "Price"
-          },
-          "attributes": {
-            "anyOf": [
-              { "additionalProperties": true, "type": "object" },
-              { "type": "null" }
-            ],
-            "title": "Attributes"
-          },
-          "returnable_item_id": {
-            "anyOf": [
-              { "type": "string", "format": "uuid" },
-              { "type": "null" }
-            ],
-            "title": "Returnable Item Id"
-          }
-        },
-        "type": "object",
-        "title": "ProductUpdate"
-      },
-      "ReconciliationOrderItem": {
-        "properties": {
-          "order_id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Order Id"
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Created At"
-          },
-          "total_amount": { "type": "integer", "title": "Total Amount" }
-        },
-        "type": "object",
-        "required": ["order_id", "created_at", "total_amount"],
-        "title": "ReconciliationOrderItem"
-      },
-      "ReconciliationPaymentItem": {
-        "properties": {
-          "transaction_id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Transaction Id"
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Created At"
-          },
-          "amount": { "type": "integer", "title": "Amount" },
-          "reason": {
-            "anyOf": [{ "type": "string" }, { "type": "null" }],
-            "title": "Reason"
-          }
-        },
-        "type": "object",
-        "required": ["transaction_id", "created_at", "amount"],
-        "title": "ReconciliationPaymentItem"
-      },
-      "ReconciliationResponse": {
-        "properties": {
-          "contract_id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Contract Id"
-          },
-          "contract_number": { "type": "string", "title": "Contract Number" },
-          "client_name": { "type": "string", "title": "Client Name" },
-          "period_from": {
-            "type": "string",
-            "format": "date",
-            "title": "Period From"
-          },
-          "period_to": {
-            "type": "string",
-            "format": "date",
-            "title": "Period To"
-          },
-          "orders": {
-            "items": { "$ref": "#/components/schemas/ReconciliationOrderItem" },
-            "type": "array",
-            "title": "Orders"
-          },
-          "total_billed": { "type": "integer", "title": "Total Billed" },
-          "payments": {
-            "items": {
-              "$ref": "#/components/schemas/ReconciliationPaymentItem"
-            },
-            "type": "array",
-            "title": "Payments"
-          },
-          "total_paid": { "type": "integer", "title": "Total Paid" },
-          "balance": { "type": "integer", "title": "Balance" }
-        },
-        "type": "object",
-        "required": [
-          "contract_id",
-          "contract_number",
-          "client_name",
-          "period_from",
-          "period_to",
-          "orders",
-          "total_billed",
-          "payments",
-          "total_paid",
-          "balance"
-        ],
-        "title": "ReconciliationResponse"
-      },
-      "RevenueBySegmentResponse": {
-        "properties": {
-          "segments": {
-            "items": { "$ref": "#/components/schemas/SegmentRevenue" },
-            "type": "array",
-            "title": "Segments"
-          },
-          "total_orders": { "type": "integer", "title": "Total Orders" },
-          "total_revenue": { "type": "integer", "title": "Total Revenue" }
-        },
-        "type": "object",
-        "required": ["segments", "total_orders", "total_revenue"],
-        "title": "RevenueBySegmentResponse",
-        "description": "EP-21: Выручка по сегментам."
-      },
-      "RevenueTrendPoint": {
-        "properties": {
-          "period": {
-            "type": "string",
-            "title": "Period",
-            "description": "2026-03-15 | 2026-W12 | 2026-03"
-          },
-          "revenue": {
-            "type": "integer",
-            "title": "Revenue",
-            "description": "сум"
-          },
-          "orders_count": { "type": "integer", "title": "Orders Count" }
-        },
-        "type": "object",
-        "required": ["period", "revenue", "orders_count"],
-        "title": "RevenueTrendPoint"
-      },
-      "RevenueTrendResponse": {
-        "properties": {
-          "points": {
-            "items": { "$ref": "#/components/schemas/RevenueTrendPoint" },
-            "type": "array",
-            "title": "Points"
-          },
-          "total_revenue": { "type": "integer", "title": "Total Revenue" },
-          "total_orders": { "type": "integer", "title": "Total Orders" },
-          "change_percent": {
-            "anyOf": [{ "type": "number" }, { "type": "null" }],
-            "title": "Change Percent",
-            "description": "% vs аналогичный предыдущий период"
-          }
-        },
-        "type": "object",
-        "required": ["points", "total_revenue", "total_orders"],
-        "title": "RevenueTrendResponse",
-        "description": "EP-8: Временной ряд выручки."
-      },
-      "Role": {
-        "type": "string",
-        "enum": [
-          "system",
-          "admin",
-          "accountant",
-          "storekeeper",
-          "cashier",
-          "courier",
-          "client_b2c",
-          "client_b2b"
-        ],
-        "title": "Role"
-      },
-      "SaleType": {
-        "type": "string",
-        "enum": ["delivery", "warehouse_pickup"],
-        "title": "SaleType"
-      },
-      "SegmentRevenue": {
-        "properties": {
-          "segment": {
-            "type": "string",
-            "title": "Segment",
-            "description": "client_b2b | client_b2c"
-          },
-          "orders_count": { "type": "integer", "title": "Orders Count" },
-          "total_revenue": {
-            "type": "integer",
-            "title": "Total Revenue",
-            "description": "сум"
-          },
-          "avg_order_value": {
-            "type": "integer",
-            "title": "Avg Order Value",
-            "description": "сум"
-          }
-        },
-        "type": "object",
-        "required": [
-          "segment",
-          "orders_count",
-          "total_revenue",
-          "avg_order_value"
-        ],
-        "title": "SegmentRevenue"
-      },
-      "StatementEntry": {
-        "properties": {
-          "id": { "type": "string", "format": "uuid", "title": "Id" },
-          "direction": { "type": "string", "title": "Direction" },
-          "counterparty": { "$ref": "#/components/schemas/AccountShort" },
-          "amount": { "type": "integer", "title": "Amount" },
-          "running_balance": { "type": "integer", "title": "Running Balance" },
-          "status": { "$ref": "#/components/schemas/TransactionStatus" },
-          "reason": { "type": "string", "title": "Reason" },
-          "order_id": {
-            "anyOf": [
-              { "type": "string", "format": "uuid" },
-              { "type": "null" }
-            ],
-            "title": "Order Id"
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Created At"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "direction",
-          "counterparty",
-          "amount",
-          "running_balance",
-          "status",
-          "reason",
-          "order_id",
-          "created_at"
-        ],
-        "title": "StatementEntry"
-      },
-      "StatementPeriod": {
-        "properties": {
-          "date_from": {
-            "type": "string",
-            "format": "date",
-            "title": "Date From"
-          },
-          "date_to": { "type": "string", "format": "date", "title": "Date To" },
-          "opening_balance": { "type": "integer", "title": "Opening Balance" },
-          "closing_balance": { "type": "integer", "title": "Closing Balance" },
-          "total_incoming": { "type": "integer", "title": "Total Incoming" },
-          "total_outgoing": { "type": "integer", "title": "Total Outgoing" }
-        },
-        "type": "object",
-        "required": [
-          "date_from",
-          "date_to",
-          "opening_balance",
-          "closing_balance",
-          "total_incoming",
-          "total_outgoing"
-        ],
-        "title": "StatementPeriod"
-      },
-      "StatusFunnelItem": {
-        "properties": {
-          "status": { "type": "string", "title": "Status" },
-          "count": { "type": "integer", "title": "Count" },
-          "percentage": {
-            "type": "number",
-            "title": "Percentage",
-            "description": "0.0-1.0"
-          }
-        },
-        "type": "object",
-        "required": ["status", "count", "percentage"],
-        "title": "StatusFunnelItem"
-      },
-      "SystemAccountSummary": {
-        "properties": {
-          "id": { "type": "string", "format": "uuid", "title": "Id" },
-          "balance": { "type": "integer", "title": "Balance" },
-          "name": { "type": "string", "title": "Name" }
-        },
-        "type": "object",
-        "required": ["id", "balance", "name"],
-        "title": "SystemAccountSummary"
-      },
-      "TaraCheckRequest": {
-        "properties": {
-          "items": {
-            "items": {
-              "$ref": "#/components/schemas/src__modules__orders__schemas__Item"
-            },
-            "type": "array",
-            "minItems": 1,
-            "title": "Items"
-          },
-          "client_inventory_id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "ID адреса клиента"
-          }
-        },
-        "type": "object",
-        "required": ["items", "client_inventory_id"],
-        "title": "TaraCheckRequest",
-        "description": "Запрос на проверку доступности тары перед оформлением заказа."
-      },
-      "TaraCheckResponse": {
-        "properties": {
-          "can_order": {
-            "type": "boolean",
-            "title": "Can Order",
-            "description": "Можно ли оформить заказ с текущей тарой"
-          },
-          "shortages": {
-            "items": { "$ref": "#/components/schemas/TaraShortage" },
-            "type": "array",
-            "title": "Shortages",
-            "description": "Список нехваток тары (пуст, если can_order=true)"
-          }
-        },
-        "type": "object",
-        "required": ["can_order"],
-        "title": "TaraCheckResponse",
-        "description": "Результат проверки тары: можно ли оформить заказ."
-      },
-      "TaraShortage": {
-        "properties": {
-          "product_id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Product Id"
-          },
-          "product_name": { "type": "string", "title": "Product Name" },
-          "returnable_item_id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Returnable Item Id"
-          },
-          "required": { "type": "integer", "title": "Required" },
-          "available": { "type": "integer", "title": "Available" },
-          "deficit": { "type": "integer", "title": "Deficit" }
-        },
-        "type": "object",
-        "required": [
-          "product_id",
-          "product_name",
-          "returnable_item_id",
-          "required",
-          "available",
-          "deficit"
-        ],
-        "title": "TaraShortage"
-      },
-      "TokenResponse": {
-        "properties": {
-          "access_token": { "type": "string", "title": "Access Token" },
-          "token_type": {
-            "type": "string",
-            "title": "Token Type",
-            "default": "bearer"
-          }
-        },
-        "type": "object",
-        "required": ["access_token"],
-        "title": "TokenResponse",
-        "description": "Стандартная схема ответа при успешной авторизации.\nПоля access_token и token_type обязательны по спецификации OAuth2."
-      },
-      "TopClientItem": {
-        "properties": {
-          "client_id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Client Id"
-          },
-          "client_name": { "type": "string", "title": "Client Name" },
-          "client_type": {
-            "type": "string",
-            "title": "Client Type",
-            "description": "client_b2c | client_b2b"
-          },
-          "orders_count": { "type": "integer", "title": "Orders Count" },
-          "total_amount": {
-            "type": "integer",
-            "title": "Total Amount",
-            "description": "сум"
-          }
-        },
-        "type": "object",
-        "required": [
-          "client_id",
-          "client_name",
-          "client_type",
-          "orders_count",
-          "total_amount"
-        ],
-        "title": "TopClientItem"
-      },
-      "TopClientsResponse": {
-        "properties": {
-          "clients": {
-            "items": { "$ref": "#/components/schemas/TopClientItem" },
-            "type": "array",
-            "title": "Clients"
-          }
-        },
-        "type": "object",
-        "required": ["clients"],
-        "title": "TopClientsResponse",
-        "description": "EP-7: Топ клиентов по заказам."
-      },
-      "TopDebtorItem": {
-        "properties": {
-          "client_id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Client Id"
-          },
-          "client_name": { "type": "string", "title": "Client Name" },
-          "client_type": {
-            "type": "string",
-            "title": "Client Type",
-            "description": "client_b2c | client_b2b"
-          },
-          "phone": {
-            "anyOf": [{ "type": "string" }, { "type": "null" }],
-            "title": "Phone"
-          },
-          "debt_amount": {
-            "type": "integer",
-            "title": "Debt Amount",
-            "description": "сум"
-          },
-          "last_payment_date": {
-            "anyOf": [
-              { "type": "string", "format": "date" },
-              { "type": "null" }
-            ],
-            "title": "Last Payment Date"
-          },
-          "days_overdue": { "type": "integer", "title": "Days Overdue" }
-        },
-        "type": "object",
-        "required": [
-          "client_id",
-          "client_name",
-          "client_type",
-          "debt_amount",
-          "days_overdue"
-        ],
-        "title": "TopDebtorItem"
-      },
-      "TopDebtorsResponse": {
-        "properties": {
-          "debtors": {
-            "items": { "$ref": "#/components/schemas/TopDebtorItem" },
-            "type": "array",
-            "title": "Debtors"
-          },
-          "total_debt": { "type": "integer", "title": "Total Debt" }
-        },
-        "type": "object",
-        "required": ["debtors", "total_debt"],
-        "title": "TopDebtorsResponse",
-        "description": "EP-10: Топ должников."
-      },
-      "TransactionCreate": {
-        "properties": {
-          "from_id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Счет списания (Дебет)",
-            "description": "Откуда уходят деньги"
-          },
-          "to_id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Счет зачисления (Кредит)",
-            "description": "Куда приходят деньги"
-          },
-          "amount": {
-            "type": "integer",
-            "exclusiveMinimum": 0.0,
-            "title": "Сумма перевода",
-            "examples": [150000]
-          },
-          "reason": {
-            "type": "string",
-            "maxLength": 255,
-            "minLength": 3,
-            "title": "Основание платежа",
-            "examples": [
-              "Сдача выручки курьером",
-              "Пополнение баланса через Payme"
-            ]
-          },
-          "order_id": {
-            "anyOf": [
-              { "type": "string", "format": "uuid" },
-              { "type": "null" }
-            ],
-            "title": "Order Id"
-          }
-        },
-        "type": "object",
-        "required": ["from_id", "to_id", "amount", "reason"],
-        "title": "TransactionCreate",
-        "description": "Схема для ручных проводок (Например: Бухгалтер принимает\nналичные от курьера).\nДля заказов (Checkout) эта схема не используется, так как\nUseCase будет генерировать проводки автоматически внутри\nPython-кода."
-      },
-      "TransactionDetail": {
-        "properties": {
-          "id": { "type": "string", "format": "uuid", "title": "Id" },
-          "from_account": { "$ref": "#/components/schemas/AccountShort" },
-          "to_account": { "$ref": "#/components/schemas/AccountShort" },
-          "amount": { "type": "integer", "title": "Amount" },
-          "status": { "$ref": "#/components/schemas/TransactionStatus" },
-          "reason": { "type": "string", "title": "Reason" },
-          "order_id": {
-            "anyOf": [
-              { "type": "string", "format": "uuid" },
-              { "type": "null" }
-            ],
-            "title": "Order Id"
-          },
-          "verified_by_id": {
-            "anyOf": [
-              { "type": "string", "format": "uuid" },
-              { "type": "null" }
-            ],
-            "title": "Verified By Id"
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Created At"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "from_account",
-          "to_account",
-          "amount",
-          "status",
-          "reason",
-          "order_id",
-          "verified_by_id",
-          "created_at"
-        ],
-        "title": "TransactionDetail"
-      },
-      "TransactionResponse": {
-        "properties": {
-          "id": { "type": "string", "format": "uuid", "title": "Id" },
-          "from_id": { "type": "string", "format": "uuid", "title": "From Id" },
-          "to_id": { "type": "string", "format": "uuid", "title": "To Id" },
-          "from_account": {
-            "anyOf": [
-              { "$ref": "#/components/schemas/AccountShort" },
-              { "type": "null" }
-            ]
-          },
-          "to_account": {
-            "anyOf": [
-              { "$ref": "#/components/schemas/AccountShort" },
-              { "type": "null" }
-            ]
-          },
-          "order_id": {
-            "anyOf": [
-              { "type": "string", "format": "uuid" },
-              { "type": "null" }
-            ],
-            "title": "Order Id"
-          },
-          "amount": { "type": "integer", "title": "Amount" },
-          "status": { "$ref": "#/components/schemas/TransactionStatus" },
-          "reason": { "type": "string", "title": "Reason" },
-          "verified_by_id": {
-            "anyOf": [
-              { "type": "string", "format": "uuid" },
-              { "type": "null" }
-            ],
-            "title": "Verified By Id"
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Created At"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "from_id",
-          "to_id",
-          "order_id",
-          "amount",
-          "status",
-          "reason",
-          "created_at"
-        ],
-        "title": "TransactionResponse",
-        "description": "Ответ для мутационных операций (create/verify/reject).\n\nСодержит все поля, необходимые фронтенду для отображения\nтранзакции без дополнительного запроса."
-      },
-      "TransactionStatus": {
-        "type": "string",
-        "enum": ["pending", "completed", "rejected"],
-        "title": "TransactionStatus"
-      },
-      "TransferItemResponse": {
-        "properties": {
-          "product": { "$ref": "#/components/schemas/ProductSimpleResponse" },
-          "quantity": { "type": "integer", "title": "Quantity" }
-        },
-        "type": "object",
-        "required": ["product", "quantity"],
-        "title": "TransferItemResponse"
-      },
-      "TransferResponse": {
-        "properties": {
-          "id": { "type": "string", "format": "uuid", "title": "Id" },
-          "from_id": { "type": "string", "format": "uuid", "title": "From Id" },
-          "to_id": { "type": "string", "format": "uuid", "title": "To Id" },
-          "from_inventory": {
-            "anyOf": [
-              { "$ref": "#/components/schemas/InventoryShortResponse" },
-              { "type": "null" }
-            ]
-          },
-          "to_inventory": {
-            "anyOf": [
-              { "$ref": "#/components/schemas/InventoryShortResponse" },
-              { "type": "null" }
-            ]
-          },
-          "created_by_id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Created By Id"
-          },
-          "created_by": {
-            "anyOf": [
-              { "$ref": "#/components/schemas/UserShortResponse" },
-              { "type": "null" }
-            ]
-          },
-          "accepted_by_id": {
-            "anyOf": [
-              { "type": "string", "format": "uuid" },
-              { "type": "null" }
-            ],
-            "title": "Accepted By Id"
-          },
-          "accepted_by": {
-            "anyOf": [
-              { "$ref": "#/components/schemas/UserShortResponse" },
-              { "type": "null" }
-            ]
-          },
-          "status": { "$ref": "#/components/schemas/TransferStatus" },
-          "type": { "$ref": "#/components/schemas/TransferType" },
-          "items": {
-            "items": { "$ref": "#/components/schemas/TransferItemResponse" },
-            "type": "array",
-            "title": "Items",
-            "default": []
-          },
-          "reason": {
-            "anyOf": [{ "type": "string" }, { "type": "null" }],
-            "title": "Reason"
-          },
-          "route_sheet_id": {
-            "anyOf": [
-              { "type": "string", "format": "uuid" },
-              { "type": "null" }
-            ],
-            "title": "Route Sheet Id"
-          },
-          "created_at": {
-            "anyOf": [
-              { "type": "string", "format": "date-time" },
-              { "type": "null" }
-            ],
-            "title": "Created At"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "from_id",
-          "to_id",
-          "created_by_id",
-          "accepted_by_id",
-          "status",
-          "type"
-        ],
-        "title": "TransferResponse"
-      },
-      "TransferStatus": {
-        "type": "string",
-        "enum": ["DRAFT", "COMPLETED", "CANCELLED"],
-        "title": "TransferStatus"
-      },
-      "TransferType": {
-        "type": "string",
-        "enum": [
-          "COURIER_LOAD",
-          "COURIER_RETURN",
-          "CLIENT_DELIVERY",
-          "CLIENT_RETURN",
-          "LOSS_WRITE_OFF",
-          "INVENTORY_FINDING",
-          "INITIAL_BALANCE",
-          "WAREHOUSE_SALE",
-          "WAREHOUSE_TARA_RETURN"
-        ],
-        "title": "TransferType"
-      },
-      "TransportCreate": {
-        "properties": {
-          "user_id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "User Id",
-            "description": "ID курьера, ответственного за транспорт"
-          },
-          "name": {
-            "type": "string",
-            "maxLength": 255,
-            "title": "Name",
-            "description": "Название транспорта (напр. 'Машина АВ123')"
-          }
-        },
-        "type": "object",
-        "required": ["user_id", "name"],
-        "title": "TransportCreate"
-      },
-      "TransportDetailResponse": {
-        "properties": {
-          "id": { "type": "string", "format": "uuid", "title": "Id" },
-          "user_id": { "type": "string", "format": "uuid", "title": "User Id" },
-          "name": { "type": "string", "title": "Name" },
-          "type": { "type": "string", "title": "Type", "default": "COURIER" },
-          "balances": {
-            "items": { "$ref": "#/components/schemas/BalanceResponse" },
-            "type": "array",
-            "title": "Balances",
-            "default": []
-          }
-        },
-        "type": "object",
-        "required": ["id", "user_id", "name"],
-        "title": "TransportDetailResponse"
-      },
-      "TransportResponse": {
-        "properties": {
-          "id": { "type": "string", "format": "uuid", "title": "Id" },
-          "user_id": { "type": "string", "format": "uuid", "title": "User Id" },
-          "name": { "type": "string", "title": "Name" },
-          "type": { "type": "string", "title": "Type", "default": "COURIER" }
-        },
-        "type": "object",
-        "required": ["id", "user_id", "name"],
-        "title": "TransportResponse"
-      },
-      "TransportUpdate": {
-        "properties": {
-          "user_id": {
-            "anyOf": [
-              { "type": "string", "format": "uuid" },
-              { "type": "null" }
-            ],
-            "title": "User Id",
-            "description": "Новый ответственный курьер"
-          },
-          "name": {
-            "anyOf": [
-              { "type": "string", "maxLength": 255 },
-              { "type": "null" }
-            ],
-            "title": "Name",
-            "description": "Новое название"
-          }
-        },
-        "type": "object",
-        "title": "TransportUpdate"
-      },
-      "UserAdminCreate": {
-        "properties": {
-          "role": { "$ref": "#/components/schemas/Role" },
-          "username": {
-            "type": "string",
-            "maxLength": 255,
-            "minLength": 2,
-            "title": "Username",
-            "example": "Анвар Анваров"
-          },
-          "phone": { "type": "string", "title": "Phone" },
-          "password": {
-            "type": "string",
-            "maxLength": 128,
-            "minLength": 4,
-            "title": "Password",
-            "description": "Пароль",
-            "example": "StrongPass123!"
-          }
-        },
-        "type": "object",
-        "required": ["role", "username", "phone", "password"],
-        "title": "UserAdminCreate"
-      },
-      "UserAdminUpdate": {
-        "properties": {
-          "username": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 255,
-                "minLength": 2,
-                "example": "Анвар Анваров"
-              },
-              { "type": "null" }
-            ],
-            "title": "Username"
-          },
-          "phone": {
-            "anyOf": [{ "type": "string" }, { "type": "null" }],
-            "title": "Phone"
-          },
-          "password": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 128,
-                "minLength": 4,
-                "description": "Пароль",
-                "example": "StrongPass123!"
-              },
-              { "type": "null" }
-            ],
-            "title": "Password"
-          },
-          "role": {
-            "anyOf": [
-              { "$ref": "#/components/schemas/Role" },
-              { "type": "null" }
-            ]
-          },
-          "is_active": {
-            "anyOf": [{ "type": "boolean" }, { "type": "null" }],
-            "title": "Is Active"
-          }
-        },
-        "type": "object",
-        "title": "UserAdminUpdate"
-      },
-      "UserCreate": {
-        "properties": {
-          "username": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 255,
-                "minLength": 2,
-                "example": "Анвар Анваров"
-              },
-              { "type": "null" }
-            ],
-            "title": "Username"
-          },
-          "phone": { "type": "string", "title": "Phone" }
-        },
-        "type": "object",
-        "required": ["phone"],
-        "title": "UserCreate"
-      },
-      "UserResponse": {
-        "properties": {
-          "role": { "$ref": "#/components/schemas/Role" },
-          "username": {
-            "type": "string",
-            "maxLength": 255,
-            "minLength": 2,
-            "title": "Username",
-            "example": "Анвар Анваров"
-          },
-          "id": { "type": "string", "format": "uuid", "title": "Id" },
-          "is_active": { "type": "boolean", "title": "Is Active" },
-          "phone": {
-            "anyOf": [{ "type": "string" }, { "type": "null" }],
-            "title": "Phone"
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Created At"
-          },
-          "updated_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Updated At"
-          }
-        },
-        "type": "object",
-        "required": [
-          "role",
-          "username",
-          "id",
-          "is_active",
-          "created_at",
-          "updated_at"
-        ],
-        "title": "UserResponse",
-        "description": "Эту схему мы возвращаем из роутера.\nОна включает ID и даты, но НИКОГДА не включает пароль (даже хешированный)."
-      },
-      "UserResponseList": {
-        "properties": {
-          "total_count": { "type": "integer", "title": "Total Count" },
-          "users": {
-            "items": { "$ref": "#/components/schemas/UserResponse" },
-            "type": "array",
-            "title": "Users"
-          }
-        },
-        "type": "object",
-        "required": ["total_count", "users"],
-        "title": "UserResponseList"
-      },
-      "UserShortResponse": {
-        "properties": {
-          "id": { "type": "string", "format": "uuid", "title": "Id" },
-          "username": { "type": "string", "title": "Username" },
-          "phone": {
-            "anyOf": [{ "type": "string" }, { "type": "null" }],
-            "title": "Phone"
-          }
-        },
-        "type": "object",
-        "required": ["id", "username"],
-        "title": "UserShortResponse",
-        "description": "Краткое представление пользователя для вложения в другие схемы."
-      },
-      "ValidationError": {
-        "properties": {
-          "loc": {
-            "items": { "anyOf": [{ "type": "string" }, { "type": "integer" }] },
-            "type": "array",
-            "title": "Location"
-          },
-          "msg": { "type": "string", "title": "Message" },
-          "type": { "type": "string", "title": "Error Type" },
-          "input": { "title": "Input" },
-          "ctx": { "type": "object", "title": "Context" }
-        },
-        "type": "object",
-        "required": ["loc", "msg", "type"],
-        "title": "ValidationError"
-      },
-      "VirtualAccountsResponse": {
-        "properties": {
-          "vendor_total": {
-            "type": "integer",
-            "title": "Vendor Total",
-            "description": "ABS(SUM VIRTUAL_VENDOR)"
-          },
-          "loss_total": {
-            "type": "integer",
-            "title": "Loss Total",
-            "description": "SUM VIRTUAL_LOSS"
-          },
-          "real_total": {
-            "type": "integer",
-            "title": "Real Total",
-            "description": "SUM (WAREHOUSE + COURIER + CLIENT)"
-          },
-          "integrity_ok": {
-            "type": "boolean",
-            "title": "Integrity Ok",
-            "description": "vendor_total == loss_total + real_total"
-          },
-          "integrity_diff": {
-            "type": "integer",
-            "title": "Integrity Diff",
-            "description": "Разница (0 если ok)"
-          },
-          "per_product": {
-            "items": { "$ref": "#/components/schemas/VirtualProductBalance" },
-            "type": "array",
-            "title": "Per Product"
-          },
-          "loss_trend_30d": {
-            "items": { "$ref": "#/components/schemas/LossTrendPoint" },
-            "type": "array",
-            "title": "Loss Trend 30D",
-            "description": "Потери по дням за 30 дней"
-          }
-        },
-        "type": "object",
-        "required": [
-          "vendor_total",
-          "loss_total",
-          "real_total",
-          "integrity_ok",
-          "integrity_diff",
-          "per_product"
-        ],
-        "title": "VirtualAccountsResponse",
-        "description": "EP-19: Баланс виртуальных счетов + контроль."
-      },
-      "VirtualProductBalance": {
-        "properties": {
-          "product_id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Product Id"
-          },
-          "product_name": { "type": "string", "title": "Product Name" },
-          "vendor_balance": {
-            "type": "integer",
-            "title": "Vendor Balance",
-            "description": "Отрицательный (VIRTUAL_VENDOR)"
-          },
-          "loss_balance": {
-            "type": "integer",
-            "title": "Loss Balance",
-            "description": "Положительный (VIRTUAL_LOSS)"
-          }
-        },
-        "type": "object",
-        "required": [
-          "product_id",
-          "product_name",
-          "vendor_balance",
-          "loss_balance"
-        ],
-        "title": "VirtualProductBalance"
-      },
-      "WarehouseCreate": {
-        "properties": {
-          "user_id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "User Id",
-            "description": "ID материально ответственного"
-          },
-          "name": { "type": "string", "maxLength": 255, "title": "Name" }
-        },
-        "type": "object",
-        "required": ["user_id", "name"],
-        "title": "WarehouseCreate"
-      },
-      "WarehouseDetailResponse": {
-        "properties": {
-          "id": { "type": "string", "format": "uuid", "title": "Id" },
-          "name": { "type": "string", "title": "Name" },
-          "user_id": { "type": "string", "format": "uuid", "title": "User Id" },
-          "user": {
-            "anyOf": [
-              { "$ref": "#/components/schemas/UserShortResponse" },
-              { "type": "null" }
-            ]
-          },
-          "balances": {
-            "items": { "$ref": "#/components/schemas/BalanceItem" },
-            "type": "array",
-            "title": "Balances",
-            "default": []
-          }
-        },
-        "type": "object",
-        "required": ["id", "name", "user_id"],
-        "title": "WarehouseDetailResponse"
-      },
-      "WarehouseSaleCapitalizeTaraRequest": {
-        "properties": {
-          "warehouse_id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Warehouse Id",
-            "description": "ID склада (для контекста)"
-          },
-          "items": {
-            "items": {
-              "$ref": "#/components/schemas/src__modules__orders__schemas__Item"
-            },
-            "type": "array",
-            "minItems": 1,
-            "title": "Items",
-            "description": "Тара, принесённая покупателем"
-          }
-        },
-        "type": "object",
-        "required": ["warehouse_id", "items"],
-        "title": "WarehouseSaleCapitalizeTaraRequest",
-        "description": "Оприходование тары, принесённой покупателем на склад."
-      },
-      "WarehouseSaleCreate": {
-        "properties": {
-          "warehouse_id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Warehouse Id",
-            "description": "ID склада, с которого продаём"
-          },
-          "items": {
-            "items": {
-              "$ref": "#/components/schemas/src__modules__orders__schemas__Item"
-            },
-            "type": "array",
-            "minItems": 1,
-            "title": "Корзина товаров"
-          },
-          "capitalize_missing_tara": {
-            "type": "boolean",
-            "title": "Оприходовать недостающую тару",
-            "default": false
-          }
-        },
-        "type": "object",
-        "required": ["warehouse_id", "items"],
-        "title": "WarehouseSaleCreate",
-        "description": "Создание заказа на самовывоз со склада."
-      },
-      "WarehouseUpdate": {
-        "properties": {
-          "name": {
-            "anyOf": [
-              { "type": "string", "maxLength": 255 },
-              { "type": "null" }
-            ],
-            "title": "Name"
-          },
-          "user_id": {
-            "anyOf": [
-              { "type": "string", "format": "uuid" },
-              { "type": "null" }
-            ],
-            "title": "User Id"
-          }
-        },
-        "type": "object",
-        "title": "WarehouseUpdate"
-      },
-      "src__application__client__schemas__Courier": {
-        "properties": { "username": { "type": "string", "title": "Username" } },
-        "type": "object",
-        "required": ["username"],
-        "title": "Courier"
-      },
-      "src__application__courier__schemas__Courier": {
-        "properties": {
-          "id": { "type": "string", "format": "uuid", "title": "Id" },
-          "username": { "type": "string", "title": "Username" },
-          "phone": {
-            "anyOf": [{ "type": "string" }, { "type": "null" }],
-            "title": "Phone"
-          },
-          "account": {
-            "anyOf": [
-              { "$ref": "#/components/schemas/AccountShortDTO" },
-              { "type": "null" }
-            ]
-          },
-          "inventory": {
-            "anyOf": [
-              { "$ref": "#/components/schemas/InventoryShortDTO" },
-              { "type": "null" }
-            ]
-          },
-          "is_active": { "type": "boolean", "title": "Is Active" },
-          "orders": {
-            "type": "integer",
-            "title": "Orders",
-            "description": "Количество выполненных заказов"
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Created At"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "username",
-          "phone",
-          "account",
-          "inventory",
-          "is_active",
-          "orders",
-          "created_at"
-        ],
-        "title": "Courier",
-        "description": "Схема одного курьера для выдачи в списке (без глубоких связей)"
-      },
-      "src__modules__inventory__schemas__InventoryResponse": {
-        "properties": {
-          "id": { "type": "string", "format": "uuid", "title": "Id" },
-          "name": { "type": "string", "title": "Name" },
-          "type": { "$ref": "#/components/schemas/InventoryType" },
-          "user": { "$ref": "#/components/schemas/UserResponse" },
-          "is_active": { "type": "boolean", "title": "Is Active" }
-        },
-        "type": "object",
-        "required": ["id", "name", "type", "user", "is_active"],
-        "title": "InventoryResponse"
-      },
-      "src__modules__inventory__schemas__Item": {
-        "properties": {
-          "product_id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Product Id"
-          },
-          "quantity": {
-            "type": "integer",
-            "exclusiveMinimum": 0.0,
-            "title": "Quantity",
-            "description": "Количество товара (строго больше нуля)"
-          }
-        },
-        "type": "object",
-        "required": ["product_id", "quantity"],
-        "title": "Item",
-        "description": "Стандартная единица измерения передачи товара."
-      },
-      "src__modules__orders__schemas__InventoryResponse": {
-        "properties": {
-          "id": { "type": "string", "format": "uuid", "title": "Id" },
-          "name": { "type": "string", "title": "Name" },
-          "type": { "$ref": "#/components/schemas/InventoryType" },
-          "is_active": { "type": "boolean", "title": "Is Active" }
-        },
-        "type": "object",
-        "required": ["id", "name", "type", "is_active"],
-        "title": "InventoryResponse"
-      },
-      "src__modules__orders__schemas__Item": {
-        "properties": {
-          "product_id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Product Id",
-            "description": "ID воды, тары или оборудования из каталога"
-          },
-          "quantity": {
-            "type": "integer",
-            "exclusiveMinimum": 0.0,
-            "title": "Количество",
-            "examples": [2]
-          }
-        },
-        "type": "object",
-        "required": ["product_id", "quantity"],
-        "title": "Item"
-      }
+          "title": "Bank Name"
+        },
+        "notes": {
+          "anyOf": [
+            { "type": "string", "maxLength": 2000 },
+            { "type": "null" }
+          ],
+          "title": "Notes"
+        }
+      },
+      "type": "object",
+      "title": "ContractUpdate",
+      "description": "Частичное обновление условий договора (только DRAFT/ACTIVE)."
     },
-    "securitySchemes": {
-      "OAuth2PasswordBearer": {
-        "type": "oauth2",
-        "flows": {
-          "password": {
-            "scopes": {
-              "users:read": "Разрешение: users:read",
-              "users:write": "Разрешение: users:write",
-              "profile:read": "Разрешение: profile:read",
-              "profile:write": "Разрешение: profile:write",
-              "catalog:read": "Разрешение: catalog:read",
-              "catalog:write": "Разрешение: catalog:write",
-              "orders:read": "Разрешение: orders:read",
-              "orders:create": "Разрешение: orders:create",
-              "orders:edit": "Разрешение: orders:edit",
-              "orders:deliver": "Разрешение: orders:deliver",
-              "orders:cancel": "Разрешение: orders:cancel",
-              "transports:read": "Разрешение: transports:read",
-              "inventory:read": "Разрешение: inventory:read",
-              "inventory:write": "Разрешение: inventory:write",
-              "logistics:supply": "Разрешение: logistics:supply",
-              "logistics:transfer": "Разрешение: logistics:transfer",
-              "logistics:adjustment": "Разрешение: logistics:adjustment",
-              "routes:read": "Разрешение: routes:read",
-              "finances:read": "Разрешение: finances:read",
-              "finances:write": "Разрешение: finances:write",
-              "payments:create": "Разрешение: payments:create",
-              "bills:read": "Разрешение: bills:read",
-              "contracts:read": "Разрешение: contracts:read",
-              "contracts:write": "Разрешение: contracts:write",
-              "contracts:manage": "Разрешение: contracts:manage",
-              "settings:read": "Разрешение: settings:read",
-              "settings:write": "Разрешение: settings:write",
-              "system:exec": "Разрешение: system:exec"
+    "CourierBalanceResponse": {
+      "properties": {
+        "account_id": {
+          "type": "string",
+          "format": "uuid",
+          "title": "Account Id"
+        },
+        "balance": { "type": "integer", "title": "Balance" },
+        "today_collected": { "type": "integer", "title": "Today Collected" },
+        "today_deposited": { "type": "integer", "title": "Today Deposited" },
+        "transactions_today": {
+          "items": { "$ref": "#/components/schemas/CourierTransactionEntry" },
+          "type": "array",
+          "title": "Transactions Today"
+        }
+      },
+      "type": "object",
+      "required": [
+        "account_id",
+        "balance",
+        "today_collected",
+        "today_deposited",
+        "transactions_today"
+      ],
+      "title": "CourierBalanceResponse"
+    },
+    "CourierCreate": {
+      "properties": {
+        "username": {
+          "type": "string",
+          "title": "Username",
+          "description": "ФИО курьера"
+        },
+        "phone": {
+          "type": "string",
+          "title": "Phone",
+          "description": "Номер телефона курьера (будет Identity)"
+        },
+        "password": {
+          "type": "string",
+          "minLength": 8,
+          "title": "Password",
+          "description": "Пароль курьера (минимум 8 символов, будет захэширован)"
+        }
+      },
+      "type": "object",
+      "required": ["username", "phone", "password"],
+      "title": "CourierCreate"
+    },
+    "CourierDayLoad": {
+      "properties": {
+        "date": { "type": "string", "title": "Date" },
+        "courier_id": {
+          "type": "string",
+          "format": "uuid",
+          "title": "Courier Id"
+        },
+        "courier_name": { "type": "string", "title": "Courier Name" },
+        "deliveries_count": { "type": "integer", "title": "Deliveries Count" }
+      },
+      "type": "object",
+      "required": ["date", "courier_id", "courier_name", "deliveries_count"],
+      "title": "CourierDayLoad"
+    },
+    "CourierFinanceSummary": {
+      "properties": {
+        "courier_id": {
+          "type": "string",
+          "format": "uuid",
+          "title": "Courier Id"
+        },
+        "courier_name": { "type": "string", "title": "Courier Name" },
+        "account_id": {
+          "type": "string",
+          "format": "uuid",
+          "title": "Account Id"
+        },
+        "cash_balance": { "type": "integer", "title": "Cash Balance" },
+        "today_collected": { "type": "integer", "title": "Today Collected" },
+        "today_deposited": { "type": "integer", "title": "Today Deposited" },
+        "pending_deposit": { "type": "integer", "title": "Pending Deposit" }
+      },
+      "type": "object",
+      "required": [
+        "courier_id",
+        "courier_name",
+        "account_id",
+        "cash_balance",
+        "today_collected",
+        "today_deposited",
+        "pending_deposit"
+      ],
+      "title": "CourierFinanceSummary"
+    },
+    "CourierFleetCard": {
+      "properties": {
+        "courier_id": {
+          "type": "string",
+          "format": "uuid",
+          "title": "Courier Id"
+        },
+        "courier_name": { "type": "string", "title": "Courier Name" },
+        "vehicle_id": {
+          "anyOf": [{ "type": "string", "format": "uuid" }, { "type": "null" }],
+          "title": "Vehicle Id"
+        },
+        "vehicle_name": {
+          "anyOf": [{ "type": "string" }, { "type": "null" }],
+          "title": "Vehicle Name"
+        },
+        "is_active": {
+          "type": "boolean",
+          "title": "Is Active",
+          "description": "Есть ли активный транспорт"
+        },
+        "vehicle_balances": {
+          "items": { "$ref": "#/components/schemas/CourierVehicleBalance" },
+          "type": "array",
+          "title": "Vehicle Balances"
+        },
+        "orders_assigned_today": {
+          "type": "integer",
+          "title": "Orders Assigned Today",
+          "default": 0
+        },
+        "orders_delivered_today": {
+          "type": "integer",
+          "title": "Orders Delivered Today",
+          "default": 0
+        },
+        "cash_balance": {
+          "type": "integer",
+          "title": "Cash Balance",
+          "description": "сум — баланс кассы курьера",
+          "default": 0
+        },
+        "cash_collected_today": {
+          "type": "integer",
+          "title": "Cash Collected Today",
+          "description": "сум — собрано за сегодня",
+          "default": 0
+        },
+        "containers_collected_today": {
+          "type": "integer",
+          "title": "Containers Collected Today",
+          "description": "Тара, собранная у клиентов сегодня",
+          "default": 0
+        }
+      },
+      "type": "object",
+      "required": ["courier_id", "courier_name", "is_active"],
+      "title": "CourierFleetCard",
+      "description": "Карточка одного курьера."
+    },
+    "CourierFleetResponse": {
+      "properties": {
+        "couriers": {
+          "items": { "$ref": "#/components/schemas/CourierFleetCard" },
+          "type": "array",
+          "title": "Couriers"
+        },
+        "total_active": { "type": "integer", "title": "Total Active" },
+        "total_stock_on_couriers": {
+          "type": "integer",
+          "title": "Total Stock On Couriers"
+        },
+        "total_courier_cash": {
+          "type": "integer",
+          "title": "Total Courier Cash",
+          "description": "сум"
+        }
+      },
+      "type": "object",
+      "required": [
+        "couriers",
+        "total_active",
+        "total_stock_on_couriers",
+        "total_courier_cash"
+      ],
+      "title": "CourierFleetResponse",
+      "description": "EP-17: Карточки всех курьеров."
+    },
+    "CourierInventoryWithBalancesDTO": {
+      "properties": {
+        "id": { "type": "string", "format": "uuid", "title": "Id" },
+        "name": { "type": "string", "title": "Name" },
+        "balances": {
+          "items": { "$ref": "#/components/schemas/BalanceResponse" },
+          "type": "array",
+          "title": "Balances"
+        }
+      },
+      "type": "object",
+      "required": ["id", "name", "balances"],
+      "title": "CourierInventoryWithBalancesDTO"
+    },
+    "CourierLoadResponse": {
+      "properties": {
+        "data": {
+          "items": { "$ref": "#/components/schemas/CourierDayLoad" },
+          "type": "array",
+          "title": "Data"
+        },
+        "total_deliveries": {
+          "type": "integer",
+          "title": "Total Deliveries"
+        },
+        "avg_per_courier": { "type": "number", "title": "Avg Per Courier" },
+        "max_load": { "type": "integer", "title": "Max Load" }
+      },
+      "type": "object",
+      "required": ["data", "total_deliveries", "avg_per_courier", "max_load"],
+      "title": "CourierLoadResponse",
+      "description": "EP-20: Загрузка курьеров по дням."
+    },
+    "CourierOrderDTO": {
+      "properties": {
+        "id": { "type": "string", "format": "uuid", "title": "Id" },
+        "status": { "$ref": "#/components/schemas/OrderStatus" },
+        "payment_method": { "$ref": "#/components/schemas/PaymentMethod" },
+        "sale_type": { "$ref": "#/components/schemas/SaleType" },
+        "total_amount": { "type": "integer", "title": "Total Amount" },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "title": "Created At"
+        }
+      },
+      "type": "object",
+      "required": [
+        "id",
+        "status",
+        "payment_method",
+        "sale_type",
+        "total_amount",
+        "created_at"
+      ],
+      "title": "CourierOrderDTO",
+      "description": "Заказ в карточке курьера"
+    },
+    "CourierResponse": {
+      "properties": {
+        "id": { "type": "string", "format": "uuid", "title": "Id" },
+        "username": { "type": "string", "title": "Username" },
+        "phone": {
+          "anyOf": [{ "type": "string" }, { "type": "null" }],
+          "title": "Phone"
+        },
+        "is_active": { "type": "boolean", "title": "Is Active" },
+        "account": {
+          "anyOf": [
+            { "$ref": "#/components/schemas/AccountShortDTO" },
+            { "type": "null" }
+          ]
+        },
+        "inventory": {
+          "anyOf": [
+            {
+              "$ref": "#/components/schemas/CourierInventoryWithBalancesDTO"
             },
-            "tokenUrl": "/api/v1/auth/login"
-          }
+            { "type": "null" }
+          ]
+        },
+        "orders": {
+          "items": { "$ref": "#/components/schemas/CourierOrderDTO" },
+          "type": "array",
+          "title": "Orders"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "title": "Created At"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "title": "Updated At"
+        }
+      },
+      "type": "object",
+      "required": [
+        "id",
+        "username",
+        "phone",
+        "is_active",
+        "account",
+        "inventory",
+        "orders",
+        "created_at",
+        "updated_at"
+      ],
+      "title": "CourierResponse",
+      "description": "Полная карточка курьера для детального просмотра"
+    },
+    "CourierTransactionEntry": {
+      "properties": {
+        "direction": { "type": "string", "title": "Direction" },
+        "amount": { "type": "integer", "title": "Amount" },
+        "reason": { "type": "string", "title": "Reason" },
+        "order_id": {
+          "anyOf": [{ "type": "string", "format": "uuid" }, { "type": "null" }],
+          "title": "Order Id"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "title": "Created At"
+        }
+      },
+      "type": "object",
+      "required": ["direction", "amount", "reason", "order_id", "created_at"],
+      "title": "CourierTransactionEntry"
+    },
+    "CourierVehicleBalance": {
+      "properties": {
+        "product_id": {
+          "type": "string",
+          "format": "uuid",
+          "title": "Product Id"
+        },
+        "product_name": { "type": "string", "title": "Product Name" },
+        "quantity": { "type": "integer", "title": "Quantity" }
+      },
+      "type": "object",
+      "required": ["product_id", "product_name", "quantity"],
+      "title": "CourierVehicleBalance"
+    },
+    "CouriersResponse": {
+      "properties": {
+        "total_count": { "type": "integer", "title": "Total Count" },
+        "couriers": {
+          "items": {
+            "$ref": "#/components/schemas/src__application__courier__schemas__Courier"
+          },
+          "type": "array",
+          "title": "Couriers"
+        }
+      },
+      "type": "object",
+      "required": ["total_count", "couriers"],
+      "title": "CouriersResponse",
+      "description": "Схема ответа для эндпоинта списка курьеров с пагинацией"
+    },
+    "CouriersSummaryResponse": {
+      "properties": {
+        "couriers": {
+          "items": { "$ref": "#/components/schemas/CourierFinanceSummary" },
+          "type": "array",
+          "title": "Couriers"
+        },
+        "total_courier_cash": {
+          "type": "integer",
+          "title": "Total Courier Cash"
+        },
+        "total_pending_deposit": {
+          "type": "integer",
+          "title": "Total Pending Deposit"
+        }
+      },
+      "type": "object",
+      "required": ["couriers", "total_courier_cash", "total_pending_deposit"],
+      "title": "CouriersSummaryResponse"
+    },
+    "CreateTransferRequest": {
+      "properties": {
+        "type": { "$ref": "#/components/schemas/TransferType" },
+        "from_id": {
+          "anyOf": [{ "type": "string", "format": "uuid" }, { "type": "null" }],
+          "title": "From Id",
+          "description": "ID склада-отправителя (авто для INVENTORY_FINDING, INITIAL_BALANCE)"
+        },
+        "to_id": {
+          "anyOf": [{ "type": "string", "format": "uuid" }, { "type": "null" }],
+          "title": "To Id",
+          "description": "ID склада-получателя (авто для LOSS_WRITE_OFF)"
+        },
+        "items": {
+          "items": {
+            "$ref": "#/components/schemas/src__modules__inventory__schemas__Item"
+          },
+          "type": "array",
+          "minItems": 1,
+          "title": "Items",
+          "description": "Список товаров"
+        },
+        "reason": {
+          "anyOf": [
+            { "type": "string", "maxLength": 255, "minLength": 3 },
+            { "type": "null" }
+          ],
+          "title": "Reason",
+          "description": "Причина списания (обязательно для LOSS_WRITE_OFF)"
+        },
+        "route_sheet_id": {
+          "anyOf": [{ "type": "string", "format": "uuid" }, { "type": "null" }],
+          "title": "Route Sheet Id",
+          "description": "ID маршрутного листа (для COURIER_LOAD)"
+        }
+      },
+      "type": "object",
+      "required": ["type", "items"],
+      "title": "CreateTransferRequest",
+      "description": "Единый запрос на создание и проведение накладной (single-step)."
+    },
+    "DashboardTotals": {
+      "properties": {
+        "total_revenue": { "type": "integer", "title": "Total Revenue" },
+        "total_cash_in_hand": {
+          "type": "integer",
+          "title": "Total Cash In Hand"
+        },
+        "total_card_pending": {
+          "type": "integer",
+          "title": "Total Card Pending"
+        },
+        "total_client_debt": {
+          "type": "integer",
+          "title": "Total Client Debt"
+        },
+        "total_courier_cash": {
+          "type": "integer",
+          "title": "Total Courier Cash"
+        },
+        "total_b2b_credit_used": {
+          "type": "integer",
+          "title": "Total B2B Credit Used",
+          "default": 0
+        },
+        "total_b2b_settled_debt": {
+          "type": "integer",
+          "title": "Total B2B Settled Debt",
+          "default": 0
+        }
+      },
+      "type": "object",
+      "required": [
+        "total_revenue",
+        "total_cash_in_hand",
+        "total_card_pending",
+        "total_client_debt",
+        "total_courier_cash"
+      ],
+      "title": "DashboardTotals"
+    },
+    "DebtAgingResponse": {
+      "properties": {
+        "buckets": {
+          "items": { "$ref": "#/components/schemas/AgingBucket" },
+          "type": "array",
+          "title": "Buckets"
+        },
+        "total_debt": { "type": "integer", "title": "Total Debt" },
+        "total_debtors": { "type": "integer", "title": "Total Debtors" }
+      },
+      "type": "object",
+      "required": ["buckets", "total_debt", "total_debtors"],
+      "title": "DebtAgingResponse",
+      "description": "EP-9: Aging-бакеты."
+    },
+    "FinanceDashboard": {
+      "properties": {
+        "system_accounts": {
+          "additionalProperties": {
+            "$ref": "#/components/schemas/SystemAccountSummary"
+          },
+          "type": "object",
+          "title": "System Accounts"
+        },
+        "totals": { "$ref": "#/components/schemas/DashboardTotals" },
+        "pending_transactions_count": {
+          "type": "integer",
+          "title": "Pending Transactions Count"
+        }
+      },
+      "type": "object",
+      "required": ["system_accounts", "totals", "pending_transactions_count"],
+      "title": "FinanceDashboard"
+    },
+    "FinanceSummaryKPIs": {
+      "properties": {
+        "avg_order_value": {
+          "type": "integer",
+          "title": "Avg Order Value",
+          "description": "сум (AOV)"
+        },
+        "total_orders": { "type": "integer", "title": "Total Orders" },
+        "total_revenue": {
+          "type": "integer",
+          "title": "Total Revenue",
+          "description": "сум"
+        },
+        "card_confirmation_rate": {
+          "type": "number",
+          "title": "Card Confirmation Rate",
+          "description": "0.0-1.0"
+        },
+        "card_rejection_rate": {
+          "type": "number",
+          "title": "Card Rejection Rate",
+          "description": "0.0-1.0"
+        },
+        "avg_card_confirmation_hours": {
+          "anyOf": [{ "type": "number" }, { "type": "null" }],
+          "title": "Avg Card Confirmation Hours"
+        },
+        "collection_rate": {
+          "type": "number",
+          "title": "Collection Rate",
+          "description": "0.0-1.0 сдано/собрано"
+        },
+        "overdue_debt_ratio": {
+          "type": "number",
+          "title": "Overdue Debt Ratio",
+          "description": "0.0-1.0 долг>7д / общий долг"
+        }
+      },
+      "type": "object",
+      "required": [
+        "avg_order_value",
+        "total_orders",
+        "total_revenue",
+        "card_confirmation_rate",
+        "card_rejection_rate",
+        "collection_rate",
+        "overdue_debt_ratio"
+      ],
+      "title": "FinanceSummaryKPIs",
+      "description": "EP-12: Расчётные финансовые метрики."
+    },
+    "HTTPValidationError": {
+      "properties": {
+        "detail": {
+          "items": { "$ref": "#/components/schemas/ValidationError" },
+          "type": "array",
+          "title": "Detail"
+        }
+      },
+      "type": "object",
+      "title": "HTTPValidationError"
+    },
+    "HeatmapCell": {
+      "properties": {
+        "day_of_week": {
+          "type": "integer",
+          "title": "Day Of Week",
+          "description": "1=Пн..7=Вс (ISO 8601)"
+        },
+        "hour": { "type": "integer", "title": "Hour", "description": "0-23" },
+        "count": { "type": "integer", "title": "Count" }
+      },
+      "type": "object",
+      "required": ["day_of_week", "hour", "count"],
+      "title": "HeatmapCell"
+    },
+    "Inventory": {
+      "properties": {
+        "id": { "type": "string", "format": "uuid", "title": "Id" },
+        "type": { "$ref": "#/components/schemas/InventoryType" },
+        "name": { "type": "string", "title": "Name" },
+        "balances": {
+          "items": { "$ref": "#/components/schemas/Balance" },
+          "type": "array",
+          "title": "Balances"
+        }
+      },
+      "type": "object",
+      "required": ["id", "type", "name", "balances"],
+      "title": "Inventory"
+    },
+    "InventoryCreate": {
+      "properties": {
+        "name": {
+          "type": "string",
+          "title": "Name",
+          "description": "Название склада/машины"
+        }
+      },
+      "type": "object",
+      "required": ["name"],
+      "title": "InventoryCreate"
+    },
+    "InventorySearchResult": {
+      "properties": {
+        "id": { "type": "string", "format": "uuid", "title": "Id" },
+        "name": { "type": "string", "title": "Name" },
+        "type": { "$ref": "#/components/schemas/InventoryType" },
+        "user_id": { "type": "string", "format": "uuid", "title": "User Id" }
+      },
+      "type": "object",
+      "required": ["id", "name", "type", "user_id"],
+      "title": "InventorySearchResult",
+      "description": "Краткое описание инвентаря для поиска (например, инвентарь клиента)."
+    },
+    "InventoryShortDTO": {
+      "properties": {
+        "id": { "type": "string", "format": "uuid", "title": "Id" },
+        "name": { "type": "string", "title": "Name" }
+      },
+      "type": "object",
+      "required": ["id", "name"],
+      "title": "InventoryShortDTO",
+      "description": "Схема для сериализации инвентаря (машины)"
+    },
+    "InventoryShortResponse": {
+      "properties": {
+        "id": { "type": "string", "format": "uuid", "title": "Id" },
+        "name": { "type": "string", "title": "Name" },
+        "type": { "$ref": "#/components/schemas/InventoryType" }
+      },
+      "type": "object",
+      "required": ["id", "name", "type"],
+      "title": "InventoryShortResponse",
+      "description": "Краткое описание склада/инвентаря для вложения в накладную."
+    },
+    "InventorySummary": {
+      "properties": {
+        "total_water_stock": {
+          "type": "integer",
+          "title": "Total Water Stock",
+          "description": "Полные бутыли на складах + курьерах"
+        },
+        "total_container_stock": {
+          "type": "integer",
+          "title": "Total Container Stock",
+          "description": "Пустые бутыли на складах + курьерах"
+        },
+        "total_equipment_stock": {
+          "type": "integer",
+          "title": "Total Equipment Stock",
+          "description": "Оборудование на складах + курьерах"
+        },
+        "containers_at_clients": {
+          "type": "integer",
+          "title": "Containers At Clients",
+          "description": "Тара у клиентов"
+        },
+        "stock_on_couriers": {
+          "type": "integer",
+          "title": "Stock On Couriers",
+          "description": "Всего единиц товара на курьерах"
+        },
+        "losses_today": {
+          "type": "integer",
+          "title": "Losses Today",
+          "description": "Списания за сегодня (единиц)"
+        },
+        "active_couriers_count": {
+          "type": "integer",
+          "title": "Active Couriers Count"
+        }
+      },
+      "type": "object",
+      "required": [
+        "total_water_stock",
+        "total_container_stock",
+        "total_equipment_stock",
+        "containers_at_clients",
+        "stock_on_couriers",
+        "losses_today",
+        "active_couriers_count"
+      ],
+      "title": "InventorySummary",
+      "description": "EP-13: Агрегированные KPI по складскому учёту."
+    },
+    "InventoryTrendPoint": {
+      "properties": {
+        "date": { "type": "string", "title": "Date" },
+        "water_stock": { "type": "integer", "title": "Water Stock" },
+        "container_stock": { "type": "integer", "title": "Container Stock" },
+        "containers_at_clients": {
+          "type": "integer",
+          "title": "Containers At Clients"
+        }
+      },
+      "type": "object",
+      "required": [
+        "date",
+        "water_stock",
+        "container_stock",
+        "containers_at_clients"
+      ],
+      "title": "InventoryTrendPoint"
+    },
+    "InventoryTrendResponse": {
+      "properties": {
+        "points": {
+          "items": { "$ref": "#/components/schemas/InventoryTrendPoint" },
+          "type": "array",
+          "title": "Points"
+        }
+      },
+      "type": "object",
+      "required": ["points"],
+      "title": "InventoryTrendResponse",
+      "description": "EP-18: Временной ряд остатков."
+    },
+    "InventoryType": {
+      "type": "string",
+      "enum": [
+        "WAREHOUSE",
+        "COURIER",
+        "CLIENT",
+        "VIRTUAL_LOSS",
+        "VIRTUAL_VENDOR"
+      ],
+      "title": "InventoryType"
+    },
+    "InvoiceGenerateRequest": {
+      "properties": {
+        "period_from": {
+          "type": "string",
+          "format": "date",
+          "title": "Period From"
+        },
+        "period_to": {
+          "type": "string",
+          "format": "date",
+          "title": "Period To"
+        }
+      },
+      "type": "object",
+      "required": ["period_from", "period_to"],
+      "title": "InvoiceGenerateRequest"
+    },
+    "InvoiceResponse": {
+      "properties": {
+        "id": { "type": "string", "format": "uuid", "title": "Id" },
+        "contract_id": {
+          "type": "string",
+          "format": "uuid",
+          "title": "Contract Id"
+        },
+        "number": { "type": "string", "title": "Number" },
+        "status": { "$ref": "#/components/schemas/InvoiceStatus" },
+        "period_from": {
+          "type": "string",
+          "format": "date",
+          "title": "Period From"
+        },
+        "period_to": {
+          "type": "string",
+          "format": "date",
+          "title": "Period To"
+        },
+        "amount": { "type": "integer", "title": "Amount" },
+        "due_date": {
+          "anyOf": [{ "type": "string", "format": "date" }, { "type": "null" }],
+          "title": "Due Date"
+        },
+        "issued_at": {
+          "anyOf": [
+            { "type": "string", "format": "date-time" },
+            { "type": "null" }
+          ],
+          "title": "Issued At"
+        },
+        "paid_at": {
+          "anyOf": [
+            { "type": "string", "format": "date-time" },
+            { "type": "null" }
+          ],
+          "title": "Paid At"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "title": "Created At"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "title": "Updated At"
+        }
+      },
+      "type": "object",
+      "required": [
+        "id",
+        "contract_id",
+        "number",
+        "status",
+        "period_from",
+        "period_to",
+        "amount",
+        "due_date",
+        "issued_at",
+        "paid_at",
+        "created_at",
+        "updated_at"
+      ],
+      "title": "InvoiceResponse"
+    },
+    "InvoiceStatus": {
+      "type": "string",
+      "enum": [
+        "draft",
+        "issued",
+        "partially_paid",
+        "paid",
+        "overdue",
+        "cancelled"
+      ],
+      "title": "InvoiceStatus"
+    },
+    "Item-Output": {
+      "properties": {
+        "quantity": { "type": "integer", "title": "Quantity" },
+        "unit_price": { "type": "integer", "title": "Unit Price" },
+        "product": { "$ref": "#/components/schemas/Product" },
+        "subtotal": {
+          "type": "integer",
+          "title": "Subtotal",
+          "readOnly": true
+        }
+      },
+      "type": "object",
+      "required": ["quantity", "unit_price", "product", "subtotal"],
+      "title": "Item"
+    },
+    "JobResponse": {
+      "properties": { "updated": { "type": "integer", "title": "Updated" } },
+      "type": "object",
+      "required": ["updated"],
+      "title": "JobResponse"
+    },
+    "LocalLogin": {
+      "properties": {
+        "phone": { "type": "string", "title": "Phone" },
+        "password": {
+          "type": "string",
+          "minLength": 1,
+          "title": "Password",
+          "description": "Пароль пользователя"
+        }
+      },
+      "type": "object",
+      "required": ["phone", "password"],
+      "title": "LocalLogin"
+    },
+    "LossTrendPoint": {
+      "properties": {
+        "date": { "type": "string", "title": "Date" },
+        "quantity": { "type": "integer", "title": "Quantity" }
+      },
+      "type": "object",
+      "required": ["date", "quantity"],
+      "title": "LossTrendPoint"
+    },
+    "MovementStatsResponse": {
+      "properties": {
+        "types": {
+          "items": { "$ref": "#/components/schemas/MovementTypeStats" },
+          "type": "array",
+          "title": "Types"
+        },
+        "total_transfers": { "type": "integer", "title": "Total Transfers" },
+        "total_items": { "type": "integer", "title": "Total Items" }
+      },
+      "type": "object",
+      "required": ["types", "total_transfers", "total_items"],
+      "title": "MovementStatsResponse",
+      "description": "EP-16: Статистика перемещений."
+    },
+    "MovementTypeStats": {
+      "properties": {
+        "transfer_type": { "type": "string", "title": "Transfer Type" },
+        "transfers_count": { "type": "integer", "title": "Transfers Count" },
+        "total_items": { "type": "integer", "title": "Total Items" }
+      },
+      "type": "object",
+      "required": ["transfer_type", "transfers_count", "total_items"],
+      "title": "MovementTypeStats"
+    },
+    "OnboardingOrderItemSchema": {
+      "properties": {
+        "product_id": {
+          "type": "string",
+          "format": "uuid",
+          "title": "Product Id"
+        },
+        "quantity": { "type": "integer", "title": "Quantity" }
+      },
+      "type": "object",
+      "required": ["product_id", "quantity"],
+      "title": "OnboardingOrderItemSchema"
+    },
+    "OnboardingOrderSchema": {
+      "properties": {
+        "items": {
+          "items": {
+            "$ref": "#/components/schemas/OnboardingOrderItemSchema"
+          },
+          "type": "array",
+          "title": "Items"
+        },
+        "payment_method": { "$ref": "#/components/schemas/PaymentMethod" }
+      },
+      "type": "object",
+      "required": ["items", "payment_method"],
+      "title": "OnboardingOrderSchema"
+    },
+    "Order": {
+      "properties": {
+        "payment_method": { "$ref": "#/components/schemas/PaymentMethod" },
+        "status": { "$ref": "#/components/schemas/OrderStatus" },
+        "total_amount": { "type": "integer", "title": "Total Amount" },
+        "client_inventory": {
+          "$ref": "#/components/schemas/ClientInventory"
+        },
+        "courier": {
+          "anyOf": [
+            {
+              "$ref": "#/components/schemas/src__application__client__schemas__Courier"
+            },
+            { "type": "null" }
+          ]
+        },
+        "items": {
+          "items": { "$ref": "#/components/schemas/Item-Output" },
+          "type": "array",
+          "title": "Items"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "title": "Created At"
+        }
+      },
+      "type": "object",
+      "required": [
+        "payment_method",
+        "status",
+        "total_amount",
+        "client_inventory",
+        "items",
+        "created_at"
+      ],
+      "title": "Order"
+    },
+    "OrderCreate": {
+      "properties": {
+        "items": {
+          "items": {
+            "$ref": "#/components/schemas/src__modules__orders__schemas__Item"
+          },
+          "type": "array",
+          "minItems": 1,
+          "title": "Корзина товаров"
+        },
+        "payment_method": {
+          "$ref": "#/components/schemas/PaymentMethod",
+          "title": "Способ оплаты",
+          "description": "Намерение клиента по оплате: Наличные, Карта ",
+          "examples": ["cash"]
+        },
+        "client_inventory_id": {
+          "type": "string",
+          "format": "uuid",
+          "title": "ID адреса клиента",
+          "description": "Инвентарь клиента, куда будет доставлен заказ"
+        },
+        "capitalize_missing_tara": {
+          "type": "boolean",
+          "title": "Оприходовать недостающую тару",
+          "description": "Если True — система автоматически оприходует дефицит тары перед созданием заказа (INITIAL_BALANCE).",
+          "default": false
+        },
+        "notes": {
+          "anyOf": [{ "type": "string", "maxLength": 500 }, { "type": "null" }],
+          "title": "Заметки к доставке",
+          "description": "Инструкции для курьера: код домофона, этаж, время доставки и т.д."
+        }
+      },
+      "type": "object",
+      "required": ["items", "payment_method", "client_inventory_id"],
+      "title": "OrderCreate"
+    },
+    "OrderDeliverRequest": {
+      "properties": {
+        "actual_items": {
+          "anyOf": [
+            {
+              "items": { "$ref": "#/components/schemas/OrderItemActual" },
+              "type": "array"
+            },
+            { "type": "null" }
+          ],
+          "title": "Actual Items",
+          "description": "Фактический состав (если отличается от заказа)"
+        }
+      },
+      "type": "object",
+      "title": "OrderDeliverRequest",
+      "description": "Запрос курьера на завершение доставки с возможной корректировкой."
+    },
+    "OrderFunnelResponse": {
+      "properties": {
+        "total": { "type": "integer", "title": "Total" },
+        "statuses": {
+          "items": { "$ref": "#/components/schemas/StatusFunnelItem" },
+          "type": "array",
+          "title": "Statuses"
+        }
+      },
+      "type": "object",
+      "required": ["total", "statuses"],
+      "title": "OrderFunnelResponse",
+      "description": "EP-3: Распределение по текущему статусу."
+    },
+    "OrderHeatmapResponse": {
+      "properties": {
+        "cells": {
+          "items": { "$ref": "#/components/schemas/HeatmapCell" },
+          "type": "array",
+          "title": "Cells"
+        },
+        "max_count": { "type": "integer", "title": "Max Count" }
+      },
+      "type": "object",
+      "required": ["cells", "max_count"],
+      "title": "OrderHeatmapResponse",
+      "description": "EP-4: Тепловая карта заказов."
+    },
+    "OrderItemActual": {
+      "properties": {
+        "product_id": {
+          "type": "string",
+          "format": "uuid",
+          "title": "Product Id"
+        },
+        "quantity": { "type": "integer", "minimum": 0.0, "title": "Quantity" }
+      },
+      "type": "object",
+      "required": ["product_id", "quantity"],
+      "title": "OrderItemActual",
+      "description": "Фактически доставленное количество товара."
+    },
+    "OrderItemResponse": {
+      "properties": {
+        "id": { "type": "string", "format": "uuid", "title": "Id" },
+        "product_id": {
+          "type": "string",
+          "format": "uuid",
+          "title": "Product Id"
+        },
+        "product": { "$ref": "#/components/schemas/ProductResponse" },
+        "quantity": {
+          "type": "integer",
+          "title": "Quantity",
+          "description": "Количество"
+        },
+        "unit_price": {
+          "type": "integer",
+          "title": "Unit Price",
+          "description": "Историческая цена на момент покупки"
+        },
+        "total": {
+          "type": "integer",
+          "title": "Total",
+          "description": "quantity * unit_price"
+        }
+      },
+      "type": "object",
+      "required": [
+        "id",
+        "product_id",
+        "product",
+        "quantity",
+        "unit_price",
+        "total"
+      ],
+      "title": "OrderItemResponse",
+      "description": "Как выглядит одна позиция в заказе при выдаче клиенту."
+    },
+    "OrderResponse": {
+      "properties": {
+        "id": { "type": "string", "format": "uuid", "title": "Id" },
+        "client_id": {
+          "type": "string",
+          "format": "uuid",
+          "title": "Client Id"
+        },
+        "client": { "$ref": "#/components/schemas/UserResponse" },
+        "client_inventory_id": {
+          "type": "string",
+          "format": "uuid",
+          "title": "Client Inventory Id"
+        },
+        "client_inventory": {
+          "$ref": "#/components/schemas/src__modules__orders__schemas__InventoryResponse"
+        },
+        "courier_id": {
+          "anyOf": [{ "type": "string", "format": "uuid" }, { "type": "null" }],
+          "title": "Courier Id"
+        },
+        "courier": {
+          "anyOf": [
+            { "$ref": "#/components/schemas/UserResponse" },
+            { "type": "null" }
+          ]
+        },
+        "status": { "$ref": "#/components/schemas/OrderStatus" },
+        "payment_method": { "$ref": "#/components/schemas/PaymentMethod" },
+        "total_amount": { "type": "integer", "title": "Total Amount" },
+        "capitalization_applied": {
+          "type": "boolean",
+          "title": "Capitalization Applied",
+          "description": "True, если при создании заказа было выполнено авто-оприходование недостающей тары (INITIAL_BALANCE).",
+          "default": false
+        },
+        "sale_type": {
+          "$ref": "#/components/schemas/SaleType",
+          "description": "Тип продажи: delivery или warehouse_pickup",
+          "default": "delivery"
+        },
+        "warehouse_id": {
+          "anyOf": [{ "type": "string", "format": "uuid" }, { "type": "null" }],
+          "title": "Warehouse Id",
+          "description": "ID склада (только для самовывоза)"
+        },
+        "contract_id": {
+          "anyOf": [{ "type": "string", "format": "uuid" }, { "type": "null" }],
+          "title": "Contract Id",
+          "description": "ID договора (только для CONTRACT оплаты)"
+        },
+        "reserved_credit_amount": {
+          "anyOf": [{ "type": "integer" }, { "type": "null" }],
+          "title": "Reserved Credit Amount",
+          "description": "Зарезервированная сумма кредита (только для CONTRACT оплаты)"
+        },
+        "notes": {
+          "anyOf": [{ "type": "string" }, { "type": "null" }],
+          "title": "Notes",
+          "description": "Инструкции по доставке"
+        },
+        "cancellation_reason": {
+          "anyOf": [{ "type": "string" }, { "type": "null" }],
+          "title": "Cancellation Reason",
+          "description": "Причина отмены (если статус CANCELLED)"
+        },
+        "items": {
+          "items": { "$ref": "#/components/schemas/OrderItemResponse" },
+          "type": "array",
+          "title": "Items"
+        },
+        "stock_transfers": {
+          "items": { "$ref": "#/components/schemas/TransferResponse" },
+          "type": "array",
+          "title": "Stock Transfers",
+          "default": []
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "title": "Created At"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "title": "Updated At"
+        }
+      },
+      "type": "object",
+      "required": [
+        "id",
+        "client_id",
+        "client",
+        "client_inventory_id",
+        "client_inventory",
+        "status",
+        "payment_method",
+        "total_amount",
+        "items",
+        "created_at",
+        "updated_at"
+      ],
+      "title": "OrderResponse",
+      "description": "Полная модель заказа для Личного Кабинета или Дашборда."
+    },
+    "OrderStatus": {
+      "type": "string",
+      "enum": [
+        "new",
+        "assigned",
+        "in_transit",
+        "arrived",
+        "delivered",
+        "pickup_completed",
+        "cancelled"
+      ],
+      "title": "OrderStatus"
+    },
+    "OrderStatusCount": {
+      "properties": {
+        "status": {
+          "type": "string",
+          "title": "Status",
+          "description": "OrderStatus value"
+        },
+        "count": { "type": "integer", "title": "Count" }
+      },
+      "type": "object",
+      "required": ["status", "count"],
+      "title": "OrderStatusCount"
+    },
+    "OrderTrendPoint": {
+      "properties": {
+        "period": { "type": "string", "title": "Period" },
+        "orders_count": { "type": "integer", "title": "Orders Count" },
+        "revenue": {
+          "type": "integer",
+          "title": "Revenue",
+          "description": "сум"
+        },
+        "avg_order_value": {
+          "type": "integer",
+          "title": "Avg Order Value",
+          "description": "сум"
+        }
+      },
+      "type": "object",
+      "required": ["period", "orders_count", "revenue", "avg_order_value"],
+      "title": "OrderTrendPoint"
+    },
+    "OrderTrendResponse": {
+      "properties": {
+        "points": {
+          "items": { "$ref": "#/components/schemas/OrderTrendPoint" },
+          "type": "array",
+          "title": "Points"
+        },
+        "total_orders": { "type": "integer", "title": "Total Orders" },
+        "total_revenue": { "type": "integer", "title": "Total Revenue" }
+      },
+      "type": "object",
+      "required": ["points", "total_orders", "total_revenue"],
+      "title": "OrderTrendResponse",
+      "description": "EP-2: Временной ряд заказов."
+    },
+    "OrdersResponse": {
+      "properties": {
+        "total_count": { "type": "integer", "title": "Total Count" },
+        "orders": {
+          "items": { "$ref": "#/components/schemas/OrderResponse" },
+          "type": "array",
+          "title": "Orders"
+        }
+      },
+      "type": "object",
+      "required": ["total_count", "orders"],
+      "title": "OrdersResponse",
+      "description": "Постраничный список заказов с общим количеством."
+    },
+    "OrdersSummary": {
+      "properties": {
+        "active_by_status": {
+          "items": { "$ref": "#/components/schemas/OrderStatusCount" },
+          "type": "array",
+          "title": "Active By Status",
+          "description": "Количество заказов в незавершённых статусах: new, assigned, in_transit, arrived"
+        },
+        "unassigned_orders": {
+          "type": "integer",
+          "title": "Unassigned Orders",
+          "description": "NEW delivery-заказы без курьера — ключевой показатель для диспетчера"
+        },
+        "total_today": { "type": "integer", "title": "Total Today" },
+        "delivered_today": { "type": "integer", "title": "Delivered Today" },
+        "cancelled_today": { "type": "integer", "title": "Cancelled Today" },
+        "revenue_today": {
+          "type": "integer",
+          "title": "Revenue Today",
+          "description": "сум, сумма завершённых сегодня"
+        },
+        "by_sale_type": {
+          "additionalProperties": { "type": "integer" },
+          "type": "object",
+          "title": "By Sale Type",
+          "description": "{\"delivery\": N, \"warehouse_pickup\": N}"
+        },
+        "active_couriers": { "type": "integer", "title": "Active Couriers" }
+      },
+      "type": "object",
+      "required": [
+        "active_by_status",
+        "unassigned_orders",
+        "total_today",
+        "delivered_today",
+        "cancelled_today",
+        "revenue_today",
+        "by_sale_type",
+        "active_couriers"
+      ],
+      "title": "OrdersSummary",
+      "description": "EP-1: Операционная сводка (BR-1)."
+    },
+    "PaymentBreakdownResponse": {
+      "properties": {
+        "methods": {
+          "items": { "$ref": "#/components/schemas/PaymentMethodStats" },
+          "type": "array",
+          "title": "Methods"
+        },
+        "total_orders": { "type": "integer", "title": "Total Orders" },
+        "total_amount": { "type": "integer", "title": "Total Amount" }
+      },
+      "type": "object",
+      "required": ["methods", "total_orders", "total_amount"],
+      "title": "PaymentBreakdownResponse",
+      "description": "EP-5: Разбивка по способам оплаты."
+    },
+    "PaymentMethod": {
+      "type": "string",
+      "enum": ["cash", "card", "contract"],
+      "title": "PaymentMethod"
+    },
+    "PaymentMethodFinanceStats": {
+      "properties": {
+        "method": {
+          "type": "string",
+          "title": "Method",
+          "description": "cash | card | contract"
+        },
+        "transactions_count": {
+          "type": "integer",
+          "title": "Transactions Count"
+        },
+        "total_amount": {
+          "type": "integer",
+          "title": "Total Amount",
+          "description": "сум"
+        }
+      },
+      "type": "object",
+      "required": ["method", "transactions_count", "total_amount"],
+      "title": "PaymentMethodFinanceStats"
+    },
+    "PaymentMethodStats": {
+      "properties": {
+        "method": {
+          "type": "string",
+          "title": "Method",
+          "description": "cash | card | contract"
+        },
+        "orders_count": { "type": "integer", "title": "Orders Count" },
+        "total_amount": {
+          "type": "integer",
+          "title": "Total Amount",
+          "description": "сум"
+        }
+      },
+      "type": "object",
+      "required": ["method", "orders_count", "total_amount"],
+      "title": "PaymentMethodStats"
+    },
+    "PaymentMethodsFinanceResponse": {
+      "properties": {
+        "methods": {
+          "items": {
+            "$ref": "#/components/schemas/PaymentMethodFinanceStats"
+          },
+          "type": "array",
+          "title": "Methods"
+        }
+      },
+      "type": "object",
+      "required": ["methods"],
+      "title": "PaymentMethodsFinanceResponse",
+      "description": "EP-11: Финансовая разбивка по способам оплаты."
+    },
+    "PriceItemCreate": {
+      "properties": {
+        "price": {
+          "type": "integer",
+          "minimum": 0.0,
+          "title": "Price",
+          "description": "Договорная цена в сумах"
+        }
+      },
+      "type": "object",
+      "required": ["price"],
+      "title": "PriceItemCreate"
+    },
+    "PriceItemResponse": {
+      "properties": {
+        "id": { "type": "string", "format": "uuid", "title": "Id" },
+        "contract_id": {
+          "type": "string",
+          "format": "uuid",
+          "title": "Contract Id"
+        },
+        "product_id": {
+          "type": "string",
+          "format": "uuid",
+          "title": "Product Id"
+        },
+        "price": { "type": "integer", "title": "Price" },
+        "is_active": { "type": "boolean", "title": "Is Active" },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "title": "Created At"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "title": "Updated At"
+        }
+      },
+      "type": "object",
+      "required": [
+        "id",
+        "contract_id",
+        "product_id",
+        "price",
+        "is_active",
+        "created_at",
+        "updated_at"
+      ],
+      "title": "PriceItemResponse"
+    },
+    "Product": {
+      "properties": {
+        "type": { "$ref": "#/components/schemas/ProductType" },
+        "name": { "type": "string", "title": "Name" },
+        "price": { "type": "integer", "title": "Price" },
+        "attributes": {
+          "additionalProperties": true,
+          "type": "object",
+          "title": "Attributes"
+        }
+      },
+      "type": "object",
+      "required": ["type", "name", "price"],
+      "title": "Product"
+    },
+    "ProductCreate": {
+      "properties": {
+        "name": {
+          "type": "string",
+          "maxLength": 255,
+          "minLength": 1,
+          "title": "Название товара",
+          "examples": ["Вода Завод А 19Л ПК"]
+        },
+        "price": {
+          "type": "integer",
+          "minimum": 0.0,
+          "title": "Цена",
+          "description": "Цена в сумах (UZS), целое число",
+          "default": 0,
+          "examples": [20000]
+        },
+        "attributes": {
+          "additionalProperties": true,
+          "type": "object",
+          "title": "Характеристики",
+          "description": "JSON с физическими свойствами (volume, material)",
+          "examples": [{ "material": "PC", "volume": 18.9 }]
+        },
+        "returnable_item_id": {
+          "anyOf": [{ "type": "string", "format": "uuid" }, { "type": "null" }],
+          "title": "ID возвратной тары",
+          "description": "Указывается для воды, требующей обмена пустой бутылки"
+        },
+        "type": {
+          "$ref": "#/components/schemas/ProductType",
+          "title": "Тип товара",
+          "examples": ["water"]
+        }
+      },
+      "type": "object",
+      "required": ["name", "type"],
+      "title": "ProductCreate"
+    },
+    "ProductResponse": {
+      "properties": {
+        "name": {
+          "type": "string",
+          "maxLength": 255,
+          "minLength": 1,
+          "title": "Название товара",
+          "examples": ["Вода Завод А 19Л ПК"]
+        },
+        "price": {
+          "type": "integer",
+          "minimum": 0.0,
+          "title": "Цена",
+          "description": "Цена в сумах (UZS), целое число",
+          "default": 0,
+          "examples": [20000]
+        },
+        "attributes": {
+          "additionalProperties": true,
+          "type": "object",
+          "title": "Характеристики",
+          "description": "JSON с физическими свойствами (volume, material)",
+          "examples": [{ "material": "PC", "volume": 18.9 }]
+        },
+        "returnable_item_id": {
+          "anyOf": [{ "type": "string", "format": "uuid" }, { "type": "null" }],
+          "title": "ID возвратной тары",
+          "description": "Указывается для воды, требующей обмена пустой бутылки"
+        },
+        "id": { "type": "string", "format": "uuid", "title": "Id" },
+        "type": { "$ref": "#/components/schemas/ProductType" },
+        "is_active": { "type": "boolean", "title": "Is Active" },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "title": "Created At"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "title": "Updated At"
+        }
+      },
+      "type": "object",
+      "required": [
+        "name",
+        "id",
+        "type",
+        "is_active",
+        "created_at",
+        "updated_at"
+      ],
+      "title": "ProductResponse"
+    },
+    "ProductSimpleResponse": {
+      "properties": {
+        "id": { "type": "string", "format": "uuid", "title": "Id" },
+        "name": { "type": "string", "title": "Name" },
+        "type": { "$ref": "#/components/schemas/ProductType" },
+        "price": { "type": "integer", "title": "Price", "default": 0 },
+        "is_active": {
+          "type": "boolean",
+          "title": "Is Active",
+          "default": true
+        }
+      },
+      "type": "object",
+      "required": ["id", "name", "type"],
+      "title": "ProductSimpleResponse"
+    },
+    "ProductType": {
+      "type": "string",
+      "enum": ["water", "container", "equipment"],
+      "title": "ProductType"
+    },
+    "ProductUpdate": {
+      "properties": {
+        "name": {
+          "anyOf": [
+            { "type": "string", "maxLength": 255, "minLength": 1 },
+            { "type": "null" }
+          ],
+          "title": "Name"
+        },
+        "type": {
+          "anyOf": [
+            { "$ref": "#/components/schemas/ProductType" },
+            { "type": "null" }
+          ]
+        },
+        "price": {
+          "anyOf": [{ "type": "integer", "minimum": 0.0 }, { "type": "null" }],
+          "title": "Price"
+        },
+        "attributes": {
+          "anyOf": [
+            { "additionalProperties": true, "type": "object" },
+            { "type": "null" }
+          ],
+          "title": "Attributes"
+        },
+        "returnable_item_id": {
+          "anyOf": [{ "type": "string", "format": "uuid" }, { "type": "null" }],
+          "title": "Returnable Item Id"
+        }
+      },
+      "type": "object",
+      "title": "ProductUpdate"
+    },
+    "ReconciliationOrderItem": {
+      "properties": {
+        "order_id": {
+          "type": "string",
+          "format": "uuid",
+          "title": "Order Id"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "title": "Created At"
+        },
+        "total_amount": { "type": "integer", "title": "Total Amount" }
+      },
+      "type": "object",
+      "required": ["order_id", "created_at", "total_amount"],
+      "title": "ReconciliationOrderItem"
+    },
+    "ReconciliationPaymentItem": {
+      "properties": {
+        "transaction_id": {
+          "type": "string",
+          "format": "uuid",
+          "title": "Transaction Id"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "title": "Created At"
+        },
+        "amount": { "type": "integer", "title": "Amount" },
+        "reason": {
+          "anyOf": [{ "type": "string" }, { "type": "null" }],
+          "title": "Reason"
+        }
+      },
+      "type": "object",
+      "required": ["transaction_id", "created_at", "amount"],
+      "title": "ReconciliationPaymentItem"
+    },
+    "ReconciliationResponse": {
+      "properties": {
+        "contract_id": {
+          "type": "string",
+          "format": "uuid",
+          "title": "Contract Id"
+        },
+        "contract_number": { "type": "string", "title": "Contract Number" },
+        "client_name": { "type": "string", "title": "Client Name" },
+        "period_from": {
+          "type": "string",
+          "format": "date",
+          "title": "Period From"
+        },
+        "period_to": {
+          "type": "string",
+          "format": "date",
+          "title": "Period To"
+        },
+        "orders": {
+          "items": { "$ref": "#/components/schemas/ReconciliationOrderItem" },
+          "type": "array",
+          "title": "Orders"
+        },
+        "total_billed": { "type": "integer", "title": "Total Billed" },
+        "payments": {
+          "items": {
+            "$ref": "#/components/schemas/ReconciliationPaymentItem"
+          },
+          "type": "array",
+          "title": "Payments"
+        },
+        "total_paid": { "type": "integer", "title": "Total Paid" },
+        "balance": { "type": "integer", "title": "Balance" }
+      },
+      "type": "object",
+      "required": [
+        "contract_id",
+        "contract_number",
+        "client_name",
+        "period_from",
+        "period_to",
+        "orders",
+        "total_billed",
+        "payments",
+        "total_paid",
+        "balance"
+      ],
+      "title": "ReconciliationResponse"
+    },
+    "RevenueBySegmentResponse": {
+      "properties": {
+        "segments": {
+          "items": { "$ref": "#/components/schemas/SegmentRevenue" },
+          "type": "array",
+          "title": "Segments"
+        },
+        "total_orders": { "type": "integer", "title": "Total Orders" },
+        "total_revenue": { "type": "integer", "title": "Total Revenue" }
+      },
+      "type": "object",
+      "required": ["segments", "total_orders", "total_revenue"],
+      "title": "RevenueBySegmentResponse",
+      "description": "EP-21: Выручка по сегментам."
+    },
+    "RevenueTrendPoint": {
+      "properties": {
+        "period": {
+          "type": "string",
+          "title": "Period",
+          "description": "2026-03-15 | 2026-W12 | 2026-03"
+        },
+        "revenue": {
+          "type": "integer",
+          "title": "Revenue",
+          "description": "сум"
+        },
+        "orders_count": { "type": "integer", "title": "Orders Count" }
+      },
+      "type": "object",
+      "required": ["period", "revenue", "orders_count"],
+      "title": "RevenueTrendPoint"
+    },
+    "RevenueTrendResponse": {
+      "properties": {
+        "points": {
+          "items": { "$ref": "#/components/schemas/RevenueTrendPoint" },
+          "type": "array",
+          "title": "Points"
+        },
+        "total_revenue": { "type": "integer", "title": "Total Revenue" },
+        "total_orders": { "type": "integer", "title": "Total Orders" },
+        "change_percent": {
+          "anyOf": [{ "type": "number" }, { "type": "null" }],
+          "title": "Change Percent",
+          "description": "% vs аналогичный предыдущий период"
+        }
+      },
+      "type": "object",
+      "required": ["points", "total_revenue", "total_orders"],
+      "title": "RevenueTrendResponse",
+      "description": "EP-8: Временной ряд выручки."
+    },
+    "Role": {
+      "type": "string",
+      "enum": [
+        "system",
+        "admin",
+        "accountant",
+        "storekeeper",
+        "cashier",
+        "courier",
+        "client_b2c",
+        "client_b2b"
+      ],
+      "title": "Role"
+    },
+    "SaleType": {
+      "type": "string",
+      "enum": ["delivery", "warehouse_pickup"],
+      "title": "SaleType"
+    },
+    "SegmentRevenue": {
+      "properties": {
+        "segment": {
+          "type": "string",
+          "title": "Segment",
+          "description": "client_b2b | client_b2c"
+        },
+        "orders_count": { "type": "integer", "title": "Orders Count" },
+        "total_revenue": {
+          "type": "integer",
+          "title": "Total Revenue",
+          "description": "сум"
+        },
+        "avg_order_value": {
+          "type": "integer",
+          "title": "Avg Order Value",
+          "description": "сум"
+        }
+      },
+      "type": "object",
+      "required": [
+        "segment",
+        "orders_count",
+        "total_revenue",
+        "avg_order_value"
+      ],
+      "title": "SegmentRevenue"
+    },
+    "StatementEntry": {
+      "properties": {
+        "id": { "type": "string", "format": "uuid", "title": "Id" },
+        "direction": { "type": "string", "title": "Direction" },
+        "counterparty": { "$ref": "#/components/schemas/AccountShort" },
+        "amount": { "type": "integer", "title": "Amount" },
+        "running_balance": { "type": "integer", "title": "Running Balance" },
+        "status": { "$ref": "#/components/schemas/TransactionStatus" },
+        "reason": { "type": "string", "title": "Reason" },
+        "order_id": {
+          "anyOf": [{ "type": "string", "format": "uuid" }, { "type": "null" }],
+          "title": "Order Id"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "title": "Created At"
+        }
+      },
+      "type": "object",
+      "required": [
+        "id",
+        "direction",
+        "counterparty",
+        "amount",
+        "running_balance",
+        "status",
+        "reason",
+        "order_id",
+        "created_at"
+      ],
+      "title": "StatementEntry"
+    },
+    "StatementPeriod": {
+      "properties": {
+        "date_from": {
+          "type": "string",
+          "format": "date",
+          "title": "Date From"
+        },
+        "date_to": { "type": "string", "format": "date", "title": "Date To" },
+        "opening_balance": { "type": "integer", "title": "Opening Balance" },
+        "closing_balance": { "type": "integer", "title": "Closing Balance" },
+        "total_incoming": { "type": "integer", "title": "Total Incoming" },
+        "total_outgoing": { "type": "integer", "title": "Total Outgoing" }
+      },
+      "type": "object",
+      "required": [
+        "date_from",
+        "date_to",
+        "opening_balance",
+        "closing_balance",
+        "total_incoming",
+        "total_outgoing"
+      ],
+      "title": "StatementPeriod"
+    },
+    "StatusFunnelItem": {
+      "properties": {
+        "status": { "type": "string", "title": "Status" },
+        "count": { "type": "integer", "title": "Count" },
+        "percentage": {
+          "type": "number",
+          "title": "Percentage",
+          "description": "0.0-1.0"
+        }
+      },
+      "type": "object",
+      "required": ["status", "count", "percentage"],
+      "title": "StatusFunnelItem"
+    },
+    "SystemAccountSummary": {
+      "properties": {
+        "id": { "type": "string", "format": "uuid", "title": "Id" },
+        "balance": { "type": "integer", "title": "Balance" },
+        "name": { "type": "string", "title": "Name" }
+      },
+      "type": "object",
+      "required": ["id", "balance", "name"],
+      "title": "SystemAccountSummary"
+    },
+    "TaraCheckRequest": {
+      "properties": {
+        "items": {
+          "items": {
+            "$ref": "#/components/schemas/src__modules__orders__schemas__Item"
+          },
+          "type": "array",
+          "minItems": 1,
+          "title": "Items"
+        },
+        "client_inventory_id": {
+          "type": "string",
+          "format": "uuid",
+          "title": "ID адреса клиента"
+        }
+      },
+      "type": "object",
+      "required": ["items", "client_inventory_id"],
+      "title": "TaraCheckRequest",
+      "description": "Запрос на проверку доступности тары перед оформлением заказа."
+    },
+    "TaraCheckResponse": {
+      "properties": {
+        "can_order": {
+          "type": "boolean",
+          "title": "Can Order",
+          "description": "Можно ли оформить заказ с текущей тарой"
+        },
+        "shortages": {
+          "items": { "$ref": "#/components/schemas/TaraShortage" },
+          "type": "array",
+          "title": "Shortages",
+          "description": "Список нехваток тары (пуст, если can_order=true)"
+        }
+      },
+      "type": "object",
+      "required": ["can_order"],
+      "title": "TaraCheckResponse",
+      "description": "Результат проверки тары: можно ли оформить заказ."
+    },
+    "TaraShortage": {
+      "properties": {
+        "product_id": {
+          "type": "string",
+          "format": "uuid",
+          "title": "Product Id"
+        },
+        "product_name": { "type": "string", "title": "Product Name" },
+        "returnable_item_id": {
+          "type": "string",
+          "format": "uuid",
+          "title": "Returnable Item Id"
+        },
+        "required": { "type": "integer", "title": "Required" },
+        "available": { "type": "integer", "title": "Available" },
+        "deficit": { "type": "integer", "title": "Deficit" }
+      },
+      "type": "object",
+      "required": [
+        "product_id",
+        "product_name",
+        "returnable_item_id",
+        "required",
+        "available",
+        "deficit"
+      ],
+      "title": "TaraShortage"
+    },
+    "TokenResponse": {
+      "properties": {
+        "access_token": { "type": "string", "title": "Access Token" },
+        "token_type": {
+          "type": "string",
+          "title": "Token Type",
+          "default": "bearer"
+        }
+      },
+      "type": "object",
+      "required": ["access_token"],
+      "title": "TokenResponse",
+      "description": "Стандартная схема ответа при успешной авторизации.\nПоля access_token и token_type обязательны по спецификации OAuth2."
+    },
+    "TopClientItem": {
+      "properties": {
+        "client_id": {
+          "type": "string",
+          "format": "uuid",
+          "title": "Client Id"
+        },
+        "client_name": { "type": "string", "title": "Client Name" },
+        "client_type": {
+          "type": "string",
+          "title": "Client Type",
+          "description": "client_b2c | client_b2b"
+        },
+        "orders_count": { "type": "integer", "title": "Orders Count" },
+        "total_amount": {
+          "type": "integer",
+          "title": "Total Amount",
+          "description": "сум"
+        }
+      },
+      "type": "object",
+      "required": [
+        "client_id",
+        "client_name",
+        "client_type",
+        "orders_count",
+        "total_amount"
+      ],
+      "title": "TopClientItem"
+    },
+    "TopClientsResponse": {
+      "properties": {
+        "clients": {
+          "items": { "$ref": "#/components/schemas/TopClientItem" },
+          "type": "array",
+          "title": "Clients"
+        }
+      },
+      "type": "object",
+      "required": ["clients"],
+      "title": "TopClientsResponse",
+      "description": "EP-7: Топ клиентов по заказам."
+    },
+    "TopDebtorItem": {
+      "properties": {
+        "client_id": {
+          "type": "string",
+          "format": "uuid",
+          "title": "Client Id"
+        },
+        "client_name": { "type": "string", "title": "Client Name" },
+        "client_type": {
+          "type": "string",
+          "title": "Client Type",
+          "description": "client_b2c | client_b2b"
+        },
+        "phone": {
+          "anyOf": [{ "type": "string" }, { "type": "null" }],
+          "title": "Phone"
+        },
+        "debt_amount": {
+          "type": "integer",
+          "title": "Debt Amount",
+          "description": "сум"
+        },
+        "last_payment_date": {
+          "anyOf": [{ "type": "string", "format": "date" }, { "type": "null" }],
+          "title": "Last Payment Date"
+        },
+        "days_overdue": { "type": "integer", "title": "Days Overdue" }
+      },
+      "type": "object",
+      "required": [
+        "client_id",
+        "client_name",
+        "client_type",
+        "debt_amount",
+        "days_overdue"
+      ],
+      "title": "TopDebtorItem"
+    },
+    "TopDebtorsResponse": {
+      "properties": {
+        "debtors": {
+          "items": { "$ref": "#/components/schemas/TopDebtorItem" },
+          "type": "array",
+          "title": "Debtors"
+        },
+        "total_debt": { "type": "integer", "title": "Total Debt" }
+      },
+      "type": "object",
+      "required": ["debtors", "total_debt"],
+      "title": "TopDebtorsResponse",
+      "description": "EP-10: Топ должников."
+    },
+    "TransactionCreate": {
+      "properties": {
+        "from_id": {
+          "type": "string",
+          "format": "uuid",
+          "title": "Счет списания (Дебет)",
+          "description": "Откуда уходят деньги"
+        },
+        "to_id": {
+          "type": "string",
+          "format": "uuid",
+          "title": "Счет зачисления (Кредит)",
+          "description": "Куда приходят деньги"
+        },
+        "amount": {
+          "type": "integer",
+          "exclusiveMinimum": 0.0,
+          "title": "Сумма перевода",
+          "examples": [150000]
+        },
+        "reason": {
+          "type": "string",
+          "maxLength": 255,
+          "minLength": 3,
+          "title": "Основание платежа",
+          "examples": [
+            "Сдача выручки курьером",
+            "Пополнение баланса через Payme"
+          ]
+        },
+        "order_id": {
+          "anyOf": [{ "type": "string", "format": "uuid" }, { "type": "null" }],
+          "title": "Order Id"
+        }
+      },
+      "type": "object",
+      "required": ["from_id", "to_id", "amount", "reason"],
+      "title": "TransactionCreate",
+      "description": "Схема для ручных проводок (Например: Бухгалтер принимает\nналичные от курьера).\nДля заказов (Checkout) эта схема не используется, так как\nUseCase будет генерировать проводки автоматически внутри\nPython-кода."
+    },
+    "TransactionDetail": {
+      "properties": {
+        "id": { "type": "string", "format": "uuid", "title": "Id" },
+        "from_account": { "$ref": "#/components/schemas/AccountShort" },
+        "to_account": { "$ref": "#/components/schemas/AccountShort" },
+        "amount": { "type": "integer", "title": "Amount" },
+        "status": { "$ref": "#/components/schemas/TransactionStatus" },
+        "reason": { "type": "string", "title": "Reason" },
+        "order_id": {
+          "anyOf": [{ "type": "string", "format": "uuid" }, { "type": "null" }],
+          "title": "Order Id"
+        },
+        "verified_by_id": {
+          "anyOf": [{ "type": "string", "format": "uuid" }, { "type": "null" }],
+          "title": "Verified By Id"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "title": "Created At"
+        }
+      },
+      "type": "object",
+      "required": [
+        "id",
+        "from_account",
+        "to_account",
+        "amount",
+        "status",
+        "reason",
+        "order_id",
+        "verified_by_id",
+        "created_at"
+      ],
+      "title": "TransactionDetail"
+    },
+    "TransactionResponse": {
+      "properties": {
+        "id": { "type": "string", "format": "uuid", "title": "Id" },
+        "from_id": { "type": "string", "format": "uuid", "title": "From Id" },
+        "to_id": { "type": "string", "format": "uuid", "title": "To Id" },
+        "from_account": {
+          "anyOf": [
+            { "$ref": "#/components/schemas/AccountShort" },
+            { "type": "null" }
+          ]
+        },
+        "to_account": {
+          "anyOf": [
+            { "$ref": "#/components/schemas/AccountShort" },
+            { "type": "null" }
+          ]
+        },
+        "order_id": {
+          "anyOf": [{ "type": "string", "format": "uuid" }, { "type": "null" }],
+          "title": "Order Id"
+        },
+        "amount": { "type": "integer", "title": "Amount" },
+        "status": { "$ref": "#/components/schemas/TransactionStatus" },
+        "reason": { "type": "string", "title": "Reason" },
+        "verified_by_id": {
+          "anyOf": [{ "type": "string", "format": "uuid" }, { "type": "null" }],
+          "title": "Verified By Id"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "title": "Created At"
+        }
+      },
+      "type": "object",
+      "required": [
+        "id",
+        "from_id",
+        "to_id",
+        "order_id",
+        "amount",
+        "status",
+        "reason",
+        "created_at"
+      ],
+      "title": "TransactionResponse",
+      "description": "Ответ для мутационных операций (create/verify/reject).\n\nСодержит все поля, необходимые фронтенду для отображения\nтранзакции без дополнительного запроса."
+    },
+    "TransactionStatus": {
+      "type": "string",
+      "enum": ["pending", "completed", "rejected"],
+      "title": "TransactionStatus"
+    },
+    "TransferItemResponse": {
+      "properties": {
+        "product": { "$ref": "#/components/schemas/ProductSimpleResponse" },
+        "quantity": { "type": "integer", "title": "Quantity" }
+      },
+      "type": "object",
+      "required": ["product", "quantity"],
+      "title": "TransferItemResponse"
+    },
+    "TransferResponse": {
+      "properties": {
+        "id": { "type": "string", "format": "uuid", "title": "Id" },
+        "from_id": { "type": "string", "format": "uuid", "title": "From Id" },
+        "to_id": { "type": "string", "format": "uuid", "title": "To Id" },
+        "from_inventory": {
+          "anyOf": [
+            { "$ref": "#/components/schemas/InventoryShortResponse" },
+            { "type": "null" }
+          ]
+        },
+        "to_inventory": {
+          "anyOf": [
+            { "$ref": "#/components/schemas/InventoryShortResponse" },
+            { "type": "null" }
+          ]
+        },
+        "created_by_id": {
+          "type": "string",
+          "format": "uuid",
+          "title": "Created By Id"
+        },
+        "created_by": {
+          "anyOf": [
+            { "$ref": "#/components/schemas/UserShortResponse" },
+            { "type": "null" }
+          ]
+        },
+        "accepted_by_id": {
+          "anyOf": [{ "type": "string", "format": "uuid" }, { "type": "null" }],
+          "title": "Accepted By Id"
+        },
+        "accepted_by": {
+          "anyOf": [
+            { "$ref": "#/components/schemas/UserShortResponse" },
+            { "type": "null" }
+          ]
+        },
+        "status": { "$ref": "#/components/schemas/TransferStatus" },
+        "type": { "$ref": "#/components/schemas/TransferType" },
+        "items": {
+          "items": { "$ref": "#/components/schemas/TransferItemResponse" },
+          "type": "array",
+          "title": "Items",
+          "default": []
+        },
+        "reason": {
+          "anyOf": [{ "type": "string" }, { "type": "null" }],
+          "title": "Reason"
+        },
+        "route_sheet_id": {
+          "anyOf": [{ "type": "string", "format": "uuid" }, { "type": "null" }],
+          "title": "Route Sheet Id"
+        },
+        "created_at": {
+          "anyOf": [
+            { "type": "string", "format": "date-time" },
+            { "type": "null" }
+          ],
+          "title": "Created At"
+        }
+      },
+      "type": "object",
+      "required": [
+        "id",
+        "from_id",
+        "to_id",
+        "created_by_id",
+        "accepted_by_id",
+        "status",
+        "type"
+      ],
+      "title": "TransferResponse"
+    },
+    "TransferStatus": {
+      "type": "string",
+      "enum": ["DRAFT", "COMPLETED", "CANCELLED"],
+      "title": "TransferStatus"
+    },
+    "TransferType": {
+      "type": "string",
+      "enum": [
+        "COURIER_LOAD",
+        "COURIER_RETURN",
+        "CLIENT_DELIVERY",
+        "CLIENT_RETURN",
+        "LOSS_WRITE_OFF",
+        "INVENTORY_FINDING",
+        "INITIAL_BALANCE",
+        "WAREHOUSE_SALE",
+        "WAREHOUSE_TARA_RETURN"
+      ],
+      "title": "TransferType"
+    },
+    "TransportCreate": {
+      "properties": {
+        "user_id": {
+          "type": "string",
+          "format": "uuid",
+          "title": "User Id",
+          "description": "ID курьера, ответственного за транспорт"
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 255,
+          "title": "Name",
+          "description": "Название транспорта (напр. 'Машина АВ123')"
+        }
+      },
+      "type": "object",
+      "required": ["user_id", "name"],
+      "title": "TransportCreate"
+    },
+    "TransportDetailResponse": {
+      "properties": {
+        "id": { "type": "string", "format": "uuid", "title": "Id" },
+        "user_id": { "type": "string", "format": "uuid", "title": "User Id" },
+        "name": { "type": "string", "title": "Name" },
+        "type": { "type": "string", "title": "Type", "default": "COURIER" },
+        "balances": {
+          "items": { "$ref": "#/components/schemas/BalanceResponse" },
+          "type": "array",
+          "title": "Balances",
+          "default": []
+        }
+      },
+      "type": "object",
+      "required": ["id", "user_id", "name"],
+      "title": "TransportDetailResponse"
+    },
+    "TransportResponse": {
+      "properties": {
+        "id": { "type": "string", "format": "uuid", "title": "Id" },
+        "user_id": { "type": "string", "format": "uuid", "title": "User Id" },
+        "name": { "type": "string", "title": "Name" },
+        "type": { "type": "string", "title": "Type", "default": "COURIER" }
+      },
+      "type": "object",
+      "required": ["id", "user_id", "name"],
+      "title": "TransportResponse"
+    },
+    "TransportUpdate": {
+      "properties": {
+        "user_id": {
+          "anyOf": [{ "type": "string", "format": "uuid" }, { "type": "null" }],
+          "title": "User Id",
+          "description": "Новый ответственный курьер"
+        },
+        "name": {
+          "anyOf": [{ "type": "string", "maxLength": 255 }, { "type": "null" }],
+          "title": "Name",
+          "description": "Новое название"
+        }
+      },
+      "type": "object",
+      "title": "TransportUpdate"
+    },
+    "UserAdminCreate": {
+      "properties": {
+        "role": { "$ref": "#/components/schemas/Role" },
+        "username": {
+          "type": "string",
+          "maxLength": 255,
+          "minLength": 2,
+          "title": "Username",
+          "example": "Анвар Анваров"
+        },
+        "phone": { "type": "string", "title": "Phone" },
+        "password": {
+          "type": "string",
+          "maxLength": 128,
+          "minLength": 4,
+          "title": "Password",
+          "description": "Пароль",
+          "example": "StrongPass123!"
+        }
+      },
+      "type": "object",
+      "required": ["role", "username", "phone", "password"],
+      "title": "UserAdminCreate"
+    },
+    "UserAdminUpdate": {
+      "properties": {
+        "username": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 255,
+              "minLength": 2,
+              "example": "Анвар Анваров"
+            },
+            { "type": "null" }
+          ],
+          "title": "Username"
+        },
+        "phone": {
+          "anyOf": [{ "type": "string" }, { "type": "null" }],
+          "title": "Phone"
+        },
+        "password": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 128,
+              "minLength": 4,
+              "description": "Пароль",
+              "example": "StrongPass123!"
+            },
+            { "type": "null" }
+          ],
+          "title": "Password"
+        },
+        "role": {
+          "anyOf": [{ "$ref": "#/components/schemas/Role" }, { "type": "null" }]
+        },
+        "is_active": {
+          "anyOf": [{ "type": "boolean" }, { "type": "null" }],
+          "title": "Is Active"
+        }
+      },
+      "type": "object",
+      "title": "UserAdminUpdate"
+    },
+    "UserCreate": {
+      "properties": {
+        "username": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 255,
+              "minLength": 2,
+              "example": "Анвар Анваров"
+            },
+            { "type": "null" }
+          ],
+          "title": "Username"
+        },
+        "phone": { "type": "string", "title": "Phone" }
+      },
+      "type": "object",
+      "required": ["phone"],
+      "title": "UserCreate"
+    },
+    "UserResponse": {
+      "properties": {
+        "role": { "$ref": "#/components/schemas/Role" },
+        "username": {
+          "type": "string",
+          "maxLength": 255,
+          "minLength": 2,
+          "title": "Username",
+          "example": "Анвар Анваров"
+        },
+        "id": { "type": "string", "format": "uuid", "title": "Id" },
+        "is_active": { "type": "boolean", "title": "Is Active" },
+        "phone": {
+          "anyOf": [{ "type": "string" }, { "type": "null" }],
+          "title": "Phone"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "title": "Created At"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "title": "Updated At"
+        }
+      },
+      "type": "object",
+      "required": [
+        "role",
+        "username",
+        "id",
+        "is_active",
+        "created_at",
+        "updated_at"
+      ],
+      "title": "UserResponse",
+      "description": "Эту схему мы возвращаем из роутера.\nОна включает ID и даты, но НИКОГДА не включает пароль (даже хешированный)."
+    },
+    "UserResponseList": {
+      "properties": {
+        "total_count": { "type": "integer", "title": "Total Count" },
+        "users": {
+          "items": { "$ref": "#/components/schemas/UserResponse" },
+          "type": "array",
+          "title": "Users"
+        }
+      },
+      "type": "object",
+      "required": ["total_count", "users"],
+      "title": "UserResponseList"
+    },
+    "UserShortResponse": {
+      "properties": {
+        "id": { "type": "string", "format": "uuid", "title": "Id" },
+        "username": { "type": "string", "title": "Username" },
+        "phone": {
+          "anyOf": [{ "type": "string" }, { "type": "null" }],
+          "title": "Phone"
+        }
+      },
+      "type": "object",
+      "required": ["id", "username"],
+      "title": "UserShortResponse",
+      "description": "Краткое представление пользователя для вложения в другие схемы."
+    },
+    "ValidationError": {
+      "properties": {
+        "loc": {
+          "items": { "anyOf": [{ "type": "string" }, { "type": "integer" }] },
+          "type": "array",
+          "title": "Location"
+        },
+        "msg": { "type": "string", "title": "Message" },
+        "type": { "type": "string", "title": "Error Type" },
+        "input": { "title": "Input" },
+        "ctx": { "type": "object", "title": "Context" }
+      },
+      "type": "object",
+      "required": ["loc", "msg", "type"],
+      "title": "ValidationError"
+    },
+    "VirtualAccountsResponse": {
+      "properties": {
+        "vendor_total": {
+          "type": "integer",
+          "title": "Vendor Total",
+          "description": "ABS(SUM VIRTUAL_VENDOR)"
+        },
+        "loss_total": {
+          "type": "integer",
+          "title": "Loss Total",
+          "description": "SUM VIRTUAL_LOSS"
+        },
+        "real_total": {
+          "type": "integer",
+          "title": "Real Total",
+          "description": "SUM (WAREHOUSE + COURIER + CLIENT)"
+        },
+        "integrity_ok": {
+          "type": "boolean",
+          "title": "Integrity Ok",
+          "description": "vendor_total == loss_total + real_total"
+        },
+        "integrity_diff": {
+          "type": "integer",
+          "title": "Integrity Diff",
+          "description": "Разница (0 если ok)"
+        },
+        "per_product": {
+          "items": { "$ref": "#/components/schemas/VirtualProductBalance" },
+          "type": "array",
+          "title": "Per Product"
+        },
+        "loss_trend_30d": {
+          "items": { "$ref": "#/components/schemas/LossTrendPoint" },
+          "type": "array",
+          "title": "Loss Trend 30D",
+          "description": "Потери по дням за 30 дней"
+        }
+      },
+      "type": "object",
+      "required": [
+        "vendor_total",
+        "loss_total",
+        "real_total",
+        "integrity_ok",
+        "integrity_diff",
+        "per_product"
+      ],
+      "title": "VirtualAccountsResponse",
+      "description": "EP-19: Баланс виртуальных счетов + контроль."
+    },
+    "VirtualProductBalance": {
+      "properties": {
+        "product_id": {
+          "type": "string",
+          "format": "uuid",
+          "title": "Product Id"
+        },
+        "product_name": { "type": "string", "title": "Product Name" },
+        "vendor_balance": {
+          "type": "integer",
+          "title": "Vendor Balance",
+          "description": "Отрицательный (VIRTUAL_VENDOR)"
+        },
+        "loss_balance": {
+          "type": "integer",
+          "title": "Loss Balance",
+          "description": "Положительный (VIRTUAL_LOSS)"
+        }
+      },
+      "type": "object",
+      "required": [
+        "product_id",
+        "product_name",
+        "vendor_balance",
+        "loss_balance"
+      ],
+      "title": "VirtualProductBalance"
+    },
+    "WarehouseCreate": {
+      "properties": {
+        "user_id": {
+          "type": "string",
+          "format": "uuid",
+          "title": "User Id",
+          "description": "ID материально ответственного"
+        },
+        "name": { "type": "string", "maxLength": 255, "title": "Name" }
+      },
+      "type": "object",
+      "required": ["user_id", "name"],
+      "title": "WarehouseCreate"
+    },
+    "WarehouseDetailResponse": {
+      "properties": {
+        "id": { "type": "string", "format": "uuid", "title": "Id" },
+        "name": { "type": "string", "title": "Name" },
+        "user_id": { "type": "string", "format": "uuid", "title": "User Id" },
+        "user": {
+          "anyOf": [
+            { "$ref": "#/components/schemas/UserShortResponse" },
+            { "type": "null" }
+          ]
+        },
+        "balances": {
+          "items": { "$ref": "#/components/schemas/BalanceItem" },
+          "type": "array",
+          "title": "Balances",
+          "default": []
+        }
+      },
+      "type": "object",
+      "required": ["id", "name", "user_id"],
+      "title": "WarehouseDetailResponse"
+    },
+    "WarehouseSaleCapitalizeTaraRequest": {
+      "properties": {
+        "warehouse_id": {
+          "type": "string",
+          "format": "uuid",
+          "title": "Warehouse Id",
+          "description": "ID склада (для контекста)"
+        },
+        "items": {
+          "items": {
+            "$ref": "#/components/schemas/src__modules__orders__schemas__Item"
+          },
+          "type": "array",
+          "minItems": 1,
+          "title": "Items",
+          "description": "Тара, принесённая покупателем"
+        }
+      },
+      "type": "object",
+      "required": ["warehouse_id", "items"],
+      "title": "WarehouseSaleCapitalizeTaraRequest",
+      "description": "Оприходование тары, принесённой покупателем на склад."
+    },
+    "WarehouseSaleCreate": {
+      "properties": {
+        "warehouse_id": {
+          "type": "string",
+          "format": "uuid",
+          "title": "Warehouse Id",
+          "description": "ID склада, с которого продаём"
+        },
+        "items": {
+          "items": {
+            "$ref": "#/components/schemas/src__modules__orders__schemas__Item"
+          },
+          "type": "array",
+          "minItems": 1,
+          "title": "Корзина товаров"
+        },
+        "capitalize_missing_tara": {
+          "type": "boolean",
+          "title": "Оприходовать недостающую тару",
+          "default": false
+        }
+      },
+      "type": "object",
+      "required": ["warehouse_id", "items"],
+      "title": "WarehouseSaleCreate",
+      "description": "Создание заказа на самовывоз со склада."
+    },
+    "WarehouseUpdate": {
+      "properties": {
+        "name": {
+          "anyOf": [{ "type": "string", "maxLength": 255 }, { "type": "null" }],
+          "title": "Name"
+        },
+        "user_id": {
+          "anyOf": [{ "type": "string", "format": "uuid" }, { "type": "null" }],
+          "title": "User Id"
+        }
+      },
+      "type": "object",
+      "title": "WarehouseUpdate"
+    },
+    "src__application__client__schemas__Courier": {
+      "properties": { "username": { "type": "string", "title": "Username" } },
+      "type": "object",
+      "required": ["username"],
+      "title": "Courier"
+    },
+    "src__application__courier__schemas__Courier": {
+      "properties": {
+        "id": { "type": "string", "format": "uuid", "title": "Id" },
+        "username": { "type": "string", "title": "Username" },
+        "phone": {
+          "anyOf": [{ "type": "string" }, { "type": "null" }],
+          "title": "Phone"
+        },
+        "account": {
+          "anyOf": [
+            { "$ref": "#/components/schemas/AccountShortDTO" },
+            { "type": "null" }
+          ]
+        },
+        "inventory": {
+          "anyOf": [
+            { "$ref": "#/components/schemas/InventoryShortDTO" },
+            { "type": "null" }
+          ]
+        },
+        "is_active": { "type": "boolean", "title": "Is Active" },
+        "orders": {
+          "type": "integer",
+          "title": "Orders",
+          "description": "Количество выполненных заказов"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "title": "Created At"
+        }
+      },
+      "type": "object",
+      "required": [
+        "id",
+        "username",
+        "phone",
+        "account",
+        "inventory",
+        "is_active",
+        "orders",
+        "created_at"
+      ],
+      "title": "Courier",
+      "description": "Схема одного курьера для выдачи в списке (без глубоких связей)"
+    },
+    "src__modules__inventory__schemas__InventoryResponse": {
+      "properties": {
+        "id": { "type": "string", "format": "uuid", "title": "Id" },
+        "name": { "type": "string", "title": "Name" },
+        "type": { "$ref": "#/components/schemas/InventoryType" },
+        "user": { "$ref": "#/components/schemas/UserResponse" },
+        "is_active": { "type": "boolean", "title": "Is Active" }
+      },
+      "type": "object",
+      "required": ["id", "name", "type", "user", "is_active"],
+      "title": "InventoryResponse"
+    },
+    "src__modules__inventory__schemas__Item": {
+      "properties": {
+        "product_id": {
+          "type": "string",
+          "format": "uuid",
+          "title": "Product Id"
+        },
+        "quantity": {
+          "type": "integer",
+          "exclusiveMinimum": 0.0,
+          "title": "Quantity",
+          "description": "Количество товара (строго больше нуля)"
+        }
+      },
+      "type": "object",
+      "required": ["product_id", "quantity"],
+      "title": "Item",
+      "description": "Стандартная единица измерения передачи товара."
+    },
+    "src__modules__orders__schemas__InventoryResponse": {
+      "properties": {
+        "id": { "type": "string", "format": "uuid", "title": "Id" },
+        "name": { "type": "string", "title": "Name" },
+        "type": { "$ref": "#/components/schemas/InventoryType" },
+        "is_active": { "type": "boolean", "title": "Is Active" }
+      },
+      "type": "object",
+      "required": ["id", "name", "type", "is_active"],
+      "title": "InventoryResponse"
+    },
+    "src__modules__orders__schemas__Item": {
+      "properties": {
+        "product_id": {
+          "type": "string",
+          "format": "uuid",
+          "title": "Product Id",
+          "description": "ID воды, тары или оборудования из каталога"
+        },
+        "quantity": {
+          "type": "integer",
+          "exclusiveMinimum": 0.0,
+          "title": "Количество",
+          "examples": [2]
+        }
+      },
+      "type": "object",
+      "required": ["product_id", "quantity"],
+      "title": "Item"
+    }
+  },
+  "securitySchemes": {
+    "OAuth2PasswordBearer": {
+      "type": "oauth2",
+      "flows": {
+        "password": {
+          "scopes": {
+            "users:read": "Разрешение: users:read",
+            "users:write": "Разрешение: users:write",
+            "profile:read": "Разрешение: profile:read",
+            "profile:write": "Разрешение: profile:write",
+            "catalog:read": "Разрешение: catalog:read",
+            "catalog:write": "Разрешение: catalog:write",
+            "orders:read": "Разрешение: orders:read",
+            "orders:create": "Разрешение: orders:create",
+            "orders:edit": "Разрешение: orders:edit",
+            "orders:deliver": "Разрешение: orders:deliver",
+            "orders:cancel": "Разрешение: orders:cancel",
+            "transports:read": "Разрешение: transports:read",
+            "inventory:read": "Разрешение: inventory:read",
+            "inventory:write": "Разрешение: inventory:write",
+            "logistics:supply": "Разрешение: logistics:supply",
+            "logistics:transfer": "Разрешение: logistics:transfer",
+            "logistics:adjustment": "Разрешение: logistics:adjustment",
+            "routes:read": "Разрешение: routes:read",
+            "finances:read": "Разрешение: finances:read",
+            "finances:write": "Разрешение: finances:write",
+            "payments:create": "Разрешение: payments:create",
+            "bills:read": "Разрешение: bills:read",
+            "contracts:read": "Разрешение: contracts:read",
+            "contracts:write": "Разрешение: contracts:write",
+            "contracts:manage": "Разрешение: contracts:manage",
+            "settings:read": "Разрешение: settings:read",
+            "settings:write": "Разрешение: settings:write",
+            "system:exec": "Разрешение: system:exec"
+          },
+          "tokenUrl": "/api/v1/auth/login"
         }
       }
     }

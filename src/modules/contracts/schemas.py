@@ -25,7 +25,6 @@ class ContractCreate(BaseModel):
     payment_due_days: int = Field(default=30, gt=0, le=365)
     legal_name: str = Field(min_length=1, max_length=255)
     inn: str = Field(min_length=9, max_length=14)
-    legal_address: str | None = Field(default=None, max_length=500)
     notes: str | None = Field(default=None, max_length=2000)
 
 
@@ -35,7 +34,6 @@ class ContractUpdate(BaseModel):
     credit_limit: int | None = Field(default=None, ge=0)
     payment_due_days: int | None = Field(default=None, gt=0, le=365)
     end_date: date | None = None
-    legal_address: str | None = Field(default=None, max_length=500)
     notes: str | None = Field(default=None, max_length=2000)
 
 
@@ -59,7 +57,6 @@ class ContractResponse(BaseModel):
     payment_due_days: int
     legal_name: str
     inn: str
-    legal_address: str | None
     notes: str | None
     signed_at: datetime | None
     signed_by_id: uuid.UUID | None

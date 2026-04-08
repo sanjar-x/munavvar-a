@@ -291,7 +291,6 @@ def upgrade() -> None:
             nullable=False,
             comment="ИНН/ПИНФЛ юридического лица",
         ),
-        sa.Column("legal_address", sa.Text(), nullable=True),
         sa.Column(
             "notes", sa.Text(), nullable=True, comment="Внутренние примечания"
         ),

@@ -186,7 +186,6 @@ class Contract(BaseModel):
         String(14), nullable=False,
         comment="ИНН/ПИНФЛ юридического лица",
     )
-    legal_address: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Служебные поля
     notes: Mapped[str | None] = mapped_column(
@@ -444,7 +443,7 @@ class Invoice(BaseModel):
 │  credit_used  ← приложение обновляет (НЕ триггер)            │
 │  payment_due_days                                            │
 │  start_date / end_date (NULL = бессрочный)                   │
-│  legal_name, inn, legal_address         │
+│  legal_name, inn                                             │
 │  signed_by_id ──────────────────────────────── FK → users.id │
 │  PARTIAL UNIQUE INDEX: (client_id) WHERE status='active'     │
 └───────────┬──────────────────────────────────────────────────┘
@@ -831,7 +830,6 @@ class ContractService:
                 "payment_due_days": dto.payment_due_days,
                 "legal_name": dto.legal_name,
                 "inn": dto.inn,
-                "legal_address": dto.legal_address,
                 "notes": dto.notes,
             })
             await self.uow.commit()
@@ -1915,7 +1913,6 @@ def upgrade() -> None:
         ),
         sa.Column("legal_name", sa.String(255), nullable=False),
         sa.Column("inn", sa.String(14), nullable=False),
-        sa.Column("legal_address", sa.Text, nullable=True),
         sa.Column("notes", sa.Text, nullable=True),
         sa.Column(
             "signed_at", sa.TIMESTAMP(timezone=True), nullable=True
@@ -2793,7 +2790,6 @@ class ContractCreate(BaseModel):
     )
     legal_name: str = Field(min_length=1, max_length=255)
     inn: str = Field(min_length=9, max_length=14)
-    legal_address: str | None = Field(default=None, max_length=500)
     notes: str | None = Field(default=None, max_length=2000)
 
 
@@ -2804,7 +2800,6 @@ class ContractUpdate(BaseModel):
         default=None, gt=0, le=365
     )
     end_date: date | None = None
-    legal_address: str | None = Field(default=None, max_length=500)
     notes: str | None = Field(default=None, max_length=2000)
 
 
@@ -2828,7 +2823,6 @@ class ContractResponse(BaseModel):
     payment_due_days: int
     legal_name: str
     inn: str
-    legal_address: str | None
     notes: str | None
     signed_at: datetime | None
     signed_by_id: uuid.UUID | None

@@ -81,7 +81,6 @@ class ContractService:
                     "payment_due_days": dto.payment_due_days,
                     "legal_name": dto.legal_name,
                     "inn": dto.inn,
-                    "legal_address": dto.legal_address,
                     "notes": dto.notes,
                 }
             )

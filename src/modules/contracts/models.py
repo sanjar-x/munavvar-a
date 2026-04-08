@@ -101,7 +101,6 @@ class Contract(BaseModel):
         nullable=False,
         comment="ИНН/ПИНФЛ юридического лица",
     )
-    legal_address: Mapped[str | None] = mapped_column(Text, nullable=True)
     # Служебные поля
     notes: Mapped[str | None] = mapped_column(
         Text, nullable=True, comment="Внутренние примечания"

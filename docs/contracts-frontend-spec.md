@@ -912,7 +912,6 @@ interface ContractResponse {
   payment_due_days: number; // 1–365
   legal_name: string;
   inn: string; // 9–14 символов
-  legal_address: string | null;
   notes: string | null;
   signed_at: string | null; // ISO datetime
   signed_by_id: string | null; // UUIDv7
@@ -1228,7 +1227,6 @@ interface ContractCreateRequest {
   payment_due_days?: number; // > 0, ≤ 365; default 30
   legal_name: string; // 1–255 символов
   inn: string; // 9–14 символов
-  legal_address?: string | null; // ≤ 500 символов
   notes?: string | null; // ≤ 2000 символов
 }
 
@@ -1237,7 +1235,6 @@ interface ContractUpdateRequest {
   credit_limit?: number; // ≥ 0
   payment_due_days?: number; // > 0, ≤ 365
   end_date?: string | null;
-  legal_address?: string | null;
   notes?: string | null;
 }
 
@@ -1315,7 +1312,6 @@ POST /api/v1/backoffice/contracts/?clientId={uuid}
 | `payment_due_days` | integer        | `> 0`, `≤ 365`            | 30      |
 | `legal_name`       | string         | `min: 1`, `max: 255`      | —       |
 | `inn`              | string         | `min: 9`, `max: 14`       | —       |
-| `legal_address`    | string \| null | `max: 500`                | null    |
 | `notes`            | string \| null | `max: 2000`               | null    |
 
 **Пример запроса:**
@@ -1333,7 +1329,6 @@ Content-Type: application/json
   "payment_due_days": 30,
   "legal_name": "ООО «Акватория»",
   "inn": "123456789",
-  "legal_address": "г. Ташкент, ул. Навои, 42",
   "notes": "VIP-клиент, приоритетная доставка"
 }
 ```
@@ -1353,7 +1348,6 @@ Content-Type: application/json
   "payment_due_days": 30,
   "legal_name": "ООО «Акватория»",
   "inn": "123456789",
-  "legal_address": "г. Ташкент, ул. Навои, 42",
   "notes": "VIP-клиент, приоритетная доставка",
   "signed_at": null,
   "signed_by_id": null,
@@ -1417,7 +1411,6 @@ Authorization: Bearer eyJhbGci...
     "payment_due_days": 30,
     "legal_name": "ООО «Акватория»",
     "inn": "123456789",
-    "legal_address": "г. Ташкент, ул. Навои, 42",
 
     "notes": "VIP-клиент",
     "signed_at": "2025-04-01T12:00:00+00:00",
@@ -1460,7 +1453,6 @@ GET /api/v1/backoffice/contracts/{contract_id}
   "payment_due_days": 30,
   "legal_name": "ООО «Акватория»",
   "inn": "123456789",
-  "legal_address": "г. Ташкент, ул. Навои, 42",
   "notes": null,
   "signed_at": "2025-04-01T12:00:00+00:00",
   "signed_by_id": "01961a2b-1111-7000-8000-000000000099",
@@ -1510,7 +1502,6 @@ PATCH /api/v1/backoffice/contracts/{contract_id}
 | `credit_limit`     | `≥ 0`; не может быть `< credit_used` (при > 0) |
 | `payment_due_days` | `> 0`, `≤ 365`                                 |
 | `end_date`         | `> start_date` если задан                      |
-| `legal_address`    | `max: 500`                                     |
 | `notes`            | `max: 2000`                                    |
 
 **Пример запроса:**
