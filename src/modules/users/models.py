@@ -15,6 +15,39 @@ if TYPE_CHECKING:
     from src.modules.orders.models import Order
 
 
+class PhoneNumber(BaseModel):
+    __tablename__ = "phone_numbers"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+        comment="Ссылка на профиль пользователя",
+    )
+    phone: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+        unique=True,
+        comment="Дополнительный номер телефона",
+    )
+    label: Mapped[str | None] = mapped_column(
+        String(50),
+        comment="Метка: Личный, Рабочий, Доп. и т.д.",
+    )
+
+    user: Mapped[User] = relationship(back_populates="phone_numbers")
+
+    __table_args__ = (
+        {
+            "comment": (
+                "Дополнительные контактные номера телефонов"
+                " пользователей (не для авторизации)"
+            ),
+        },
+    )
+
+
 class Identity(BaseModel):
     __tablename__ = "identities"
 
@@ -88,6 +121,9 @@ class User(BaseModel):
     )
 
     identities: Mapped[list[Identity]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
+    phone_numbers: Mapped[list[PhoneNumber]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
     )
     accounts: Mapped[list[Account]] = relationship(

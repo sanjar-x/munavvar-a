@@ -9,13 +9,18 @@ from src.modules.inventory.repositories import (
     StockTransferItemRepository,
     StockTransferRepository,
 )
-from src.modules.users.repositories import IdentityRepository, UserRepository
+from src.modules.users.repositories import (
+    IdentityRepository,
+    PhoneNumberRepository,
+    UserRepository,
+)
 
 
 # 1. Доменный интерфейс (Абстракция для сервисов)
 class IUserUnitOfWork(IUnitOfWork):
     users: UserRepository
     identities: IdentityRepository
+    phone_numbers: PhoneNumberRepository
     accounts: AccountRepository
     inventories: InventoryRepository
     transfers: StockTransferRepository
@@ -30,6 +35,7 @@ class UserUnitOfWork(BaseSQLAlchemyUoW, IUserUnitOfWork):
 
         self.users = UserRepository(session=self.session)
         self.identities = IdentityRepository(session=self.session)
+        self.phone_numbers = PhoneNumberRepository(session=self.session)
         self.accounts = AccountRepository(session=self.session)
         self.inventories = InventoryRepository(session=self.session)
         self.transfers = StockTransferRepository(session=self.session)

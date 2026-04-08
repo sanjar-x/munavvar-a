@@ -184,3 +184,36 @@ class UsersDashboard(BaseModel):
 class UsersDashboardResponse(BaseModel):
     total_count: int
     users: list[UsersDashboard]
+
+
+# ==========================================
+# 7. ТЕЛЕФОННЫЕ НОМЕРА
+# ==========================================
+class PhoneNumberCreate(BaseModel):
+    phone: str = Field(
+        ...,
+        min_length=5,
+        max_length=20,
+        description="Дополнительный номер телефона",
+    )
+    label: str | None = Field(
+        default=None,
+        max_length=50,
+        description="Метка: Личный, Рабочий и т.д.",
+    )
+
+
+class PhoneNumberUpdate(BaseModel):
+    label: str | None = Field(
+        default=None,
+        max_length=50,
+        description="Метка: Личный, Рабочий и т.д.",
+    )
+
+
+class PhoneNumberResponse(BaseModel):
+    id: uuid.UUID
+    phone: str
+    label: str | None = None
+    created_at: datetime
+    model_config = ConfigDict(from_attributes=True)

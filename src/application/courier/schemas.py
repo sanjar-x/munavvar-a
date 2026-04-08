@@ -43,6 +43,15 @@ class AccountShortDTO(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class PhoneNumberShort(BaseModel):
+    """Дополнительный номер телефона."""
+
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    phone: str
+    label: str | None = None
+
+
 class InventoryShortDTO(BaseModel):
     """Схема для сериализации инвентаря (машины)"""
 
@@ -78,6 +87,7 @@ class CourierResponse(BaseModel):
     id: uuid.UUID
     username: str
     phone: str | None
+    additional_phones: list[PhoneNumberShort] = []
     is_active: bool
     account: AccountShortDTO | None
     inventory: CourierInventoryWithBalancesDTO | None
@@ -95,6 +105,7 @@ class Courier(BaseModel):
     id: uuid.UUID
     username: str
     phone: str | None
+    additional_phones: list[PhoneNumberShort] = []
     account: AccountShortDTO | None
     inventory: InventoryShortDTO | None
     is_active: bool

@@ -112,3 +112,33 @@ class StaffPasswordRequiredError(UnprocessableEntityError):
             error_code="STAFF_PASSWORD_REQUIRED",
             details={"user_id": user_id, "role": role},
         )
+
+
+class PhoneAlreadyExistsError(ConflictError):
+    def __init__(self, phone: str):
+        super().__init__(
+            message=(f"Номер телефона '{phone}' уже используется."),
+            error_code="PHONE_ALREADY_EXISTS",
+            details={"phone": phone},
+        )
+
+
+class PhoneNotFoundError(NotFoundError):
+    def __init__(self, phone_id: uuid.UUID):
+        super().__init__(
+            message=(f"Телефонный номер с ID {phone_id} не найден."),
+            error_code="PHONE_NOT_FOUND",
+            details={"phone_id": phone_id},
+        )
+
+
+class PhoneLimitExceededError(UnprocessableEntityError):
+    def __init__(self, user_id: uuid.UUID, limit: int = 5):
+        super().__init__(
+            message=(
+                f"Достигнут лимит дополнительных телефонов"
+                f" ({limit}) для пользователя."
+            ),
+            error_code="PHONE_LIMIT_EXCEEDED",
+            details={"user_id": user_id, "limit": limit},
+        )

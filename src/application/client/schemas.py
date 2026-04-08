@@ -114,6 +114,15 @@ class ContractSummary(BaseModel):
     credit_used: int
 
 
+class PhoneNumberShort(BaseModel):
+    """Дополнительный номер телефона."""
+
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    phone: str
+    label: str | None = None
+
+
 class ClientResponse(BaseModel):
     model_config = ConfigDict(
         from_attributes=True,
@@ -123,6 +132,7 @@ class ClientResponse(BaseModel):
     username: str
     role: ClientRole
     phone: str | None = None
+    additional_phones: list[PhoneNumberShort] = []
     account: Account | None = None
     inventories: list[Inventory]
     client_orders: list[Order]
@@ -143,6 +153,7 @@ class Client(BaseModel):
     role: ClientRole
     username: str
     phone: str | None = None
+    additional_phones: list[PhoneNumberShort] = []
     is_active: bool
     orders: int
     created_at: datetime

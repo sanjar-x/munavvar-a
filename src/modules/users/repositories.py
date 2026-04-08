@@ -15,6 +15,7 @@ from src.infrastructure.database.models import (
     Inventory,
     Order,
     OrderItem,
+    PhoneNumber,
     User,
 )
 from src.modules.users.enums import AuthProvider, Role
@@ -23,6 +24,38 @@ from src.modules.users.exceptions import (
     UserNotFoundError,
     UserUpdateConflictError,
 )
+
+
+class PhoneNumberRepository(BaseRepository[PhoneNumber]):
+    def __init__(self, session: AsyncSession):
+        super().__init__(model=PhoneNumber, session=session)
+
+    async def get_by_phone(self, phone: str) -> PhoneNumber | None:
+        query = select(self.model).where(self.model.phone == phone)
+        return await self.session.scalar(query)
+
+    async def get_by_user(self, user_id: UUID) -> Sequence[PhoneNumber]:
+        query = (
+            select(self.model)
+            .where(
+                self.model.user_id == user_id,
+                self.model.is_active.is_(True),
+            )
+            .order_by(self.model.created_at.asc())
+        )
+        result = await self.session.scalars(query)
+        return result.all()
+
+    async def count_by_user(self, user_id: UUID) -> int:
+        query = (
+            select(func.count())
+            .select_from(self.model)
+            .where(
+                self.model.user_id == user_id,
+                self.model.is_active.is_(True),
+            )
+        )
+        return await self.session.scalar(query) or 0
 
 
 class IdentityRepository(BaseRepository[Identity]):
@@ -236,6 +269,9 @@ class UserRepository(BaseRepository[User]):
                     self.model.identities.any(
                         Identity.provider_identity_id.ilike(search_pattern)
                     ),
+                    self.model.phone_numbers.any(
+                        PhoneNumber.phone.ilike(search_pattern)
+                    ),
                 )
             )
 
@@ -246,7 +282,10 @@ class UserRepository(BaseRepository[User]):
             return 0, []
 
         query = (
-            query.options(selectinload(self.model.identities))
+            query.options(
+                selectinload(self.model.identities),
+                selectinload(self.model.phone_numbers),
+            )
             .order_by(self.model.created_at.desc(), self.model.id.desc())
             .offset(skip)
             .limit(limit)
@@ -270,6 +309,9 @@ class UserRepository(BaseRepository[User]):
                     self.model.identities.any(
                         Identity.provider_identity_id.ilike(search_pattern)
                     ),
+                    self.model.phone_numbers.any(
+                        PhoneNumber.phone.ilike(search_pattern)
+                    ),
                 )
             )
         count_query = query.with_only_columns(func.count()).order_by(None)
@@ -281,6 +323,7 @@ class UserRepository(BaseRepository[User]):
         query = (
             query.options(
                 selectinload(self.model.identities),
+                selectinload(self.model.phone_numbers),
                 selectinload(self.model.accounts),
                 selectinload(self.model.inventories),
                 selectinload(self.model.courier_orders),
@@ -329,6 +372,7 @@ class UserRepository(BaseRepository[User]):
             )
             .options(
                 selectinload(self.model.identities),
+                selectinload(self.model.phone_numbers),
                 selectinload(self.model.inventories).options(
                     selectinload(Inventory.balances).joinedload(
                         Balance.product
@@ -358,6 +402,9 @@ class UserRepository(BaseRepository[User]):
                     self.model.identities.any(
                         Identity.provider_identity_id.ilike(search_pattern)
                     ),
+                    self.model.phone_numbers.any(
+                        PhoneNumber.phone.ilike(search_pattern)
+                    ),
                 )
             )
 
@@ -370,6 +417,7 @@ class UserRepository(BaseRepository[User]):
         query = (
             query.options(
                 selectinload(self.model.identities),
+                selectinload(self.model.phone_numbers),
                 selectinload(self.model.client_orders),
             )
             .order_by(self.model.created_at.desc(), self.model.id.desc())

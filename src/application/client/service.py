@@ -13,6 +13,7 @@ from src.application.client.schemas import (
     ClientResponse,
     ContractSummary,
     InventoryCreate,
+    PhoneNumberShort,
 )
 from src.application.client.uow import ClientUnitOfWork
 from src.infrastructure.database.models import User
@@ -102,6 +103,10 @@ class ClientService:
                     "phone": client.identities[0].provider_identity_id
                     if client.identities
                     else None,
+                    "additional_phones": [
+                        PhoneNumberShort.model_validate(p)
+                        for p in (client.phone_numbers or [])
+                    ],
                     "is_active": client.is_active,
                     "orders": len(client.client_orders),
                     "created_at": client.created_at,
@@ -133,6 +138,12 @@ class ClientService:
             response.phone = (
                 identity.provider_identity_id if identity else None
             )
+            phones = await self.uow.phone_numbers.get_by_user(
+                user_id=client_id
+            )
+            response.additional_phones = [
+                PhoneNumberShort.model_validate(p) for p in phones
+            ]
             response.contracts = [
                 ContractSummary.model_validate(c) for c in contracts
             ]

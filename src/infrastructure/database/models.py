@@ -17,7 +17,7 @@ from src.modules.inventory.models import (
     StockTransferItem,
 )
 from src.modules.orders.models import Order, OrderItem, OrderStatusLog
-from src.modules.users.models import Identity, User
+from src.modules.users.models import Identity, PhoneNumber, User
 
 __all__ = [
     "BaseModel",
@@ -38,5 +38,6 @@ __all__ = [
     "OrderItem",
     "OrderStatusLog",
     "Identity",
+    "PhoneNumber",
     "User",
 ]

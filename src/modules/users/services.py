@@ -7,7 +7,7 @@ from sqlalchemy.exc import IntegrityError
 from src.common.service import BaseService
 from src.core.exceptions import BadRequestError
 from src.core.security.password import get_password_hash
-from src.infrastructure.database.models import Identity, User
+from src.infrastructure.database.models import Identity, PhoneNumber, User
 from src.modules.finances.enums import AccountType
 from src.modules.inventory.enums import (
     InventoryType,
@@ -16,13 +16,22 @@ from src.modules.inventory.enums import (
 )
 from src.modules.users.enums import AuthProvider, Role
 from src.modules.users.exceptions import (
+    PhoneAlreadyExistsError,
+    PhoneLimitExceededError,
+    PhoneNotFoundError,
     StaffPasswordRequiredError,
     UserAlreadyExistsError,
     UserNotFoundError,
     UserUpdateConflictError,
 )
-from src.modules.users.repositories import IdentityRepository, UserRepository
+from src.modules.users.repositories import (
+    IdentityRepository,
+    PhoneNumberRepository,
+    UserRepository,
+)
 from src.modules.users.schemas import (
+    PhoneNumberCreate,
+    PhoneNumberUpdate,
     UserAdminCreate,
     UserAdminUpdate,
     UserClientCreate,
@@ -40,6 +49,9 @@ STAFF_ROLES: frozenset[Role] = frozenset(
 )
 
 
+MAX_ADDITIONAL_PHONES = 5
+
+
 class UserService(BaseService[User, UserAdminCreate, UserUnitOfWork]):
     def __init__(self, uow: UserUnitOfWork):
         super().__init__(uow=uow)
@@ -51,6 +63,10 @@ class UserService(BaseService[User, UserAdminCreate, UserUnitOfWork]):
     @property
     def _identity_repo(self) -> IdentityRepository:
         return self.uow.identities
+
+    @property
+    def _phone_repo(self) -> PhoneNumberRepository:
+        return self.uow.phone_numbers
 
     async def get_client(self, client_id: uuid.UUID) -> User:
         """Получить клиента по ID.
@@ -400,4 +416,91 @@ class UserService(BaseService[User, UserAdminCreate, UserUnitOfWork]):
             if not is_deleted:
                 raise UserNotFoundError(user_id=id)
 
+            await self.uow.commit()
+
+    # ==========================================
+    # УПРАВЛЕНИЕ ДОПОЛНИТЕЛЬНЫМИ ТЕЛЕФОНАМИ
+    # ==========================================
+
+    async def _check_phone_globally_unique(self, phone: str) -> None:
+        """Проверяет, что телефон не занят ни в identities,
+        ни в phone_numbers."""
+        existing_identity = await self._identity_repo.get_local_by_id(phone)
+        if existing_identity:
+            raise PhoneAlreadyExistsError(phone=phone)
+
+        existing_phone = await self._phone_repo.get_by_phone(phone)
+        if existing_phone:
+            raise PhoneAlreadyExistsError(phone=phone)
+
+    async def get_user_phones(self, user_id: uuid.UUID) -> list[PhoneNumber]:
+        async with self.uow:
+            user = await self._repo.get(id=user_id, active_only=False)
+            if not user:
+                raise UserNotFoundError(user_id=user_id)
+            return list(await self._phone_repo.get_by_user(user_id))
+
+    async def add_phone(
+        self,
+        user_id: uuid.UUID,
+        schema: PhoneNumberCreate,
+    ) -> PhoneNumber:
+        async with self.uow:
+            user = await self._repo.get(id=user_id)
+            if not user:
+                raise UserNotFoundError(user_id=user_id)
+
+            count = await self._phone_repo.count_by_user(user_id)
+            if count >= MAX_ADDITIONAL_PHONES:
+                raise PhoneLimitExceededError(
+                    user_id=user_id,
+                    limit=MAX_ADDITIONAL_PHONES,
+                )
+
+            await self._check_phone_globally_unique(schema.phone)
+
+            try:
+                phone_number = await self._phone_repo.add(
+                    {
+                        "user_id": user_id,
+                        "phone": schema.phone,
+                        "label": schema.label,
+                    }
+                )
+            except IntegrityError as exc:
+                raise PhoneAlreadyExistsError(phone=schema.phone) from exc
+
+            await self.uow.commit()
+            return phone_number
+
+    async def update_phone(
+        self,
+        user_id: uuid.UUID,
+        phone_id: uuid.UUID,
+        data: PhoneNumberUpdate,
+    ) -> PhoneNumber:
+        async with self.uow:
+            phone = await self._phone_repo.get(phone_id)
+            if not phone or phone.user_id != user_id:
+                raise PhoneNotFoundError(phone_id=phone_id)
+
+            update_data = data.model_dump(exclude_unset=True)
+            if "phone" in update_data:
+                await self._check_phone_globally_unique(update_data["phone"])
+
+            phone = await self._phone_repo.update(phone_id, update_data)
+            await self.uow.commit()
+            return phone
+
+    async def remove_phone(
+        self,
+        user_id: uuid.UUID,
+        phone_id: uuid.UUID,
+    ) -> None:
+        async with self.uow:
+            phone = await self._phone_repo.get(phone_id)
+            if not phone or phone.user_id != user_id:
+                raise PhoneNotFoundError(phone_id=phone_id)
+
+            await self._phone_repo.delete(phone_id)
             await self.uow.commit()

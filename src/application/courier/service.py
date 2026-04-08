@@ -8,7 +8,10 @@ from src.application.courier.exceptions import (
     CourierAlreadyExistsError,
     CourierNotFoundError,
 )
-from src.application.courier.schemas import CourierCreate
+from src.application.courier.schemas import (
+    CourierCreate,
+    PhoneNumberShort,
+)
 from src.application.courier.uow import CourierUnitOfWork
 from src.application.inventories.schemas import InventoryCreate
 from src.core.exceptions import ConflictError
@@ -108,6 +111,10 @@ class CourierService:
                     "phone": courier.identities[0].provider_identity_id
                     if courier.identities
                     else None,
+                    "additional_phones": [
+                        PhoneNumberShort.model_validate(p)
+                        for p in (courier.phone_numbers or [])
+                    ],
                     "account": courier.accounts[0]
                     if courier.accounts
                     else None,
@@ -139,10 +146,17 @@ class CourierService:
                 courier_id
             )
 
+            phones = await self.uow.phone_numbers.get_by_user(
+                user_id=courier.id
+            )
+
             return {
                 "id": courier.id,
                 "username": courier.username,
                 "phone": identity.provider_identity_id,
+                "additional_phones": [
+                    PhoneNumberShort.model_validate(p) for p in phones
+                ],
                 "is_active": courier.is_active,
                 "account": account,
                 "inventory": inventory,

@@ -10,6 +10,9 @@ from src.modules.auth.dependencies import get_current_user
 from src.modules.users.dependencies import get_user_service
 from src.modules.users.enums import Role
 from src.modules.users.schemas import (
+    PhoneNumberCreate,
+    PhoneNumberResponse,
+    PhoneNumberUpdate,
     UserAdminCreate,
     UserAdminUpdate,
     UserResponse,
@@ -156,3 +159,79 @@ async def delete_user(
     user_service: Annotated[UserService, Depends(get_user_service)],
 ):
     await user_service.delete_staff(user_id)
+
+
+# ==========================================
+# ТЕЛЕФОННЫЕ НОМЕРА
+# ==========================================
+
+
+@users_router.get(
+    "/{user_id}/phones",
+    response_model=list[PhoneNumberResponse],
+    summary="Получить доп. телефоны пользователя",
+)
+async def get_user_phones(
+    user_id: uuid.UUID,
+    current_admin: Annotated[
+        User,
+        Security(get_current_user, scopes=[Scope.USERS_READ]),
+    ],
+    user_service: Annotated[UserService, Depends(get_user_service)],
+):
+    return await user_service.get_user_phones(user_id=user_id)
+
+
+@users_router.post(
+    "/{user_id}/phones",
+    response_model=PhoneNumberResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Добавить доп. телефон пользователю",
+)
+async def add_user_phone(
+    user_id: uuid.UUID,
+    data: PhoneNumberCreate,
+    current_admin: Annotated[
+        User,
+        Security(get_current_user, scopes=[Scope.USERS_WRITE]),
+    ],
+    user_service: Annotated[UserService, Depends(get_user_service)],
+):
+    return await user_service.add_phone(user_id=user_id, schema=data)
+
+
+@users_router.patch(
+    "/{user_id}/phones/{phone_id}",
+    response_model=PhoneNumberResponse,
+    summary="Обновить доп. телефон (метку)",
+)
+async def update_user_phone(
+    user_id: uuid.UUID,
+    phone_id: uuid.UUID,
+    data: PhoneNumberUpdate,
+    current_admin: Annotated[
+        User,
+        Security(get_current_user, scopes=[Scope.USERS_WRITE]),
+    ],
+    user_service: Annotated[UserService, Depends(get_user_service)],
+):
+    return await user_service.update_phone(
+        user_id=user_id, phone_id=phone_id, data=data
+    )
+
+
+@users_router.delete(
+    "/{user_id}/phones/{phone_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Удалить доп. телефон",
+)
+async def remove_user_phone(
+    user_id: uuid.UUID,
+    phone_id: uuid.UUID,
+    current_admin: Annotated[
+        User,
+        Security(get_current_user, scopes=[Scope.USERS_WRITE]),
+    ],
+    user_service: Annotated[UserService, Depends(get_user_service)],
+):
+    await user_service.remove_phone(user_id=user_id, phone_id=phone_id)

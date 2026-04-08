@@ -17,12 +17,17 @@ from src.modules.orders.repositories import (
     OrderItemRepository,
     OrderRepository,
 )
-from src.modules.users.repositories import IdentityRepository, UserRepository
+from src.modules.users.repositories import (
+    IdentityRepository,
+    PhoneNumberRepository,
+    UserRepository,
+)
 
 
 class IClientUnitOfWork(IUnitOfWork):
     products: ProductRepository
     identities: IdentityRepository
+    phone_numbers: PhoneNumberRepository
     users: UserRepository
     accounts: AccountRepository
     transactions: TransactionRepository
@@ -40,6 +45,7 @@ class ClientUnitOfWork(BaseSQLAlchemyUoW, IClientUnitOfWork):
         await super().__aenter__()
         self.products = ProductRepository(session=self.session)
         self.identities = IdentityRepository(session=self.session)
+        self.phone_numbers = PhoneNumberRepository(session=self.session)
         self.users = UserRepository(session=self.session)
         self.accounts = AccountRepository(session=self.session)
         self.transactions = TransactionRepository(session=self.session)
