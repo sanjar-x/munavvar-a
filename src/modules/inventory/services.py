@@ -191,18 +191,17 @@ class WarehouseService:
 
     async def create_warehouse(self, schema: WarehouseCreate) -> Inventory:
         async with self.uow:
-            existing = await self.uow.inventories.search_inventories(
-                search_query=schema.name,
-                inv_type=InventoryType.WAREHOUSE,
-                limit=1,
+            existing = await self.uow.inventories.get_by(
+                name=schema.name,
+                type=InventoryType.WAREHOUSE,
             )
-            if existing and existing[0].name == schema.name:
+            if existing:
                 raise ConflictError(
                     message=f"Склад с именем '{schema.name}' уже существует",
                     error_code="INVENTORY_NAME_DUPLICATE",
                     details={
                         "name": schema.name,
-                        "existing_id": str(existing[0].id),
+                        "existing_id": str(existing.id),
                     },
                 )
 
@@ -505,24 +504,27 @@ class StockTransferService:
                 }
             )
 
-            # 6. Строки накладной и проводки в леджере
-            for item in schema.items:
-                await self.uow.transfer_items.add(
-                    {
-                        "transfer_id": transfer.id,
-                        "product_id": item.product_id,
-                        "quantity": item.quantity,
-                    }
-                )
-                await self.uow.transactions.add(
-                    {
-                        "product_id": item.product_id,
-                        "transfer_id": transfer.id,
-                        "from_id": from_id,
-                        "to_id": to_id,
-                        "quantity": item.quantity,
-                    }
-                )
+            # 6. Строки накладной и проводки в леджере (batch inserts)
+            transfer_items_data = [
+                {
+                    "transfer_id": transfer.id,
+                    "product_id": item.product_id,
+                    "quantity": item.quantity,
+                }
+                for item in schema.items
+            ]
+            stock_transactions_data = [
+                {
+                    "product_id": item.product_id,
+                    "transfer_id": transfer.id,
+                    "from_id": from_id,
+                    "to_id": to_id,
+                    "quantity": item.quantity,
+                }
+                for item in schema.items
+            ]
+            await self.uow.transfer_items.add_many(transfer_items_data)
+            await self.uow.transactions.add_many(stock_transactions_data)
 
             await self.uow.commit()
             result = await self.uow.transfers.get_transfer(transfer.id)

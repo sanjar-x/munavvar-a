@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 import structlog
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
 from structlog.stdlib import BoundLogger
 
 from src.api.exceptions.handlers import setup_exception_handlers
@@ -74,6 +75,21 @@ def create_app() -> FastAPI:
 
     @app.get("/health", tags=["System"])
     async def health_check():
+        from sqlalchemy.exc import SQLAlchemyError
+
+        from src.infrastructure.database.session import async_session_maker
+
+        try:
+            async with async_session_maker() as session:
+                await session.execute(text("SELECT 1"))
+        except SQLAlchemyError:
+            from fastapi import Response
+
+            return Response(
+                content='{"status": "db_unavailable"}',
+                status_code=503,
+                media_type="application/json",
+            )
         return {"status": "ok"}
 
     return app

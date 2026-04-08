@@ -74,6 +74,12 @@ class OrderRepository(BaseRepository[Order]):
             selectinload(Order.stock_transfers).joinedload(
                 StockTransfer.to_inventory
             ),
+            selectinload(Order.stock_transfers)
+            .joinedload(StockTransfer.created_by)
+            .selectinload(User.identities),
+            selectinload(Order.stock_transfers)
+            .joinedload(StockTransfer.accepted_by)
+            .selectinload(User.identities),
         )
 
     async def get_client_orders(

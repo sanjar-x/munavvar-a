@@ -77,7 +77,14 @@ class InventoryRepository(BaseRepository[Inventory]):
         if with_for_update:
             query = query.with_for_update()
         result = await self.session.execute(query)
-        return result.scalar_one()
+        inventory = result.scalar_one_or_none()
+        if inventory is None:
+            from src.modules.inventory.exceptions import (
+                VirtualInventoryConfigurationError,
+            )
+
+            raise VirtualInventoryConfigurationError(v_type=inv_type)
+        return inventory
 
     async def get_vendor_inventory(self) -> Inventory:
         return await self.get_system_inventory(InventoryType.VIRTUAL_VENDOR)

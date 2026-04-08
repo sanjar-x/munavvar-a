@@ -56,11 +56,11 @@ class Product(BaseModel):
         comment="Динамические характеристики (объем, бренд, цвет, мощность)",
     )
 
-    returnable_item: Mapped["Product | None"] = relationship(
+    returnable_item: Mapped[Product | None] = relationship(
         remote_side="Product.id",
         back_populates="associated_products",
     )
-    associated_products: Mapped[list["Product"]] = relationship(
+    associated_products: Mapped[list[Product]] = relationship(
         back_populates="returnable_item",
     )
 

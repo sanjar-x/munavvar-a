@@ -58,21 +58,21 @@ class Inventory(BaseModel):
         nullable=False,
         comment="Понятное название (например: 'Машина АВ123', 'Склад Центр')",
     )
-    user: Mapped["User"] = relationship(back_populates="inventories")
+    user: Mapped[User] = relationship(back_populates="inventories")
 
-    outgoing_transactions: Mapped[list["StockTransaction"]] = relationship(
+    outgoing_transactions: Mapped[list[StockTransaction]] = relationship(
         foreign_keys="StockTransaction.from_id",
         back_populates="from_inventory",
         viewonly=True,
         overlaps="transactions",
     )
-    incoming_transactions: Mapped[list["StockTransaction"]] = relationship(
+    incoming_transactions: Mapped[list[StockTransaction]] = relationship(
         foreign_keys="StockTransaction.to_id",
         back_populates="to_inventory",
         viewonly=True,
         overlaps="transactions",
     )
-    balances: Mapped[list["Balance"]] = relationship(
+    balances: Mapped[list[Balance]] = relationship(
         back_populates="inventory", cascade="all, delete-orphan"
     )
     __table_args__ = (
@@ -163,20 +163,20 @@ class StockTransfer(BaseModel):
         comment="Статус документа (DRAFT, COMPLETED, CANCELLED)",
     )
 
-    from_inventory: Mapped["Inventory"] = relationship(foreign_keys=[from_id])
-    to_inventory: Mapped["Inventory"] = relationship(foreign_keys=[to_id])
-    created_by: Mapped["User"] = relationship(foreign_keys=[created_by_id])
-    accepted_by: Mapped["User | None"] = relationship(
+    from_inventory: Mapped[Inventory] = relationship(foreign_keys=[from_id])
+    to_inventory: Mapped[Inventory] = relationship(foreign_keys=[to_id])
+    created_by: Mapped[User] = relationship(foreign_keys=[created_by_id])
+    accepted_by: Mapped[User | None] = relationship(
         foreign_keys=[accepted_by_id]
     )
-    order: Mapped["Order | None"] = relationship(
+    order: Mapped[Order | None] = relationship(
         back_populates="stock_transfers"
     )
 
-    items: Mapped[list["StockTransferItem"]] = relationship(
+    items: Mapped[list[StockTransferItem]] = relationship(
         back_populates="transfer", cascade="all, delete-orphan"
     )
-    transactions: Mapped[list["StockTransaction"]] = relationship(
+    transactions: Mapped[list[StockTransaction]] = relationship(
         back_populates="transfer",
         cascade="all, delete-orphan",
         overlaps="outgoing_transactions,incoming_transactions",
@@ -217,8 +217,8 @@ class StockTransferItem(BaseModel):
     quantity: Mapped[int] = mapped_column(
         Integer, nullable=False, comment="Количество в документе"
     )
-    transfer: Mapped["StockTransfer"] = relationship(back_populates="items")
-    product: Mapped["Product"] = relationship()
+    transfer: Mapped[StockTransfer] = relationship(back_populates="items")
+    product: Mapped[Product] = relationship()
 
     __table_args__ = (
         CheckConstraint(
@@ -253,8 +253,8 @@ class Balance(BaseModel):
         Integer, nullable=False, default=0, comment="Фактический остаток"
     )
 
-    inventory: Mapped["Inventory"] = relationship(back_populates="balances")
-    product: Mapped["Product"] = relationship()
+    inventory: Mapped[Inventory] = relationship(back_populates="balances")
+    product: Mapped[Product] = relationship()
 
     __table_args__ = (
         UniqueConstraint(
@@ -302,18 +302,18 @@ class StockTransaction(BaseModel):
         Integer, nullable=False, comment="Проведенное количество"
     )
 
-    product: Mapped["Product"] = relationship()
-    from_inventory: Mapped["Inventory"] = relationship(
+    product: Mapped[Product] = relationship()
+    from_inventory: Mapped[Inventory] = relationship(
         foreign_keys=[from_id],
         back_populates="outgoing_transactions",
         overlaps="transactions",
     )
-    to_inventory: Mapped["Inventory"] = relationship(
+    to_inventory: Mapped[Inventory] = relationship(
         foreign_keys=[to_id],
         back_populates="incoming_transactions",
         overlaps="transactions",
     )
-    transfer: Mapped["StockTransfer"] = relationship(
+    transfer: Mapped[StockTransfer] = relationship(
         back_populates="transactions",
         overlaps=(
             "incoming_transactions,to_inventory,"

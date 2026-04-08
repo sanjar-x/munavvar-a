@@ -212,6 +212,13 @@ class OrderResponse(BaseModel):
         default=None,
         description="ID договора (только для CONTRACT оплаты)",
     )
+    reserved_credit_amount: int | None = Field(
+        default=None,
+        description=(
+            "Зарезервированная сумма кредита "
+            "(только для CONTRACT оплаты)"
+        ),
+    )
     notes: str | None = Field(
         default=None,
         description="Инструкции по доставке",

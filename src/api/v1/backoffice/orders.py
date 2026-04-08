@@ -127,7 +127,7 @@ async def create_order(
     ],
     dto: OrderCreate,
     admin: Annotated[
-        User, Security(get_current_user, scopes=[Scope.ORDERS_EDIT])
+        User, Security(get_current_user, scopes=[Scope.ORDERS_CREATE])
     ],
     order_service: Annotated[
         BaseOrderService, Depends(get_base_order_service)
@@ -157,7 +157,7 @@ async def create_order(
 async def create_warehouse_sale(
     dto: WarehouseSaleCreate,
     admin: Annotated[
-        User, Security(get_current_user, scopes=[Scope.ORDERS_EDIT])
+        User, Security(get_current_user, scopes=[Scope.ORDERS_CREATE])
     ],
     order_service: Annotated[
         BaseOrderService, Depends(get_base_order_service)

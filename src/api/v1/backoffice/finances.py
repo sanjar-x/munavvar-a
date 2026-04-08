@@ -11,8 +11,14 @@ from src.modules.auth.dependencies import get_current_user
 from src.modules.finances.dependencies import get_billing_service
 from src.modules.finances.enums import AccountType, TransactionStatus
 from src.modules.finances.schemas import (
+    AccountDetail,
+    AccountStatement,
     B2BContractDebtsResponse,
+    ClientsDebtsResponse,
+    CouriersSummaryResponse,
+    FinanceDashboard,
     TransactionCreate,
+    TransactionResponse,
 )
 from src.modules.finances.services import BillingService
 
@@ -24,7 +30,7 @@ finances_router = APIRouter()
 # ---------------------------------------------------------------
 
 
-@finances_router.get("/dashboard")
+@finances_router.get("/dashboard", response_model=FinanceDashboard)
 async def get_dashboard(
     current_user: Annotated[
         User,
@@ -97,7 +103,7 @@ async def get_accounts(
 # ---------------------------------------------------------------
 
 
-@finances_router.get("/accounts/{account_id}")
+@finances_router.get("/accounts/{account_id}", response_model=AccountDetail)
 async def get_account_detail(
     account_id: Annotated[uuid.UUID, Path()],
     current_user: Annotated[
@@ -117,7 +123,10 @@ async def get_account_detail(
 # ---------------------------------------------------------------
 
 
-@finances_router.get("/accounts/{account_id}/statement")
+@finances_router.get(
+    "/accounts/{account_id}/statement",
+    response_model=AccountStatement,
+)
 async def get_account_statement(
     account_id: Annotated[uuid.UUID, Path()],
     current_user: Annotated[
@@ -210,7 +219,11 @@ async def get_transactions(
 # ---------------------------------------------------------------
 
 
-@finances_router.post("/transactions", status_code=201)
+@finances_router.post(
+    "/transactions",
+    status_code=201,
+    response_model=TransactionResponse,
+)
 async def create_transaction(
     dto: TransactionCreate,
     current_user: Annotated[
@@ -231,7 +244,10 @@ async def create_transaction(
 # ---------------------------------------------------------------
 
 
-@finances_router.patch("/transactions/{transaction_id}/verify")
+@finances_router.patch(
+    "/transactions/{transaction_id}/verify",
+    response_model=TransactionResponse,
+)
 async def verify_transaction(
     transaction_id: Annotated[uuid.UUID, Path()],
     current_user: Annotated[
@@ -252,7 +268,10 @@ async def verify_transaction(
 # ---------------------------------------------------------------
 
 
-@finances_router.patch("/transactions/{transaction_id}/reject")
+@finances_router.patch(
+    "/transactions/{transaction_id}/reject",
+    response_model=TransactionResponse,
+)
 async def reject_transaction(
     transaction_id: Annotated[uuid.UUID, Path()],
     reason: Annotated[
@@ -283,7 +302,10 @@ async def reject_transaction(
 # ---------------------------------------------------------------
 
 
-@finances_router.get("/couriers/summary")
+@finances_router.get(
+    "/couriers/summary",
+    response_model=CouriersSummaryResponse,
+)
 async def get_couriers_summary(
     current_user: Annotated[
         User,
@@ -300,7 +322,10 @@ async def get_couriers_summary(
 # ---------------------------------------------------------------
 
 
-@finances_router.get("/clients/debts")
+@finances_router.get(
+    "/clients/debts",
+    response_model=ClientsDebtsResponse,
+)
 async def get_client_debts(
     current_user: Annotated[
         User,
@@ -328,7 +353,11 @@ async def get_client_debts(
 # ---------------------------------------------------------------
 
 
-@finances_router.post("/cashbox/accept-payment", status_code=201)
+@finances_router.post(
+    "/cashbox/accept-payment",
+    status_code=201,
+    response_model=TransactionResponse,
+)
 async def accept_payment(
     client_id: Annotated[uuid.UUID, Body(description="ID клиента")],
     amount: Annotated[int, Body(gt=0, description="Сумма оплаты")],

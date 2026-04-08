@@ -99,19 +99,6 @@ class InventoryAdjustmentRequest(BaseModel):
     items: list[AdjustmentItem] = Field(min_length=1)
 
 
-# ==========================================
-# 3. ЗАПРОСЫ: ЛОГИСТИКА И ИНКАССАЦИЯ (COURIER SHIFT)
-# ==========================================
-
-
-class CloseShiftRequest(BaseModel):
-    """Вечерняя сдача смены курьером (Инкассация и возврат остатков)."""
-
-    courier_id: uuid.UUID
-    returned_inventory: list[Item]
-    cash_collected: float = Field(ge=0, description="Сумма собранных наличных")
-
-
 # Типы, для которых from_id вычисляется автоматически (VIRTUAL_VENDOR)
 _VIRTUAL_SOURCE_TYPES = {
     TransferType.INVENTORY_FINDING,
@@ -170,21 +157,6 @@ class TransferResult(BaseModel):
     transfer_id: uuid.UUID
     status: TransferStatus
     created_at: datetime
-
-    model_config = ConfigDict(from_attributes=True)
-
-
-class ShiftReconciliationResponse(BaseModel):
-    """Ответ системы с планом (ожиданиями) для инкассации."""
-
-    route_sheet_id: uuid.UUID
-    courier_inventory_id: uuid.UUID
-    expected_full_water: int
-    expected_empty_bottles: int
-    expected_equipment: list[Item]
-
-    # Можно добавить расчетные суммы, если сервис знает цены
-    # expected_cash: Decimal
 
     model_config = ConfigDict(from_attributes=True)
 

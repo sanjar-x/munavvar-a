@@ -136,18 +136,16 @@ class Contract(BaseModel):
     )
 
     # Связи
-    client: Mapped["User"] = relationship(
-        foreign_keys=[client_id], lazy="raise"
-    )
-    signed_by: Mapped["User | None"] = relationship(
+    client: Mapped[User] = relationship(foreign_keys=[client_id], lazy="raise")
+    signed_by: Mapped[User | None] = relationship(
         foreign_keys=[signed_by_id], lazy="raise"
     )
-    price_items: Mapped[list["ContractPriceItem"]] = relationship(
+    price_items: Mapped[list[ContractPriceItem]] = relationship(
         back_populates="contract",
         cascade="all, delete-orphan",
         lazy="raise",
     )
-    invoices: Mapped[list["Invoice"]] = relationship(
+    invoices: Mapped[list[Invoice]] = relationship(
         back_populates="contract",
         # No cascade: ondelete="RESTRICT" on Invoice.contract_id
         # prevents deletion when invoices exist. passive_deletes
@@ -155,20 +153,20 @@ class Contract(BaseModel):
         passive_deletes=True,
         lazy="raise",
     )
-    orders: Mapped[list["Order"]] = relationship(
+    orders: Mapped[list[Order]] = relationship(
         back_populates="contract",
         foreign_keys="[Order.contract_id]",
         passive_deletes=True,
         lazy="raise",
     )
-    status_logs: Mapped[list["ContractStatusLog"]] = relationship(
+    status_logs: Mapped[list[ContractStatusLog]] = relationship(
         back_populates="contract",
         # Append-only audit log — never delete. RESTRICT on FK.
         passive_deletes=True,
         lazy="raise",
         order_by="ContractStatusLog.created_at",
     )
-    amendments: Mapped[list["ContractAmendment"]] = relationship(
+    amendments: Mapped[list[ContractAmendment]] = relationship(
         back_populates="contract",
         # Legal documents — never delete. RESTRICT on FK.
         passive_deletes=True,
@@ -237,7 +235,7 @@ class ContractPriceItem(BaseModel):
         comment="Договорная цена в тийинах",
     )
 
-    contract: Mapped["Contract"] = relationship(
+    contract: Mapped[Contract] = relationship(
         back_populates="price_items",
         lazy="raise",  # N+1 guard — загружать явно через selectinload
     )
@@ -308,7 +306,7 @@ class Invoice(BaseModel):
         sa.TIMESTAMP(timezone=True), nullable=True
     )
 
-    contract: Mapped["Contract"] = relationship(
+    contract: Mapped[Contract] = relationship(
         back_populates="invoices",
         lazy="raise",
     )
@@ -383,7 +381,7 @@ class ContractStatusLog(BaseModel):
         comment="Причина приостановки / расторжения / истечения",
     )
 
-    contract: Mapped["Contract"] = relationship(
+    contract: Mapped[Contract] = relationship(
         back_populates="status_logs",
         lazy="raise",
     )
@@ -430,7 +428,7 @@ class ContractAmendment(BaseModel):
         comment="Кто создал ДС (admin)",
     )
 
-    contract: Mapped["Contract"] = relationship(
+    contract: Mapped[Contract] = relationship(
         back_populates="amendments",
         lazy="raise",
     )

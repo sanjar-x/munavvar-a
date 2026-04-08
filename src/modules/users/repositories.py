@@ -20,6 +20,7 @@ from src.infrastructure.database.models import (
 from src.modules.users.enums import AuthProvider, Role
 from src.modules.users.exceptions import (
     UserDeleteConflictError,
+    UserNotFoundError,
     UserUpdateConflictError,
 )
 
@@ -51,7 +52,10 @@ class IdentityRepository(BaseRepository[Identity]):
             self.model.provider == provider,
         )
         result = await self.session.execute(query)
-        return result.scalar_one()
+        identity = result.scalar_one_or_none()
+        if identity is None:
+            raise UserNotFoundError(user_id=user_id)
+        return identity
 
     async def get_by_id_and_provider(
         self,
@@ -193,7 +197,12 @@ class UserRepository(BaseRepository[User]):
             self.model.role == Role.SYSTEM, self.model.is_active.is_(True)
         )
         result = await self.session.execute(statement)
-        return result.scalar_one()
+        user = result.scalar_one_or_none()
+        if user is None:
+            from src.core.constants import SYSTEM_USER_ID
+
+            raise UserNotFoundError(user_id=SYSTEM_USER_ID)
+        return user
 
     async def get_courier(self, id: UUID) -> User | None:
         return await self._get_active_by_role_and_id(id, Role.COURIER)
@@ -385,7 +394,10 @@ class UserRepository(BaseRepository[User]):
             if active_only:
                 query = query.where(self.model.is_active.is_(True))
             result = await self.session.execute(query)
-            return result.scalar_one()
+            user = result.scalar_one_or_none()
+            if user is None:
+                raise UserNotFoundError(user_id=id)
+            return user
 
         statement = update(self.model).where(self.model.id == id)
         if active_only:

@@ -33,7 +33,9 @@ async def check_tara_availability(
     ],
 ):
     """Предварительная проверка доступности тары перед оформлением заказа."""
-    return await base_order_service.check_tara_availability(dto=dto)
+    return await base_order_service.check_tara_availability(
+        dto=dto, client_id=client.id
+    )
 
 
 @orders_router.post("/", response_model=OrderResponse, status_code=201)

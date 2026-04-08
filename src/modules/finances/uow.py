@@ -15,7 +15,7 @@ class IFinancesUnitOfWork(IUnitOfWork):
 
 # 2. Доменная реализация (Связывает инфраструктуру и домен)
 class FinancesUnitOfWork(BaseSQLAlchemyUoW, IFinancesUnitOfWork):
-    async def __aenter__(self) -> "FinancesUnitOfWork":
+    async def __aenter__(self) -> FinancesUnitOfWork:
         await super().__aenter__()
         # Атрибут создается ТОЛЬКО здесь!
         self.accounts = AccountRepository(session=self.session)

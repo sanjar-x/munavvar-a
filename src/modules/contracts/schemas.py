@@ -2,7 +2,7 @@
 import uuid
 from datetime import date, datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from src.modules.contracts.enums import ContractStatus, InvoiceStatus
 
@@ -77,13 +77,13 @@ class ContractResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    model_config = {"from_attributes": True}
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ContractDetailResponse(ContractResponse):
     """Расширенный ответ с прайс-листом."""
 
-    price_items: list["PriceItemResponse"] = []
+    price_items: list[PriceItemResponse] = []
 
 
 # ─── PRICE ITEM SCHEMAS ───────────────────────────────────────────
@@ -102,7 +102,7 @@ class PriceItemResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    model_config = {"from_attributes": True}
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ─── INVOICE SCHEMAS ─────────────────────────────────────────────
@@ -127,7 +127,7 @@ class InvoiceResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    model_config = {"from_attributes": True}
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ─── RECONCILIATION SCHEMAS ──────────────────────────────────────
@@ -171,7 +171,7 @@ class ContractStatusLogResponse(BaseModel):
     reason: str | None
     created_at: datetime
 
-    model_config = {"from_attributes": True}
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ─── AMENDMENT SCHEMAS ────────────────────────────────────────────
@@ -201,7 +201,7 @@ class AmendmentResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    model_config = {"from_attributes": True}
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ─── JOB RESPONSE ────────────────────────────────────────────────

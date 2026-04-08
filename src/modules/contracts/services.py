@@ -471,7 +471,10 @@ class ContractService:
         - Один не-CANCELLED инвойс за период — запрещён дубль.
         """
         async with self.uow:
-            contract = await self.uow.contracts.get(contract_id)
+            # Lock contract row to prevent concurrent invoice number races
+            contract = await self.uow.contracts.get(
+                contract_id, with_for_update=True
+            )
             if not contract:
                 raise ContractNotFoundError(contract_id)
 

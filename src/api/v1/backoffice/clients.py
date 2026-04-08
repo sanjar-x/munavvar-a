@@ -128,7 +128,7 @@ async def get_clients(
 async def get_client(
     client_id: uuid.UUID,
     current_admin: Annotated[
-        User, Security(get_current_user, scopes=[Scope.USERS_WRITE])
+        User, Security(get_current_user, scopes=[Scope.USERS_READ])
     ],
     client_service: Annotated[ClientService, Depends(get_client_service)],
 ):

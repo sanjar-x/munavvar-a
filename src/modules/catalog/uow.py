@@ -11,7 +11,7 @@ class ICatalogUnitOfWork(IUnitOfWork):
 
 # 3.2 Доменная реализация (DomainSQLAlchemyUoW)
 class CatalogUnitOfWork(BaseSQLAlchemyUoW, ICatalogUnitOfWork):
-    async def __aenter__(self) -> "CatalogUnitOfWork":
+    async def __aenter__(self) -> CatalogUnitOfWork:
         await super().__aenter__()
         self.products = ProductRepository(session=self.session)
         return self
