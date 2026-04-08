@@ -11,6 +11,7 @@ from src.application.client.schemas import (
     ClientCreate,
     ClientOnboardingRequest,
     ClientResponse,
+    ContractSummary,
     InventoryCreate,
 )
 from src.application.client.uow import ClientUnitOfWork
@@ -123,6 +124,7 @@ class ClientService:
             account = await self.uow.accounts.get_client_account(
                 client_id=client_id
             )
+            contracts = await self.uow.contracts.get_multi(client_id=client_id)
 
             response = ClientResponse.model_validate(client)
             response.account = (
@@ -131,6 +133,9 @@ class ClientService:
             response.phone = (
                 identity.provider_identity_id if identity else None
             )
+            response.contracts = [
+                ContractSummary.model_validate(c) for c in contracts
+            ]
             return response
 
     async def onboard_client_with_balance(

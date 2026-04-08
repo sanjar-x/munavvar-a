@@ -1,11 +1,12 @@
 import enum
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field
 
 from src.modules.catalog.enums import ProductType
+from src.modules.contracts.enums import ContractStatus
 from src.modules.inventory.enums import InventoryType
 from src.modules.orders.enums import OrderStatus, PaymentMethod
 from src.modules.users.enums import Role
@@ -100,6 +101,19 @@ class Order(BaseModel):
     created_at: datetime
 
 
+class ContractSummary(BaseModel):
+    """Краткая информация о договоре для карточки клиента."""
+
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    number: str
+    status: ContractStatus
+    start_date: date
+    end_date: date | None
+    credit_limit: int
+    credit_used: int
+
+
 class ClientResponse(BaseModel):
     model_config = ConfigDict(
         from_attributes=True,
@@ -112,6 +126,7 @@ class ClientResponse(BaseModel):
     account: Account | None = None
     inventories: list[Inventory]
     client_orders: list[Order]
+    contracts: list[ContractSummary] = []
     created_at: datetime
     updated_at: datetime
 
