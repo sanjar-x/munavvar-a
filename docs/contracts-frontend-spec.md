@@ -6,7 +6,7 @@
 
 | Реквизит             | Значение                                            |
 | -------------------- | --------------------------------------------------- |
-| **Версия документа** | 2.0.0                                               |
+| **Версия документа** | 3.0.0                                               |
 | **Статус**           | APPROVED                                            |
 | **Аудитория**        | Frontend-разработчики, QA-инженеры, Tech Lead       |
 | **Формат**           | BRD + FLOW + API SPEC                               |
@@ -19,6 +19,53 @@
 > TypeScript-типы, примеры запросов/ответов, таблицы валидации полей
 > и карту ошибок. Копируйте типы «как есть» — они сгенерированы из
 > Pydantic-схем backend'а.
+
+## Changelog v2.0.0 → v3.0.0
+
+> **⚠️ Внимание Frontend-разработчиков!** Данная секция перечисляет все
+> изменения между коммитами `19c2ccc` и `41c14e1`. Изменения сгруппированы
+> по типу: ломающие (breaking), новые возможности и исправления.
+
+### 🔴 Breaking Changes
+
+| # | Изменение | Было | Стало | Раздел |
+|---|-----------|------|-------|--------|
+| 1 | Ответ `GET /backoffice/orders/` | `OrderResponse[]` | `OrdersResponse` (обёртка с `total_count`) | §18.2 |
+| 2 | Лимит `GET /backoffice/orders/` | `le=500` | `le=100` | — |
+| 3 | Лимит `GET /backoffice/contracts/` | `le=200` | `le=100` | §19.2 |
+| 4 | Лимит `GET /{id}/orders` | `le=200` | `le=100` | §19.12 |
+| 5 | Scope `POST /backoffice/orders/` | `orders:edit` | `orders:create` | — |
+| 6 | Scope `POST /backoffice/orders/warehouse-sale` | `orders:edit` | `orders:create` | — |
+| 7 | Ответ `GET /client/orders/history` | `OrderResponse[]` | `OrdersResponse` | §20.5 |
+| 8 | Scope `DELETE /client/orders/{id}/items/{pid}` | `orders:create` | `orders:cancel` | — |
+| 9 | Scope `GET /backoffice/clients/` | `users:write` | `users:read` | — |
+| 10 | Scope `GET /backoffice/clients/{id}` | `users:write` | `users:read` | — |
+
+### 🟢 New Features
+
+| # | Что добавлено | Раздел |
+|---|--------------|--------|
+| 1 | `OrderResponse` — 4 новых поля: `contract_id`, `reserved_credit_amount`, `notes`, `cancellation_reason` | §18.2 |
+| 2 | Новый тип `OrdersResponse` (`total_count` + `orders[]`) | §18.2 |
+| 3 | Новый тип `CancelOrderRequest` с полем `reason` | §18.3 |
+| 4 | Новый тип `OrderStatus` enum | §18.1 |
+| 5 | `POST /backoffice/orders/jobs/expire-stale` — автоочистка устаревших заказов | §19.25 |
+| 6 | `POST /client/orders/{id}/cancel` — отмена заказа клиентом | §20.6 |
+| 7 | `GET /client/orders/history` — пагинированная история с фильтром `status` | §20.5 |
+| 8 | `GET /client/inventory/balance` — баланс тары клиента | §20.7 |
+| 9 | `GET /courier/inventory/my-stock` — остатки товаров в машине курьера | §20.8 |
+| 10 | `GET /backoffice/finances/b2b-debts` — дебиторка B2B по договорам | — |
+| 11 | Suspend/Terminate/Expire контракта автоматически отменяют NEW/ASSIGNED заказы | §19.6, §19.8, §19.24 |
+| 12 | `OrderCreate.notes` — заметки к доставке (код домофона, этаж и т.д.) | §18.3 |
+
+### 🔧 Fixes
+
+| # | Исправление | Влияние на Frontend |
+|---|------------|---------------------|
+| 1 | Исправлен баг `bulk_cancel_by_contract`: кредит по отменённым заказам теперь корректно возвращается | `credit_used` обновляется правильно при массовой отмене |
+| 2 | `expire-stale` теперь очищает и ASSIGNED заказы (72ч по `updated_at`) | Заказы в ASSIGNED не зависают бесконечно |
+| 3 | Фактуры за оплату с отсутствующим платежом генерируют предупреждение (аудит) | Нет изменения API, внутренний лог |
+| 4 | `response_model` добавлен на все финансовые эндпоинты | Ответы теперь строго типизированы |
 
 ---
 
@@ -440,7 +487,18 @@ Scheduler (Admin)           API                         DB
   │                          │   AND end_date < today ──► │
   │                          ├── UPDATE → EXPIRED ──────► │
   │                          ├── INSERT status_log ─────► │
+  │                          ├─ CANCEL in-flight orders ► │  ← NEW v3.0
+  │                          │  (NEW/ASSIGNED → CANCELLED) │
+  │                          │  + INSERT OrderStatusLog ─► │
+  │                          │  + credit_used -= amount ─► │
   │   ◄── {updated: N} ──── │◄──── COMMIT ─────────── │
+  │                          │                           │
+  ├── POST /orders/jobs/expire-stale ►                    │  ← NEW v3.0
+  │   {maxAgeHours, assignedMaxAgeHours}                  │
+  │                          ├── NEW: created_at < X ──► │
+  │                          ├── ASSIGNED: updated_at<Y ► │
+  │                          ├── CANCEL + credit return ► │
+  │   ◄── {cancelled: N} ── │◄──── COMMIT ─────────── │
 ```
 
 ### 13.5 Клиентский портал (B2B)
@@ -460,6 +518,32 @@ CLIENT_B2B                   API                         DB
   │                           │                           │
   ├── GET /my-contract/invoices ►│                         │
   │   ◄── 200 Invoice[] ──── │                           │
+  │                           │                           │
+  ├── GET /my-contract/invoices/{id} ►│              ← NEW v3.0
+  │   ◄── 200 Invoice ────── │  (IDOR-safe)              │
+```
+
+### 13.6 Клиентское управление заказами (NEW v3.0)
+
+```
+CLIENT (B2B/B2C)              API                         DB
+  │                            │                           │
+  ├── GET /client/orders/history ►│                        │
+  │   ?skip=0&limit=20&status=.. ├── filter by user_id ──► │
+  │   ◄── OrdersResponse ──── │  {total_count, orders[]}  │
+  │                            │                           │
+  ├── GET /client/orders/{id} ─► │                          │
+  │                            ├── check owner (IDOR) ───► │
+  │   ◄── 200 OrderResponse ── │                           │
+  │                            │                           │
+  ├── POST /client/orders/{id}/cancel ►│                   │
+  │   {reason?: "..."} ◄────── ├── check owner (IDOR) ──► │
+  │                            ├── status ∈ {NEW,ASSIGNED}│
+  │                            ├── cancel + credit return ►│
+  │   ◄── 200 OrderResponse ── │◄──── COMMIT ─────────── │
+  │                            │                           │
+  ├── GET /client/inventory/balance ►│                      │
+  │   ◄── BalanceResponse[] ── │  (тара на адресах)        │
 ```
 
 ## 14. Интеграция: Contracts ↔ Orders
@@ -483,8 +567,13 @@ CLIENT_B2B                   API                         DB
 
 ```
 Order DELIVERED / PICKUP_COMPLETED / CANCELLED:
-  → contract.credit_used -= order.total_amount
+  → contract.credit_used -= order.reserved_credit_amount
 ```
+
+> **NEW v3.0:** При отмене заказа поле `cancellation_reason` записывается
+> в заказ. Если отмена произошла автоматически (expire/suspend/terminate
+> контракта), причина устанавливается системой. При ручной отмене клиентом
+> или бэкофисом — берётся из `CancelOrderRequest.reason`.
 
 ---
 
@@ -593,6 +682,31 @@ enum InvoiceStatus {
   OVERDUE = "overdue",
   CANCELLED = "cancelled",
   // PARTIALLY_PAID = 'partially_paid' — NOT IMPLEMENTED
+}
+
+/** Статус заказа. NEW v3.0 */
+enum OrderStatus {
+  NEW = "new",
+  ASSIGNED = "assigned",
+  IN_TRANSIT = "in_transit",
+  ARRIVED = "arrived",
+  DELIVERED = "delivered",
+  PICKUP_READY = "pickup_ready",
+  PICKUP_COMPLETED = "pickup_completed",
+  CANCELLED = "cancelled",
+}
+
+/** Способ оплаты. NEW v3.0 */
+enum PaymentMethod {
+  CASH = "cash",
+  CARD = "card",
+  CONTRACT = "contract",
+}
+
+/** Тип продажи. NEW v3.0 */
+enum SaleType {
+  DELIVERY = "delivery",
+  WAREHOUSE_PICKUP = "warehouse_pickup",
 }
 ```
 
@@ -715,6 +829,55 @@ interface ReconciliationResponse {
 interface JobResponse {
   updated: number;
 }
+
+/**
+ * Полная модель заказа. NEW v3.0
+ * ⚠️ Используется в интеграции Contracts ↔ Orders.
+ * Поля contract_id и reserved_credit_amount присутствуют
+ * только при payment_method === 'contract'.
+ */
+interface OrderResponse {
+  id: string;
+  client_id: string;
+  client: UserResponse;
+  client_inventory_id: string;
+  client_inventory: InventoryResponse;
+  courier_id: string | null;
+  courier: UserResponse | null;
+  status: OrderStatus;
+  payment_method: PaymentMethod;
+  total_amount: number; // тийин
+  capitalization_applied: boolean;
+  sale_type: SaleType;
+  warehouse_id: string | null;
+  contract_id: string | null; // NEW v3.0 — ID договора
+  reserved_credit_amount: number | null; // NEW v3.0 — тийин
+  notes: string | null; // NEW v3.0 — заметки к доставке
+  cancellation_reason: string | null; // NEW v3.0 — причина отмены
+  items: OrderItemResponse[];
+  stock_transfers: TransferResponse[];
+  created_at: string; // ISO datetime
+  updated_at: string; // ISO datetime
+}
+
+/**
+ * Обёртка для пагинированного списка заказов. NEW v3.0
+ * ⚠️ BREAKING: заменяет OrderResponse[] во всех list-эндпоинтах.
+ */
+interface OrdersResponse {
+  total_count: number;
+  orders: OrderResponse[];
+}
+
+/** Позиция заказа */
+interface OrderItemResponse {
+  id: string;
+  product_id: string;
+  product: ProductResponse;
+  quantity: number;
+  unit_price: number; // тийин, историческая цена
+  total: number; // quantity * unit_price
+}
 ```
 
 ### 18.3 Request Types
@@ -772,6 +935,11 @@ interface AmendmentCreateRequest {
   number: string; // 1–50 символов; "ДС-001"
   description: string; // 3–2000 символов
   effective_date: string; // ISO date
+}
+
+/** Отмена заказа (клиент или бэкофис). NEW v3.0 */
+interface CancelOrderRequest {
+  reason?: string | null; // ≤ 500 символов; опциональная причина
 }
 ```
 
@@ -1103,6 +1271,10 @@ POST /api/v1/backoffice/contracts/{contract_id}/suspend
 - `suspended_at` ← текущее время (UTC)
 - `suspension_reason` ← переданный `reason`
 - Запись в `contract_status_logs`
+- **NEW v3.0:** Автоматическая отмена in-flight заказов (NEW/ASSIGNED → CANCELLED)
+  - Каждый заказ получает `cancellation_reason: "Договор приостановлен"`
+  - Создаётся `OrderStatusLog` для каждого отменённого заказа
+  - `credit_used` уменьшается на `reserved_credit_amount` каждого заказа
 
 **Ошибки:**
 
@@ -1168,6 +1340,10 @@ POST /api/v1/backoffice/contracts/{contract_id}/terminate
 - `terminated_at` ← текущее время (UTC)
 - `termination_reason` ← переданный `reason`
 - Запись в `contract_status_logs`
+- **NEW v3.0:** Автоматическая отмена in-flight заказов (NEW/ASSIGNED → CANCELLED)
+  - Каждый заказ получает `cancellation_reason: "Договор расторгнут"`
+  - Создаётся `OrderStatusLog` для каждого отменённого заказа
+  - `credit_used` уменьшается на `reserved_credit_amount` каждого заказа
 
 **Ошибки:**
 
@@ -1250,6 +1426,9 @@ GET /api/v1/backoffice/contracts/{contract_id}/orders?skip=0&limit=50
 | `limit`  | integer | 50      | `1–100`     |
 
 **Ответ — 200:** `OrderResponse[]`
+
+> **Примечание v3.0:** `OrderResponse` теперь включает поля `contract_id`,
+> `reserved_credit_amount`, `notes` и `cancellation_reason`.
 
 ---
 
@@ -1593,6 +1772,43 @@ POST /api/v1/backoffice/contracts/jobs/expire-contracts
 
 > Переводит ACTIVE договоры с `end_date < today` в EXPIRED.
 > Логирует каждый переход в аудит-лог. Идемпотентен.
+>
+> **NEW v3.0:** Автоматически отменяет все in-flight заказы (NEW/ASSIGNED)
+> по каждому истёкшему договору. Каждый заказ получает
+> `cancellation_reason: "Договор истёк"` и запись в `OrderStatusLog`.
+> `credit_used` уменьшается на сумму `reserved_credit_amount`.
+
+---
+
+### 19.25 Job: очистка устаревших заказов (NEW v3.0)
+
+```
+POST /api/v1/backoffice/orders/jobs/expire-stale
+```
+
+**Scope:** `orders:edit`
+
+| Параметр              | Тип     | Default | Описание                              |
+| --------------------- | ------- | ------- | ------------------------------------- |
+| `maxAgeHours`         | integer | 48      | Макс. возраст NEW заказов (часы)      |
+| `assignedMaxAgeHours` | integer | 72      | Макс. возраст ASSIGNED заказов (часы) |
+
+**Ответ — 200:**
+
+```json
+{
+  "cancelled": 5,
+  "details": "Отменено NEW: 3, ASSIGNED: 2"
+}
+```
+
+**Бизнес-логика:**
+
+- **NEW** заказы: отменяются если `created_at < now() - maxAgeHours`
+- **ASSIGNED** заказы: отменяются если `updated_at < now() - assignedMaxAgeHours`
+  (используется `updated_at`, чтобы не отменять недавно назначенные заказы)
+- Кредит по CONTRACT-заказам возвращается
+- Каждый заказ получает `cancellation_reason` и `OrderStatusLog`
 
 ---
 
@@ -1674,6 +1890,134 @@ GET /api/v1/client/contracts/my-contract/invoices/{invoice_id}
 
 ---
 
+### 20.5 Моя история заказов (NEW v3.0)
+
+```
+GET /api/v1/client/orders/history?skip=0&limit=20&status=delivered
+```
+
+**Scope:** `orders:read`
+
+| Параметр | Тип         | Default | Ограничения     | Описание           |
+| -------- | ----------- | ------- | --------------- | ------------------ |
+| `skip`   | integer     | 0       | `≥ 0`           | Смещение           |
+| `limit`  | integer     | 20      | `1–100`         | Размер страницы    |
+| `status` | OrderStatus | null    | опциональный    | Фильтр по статусу  |
+
+**Ответ — 200:** `OrdersResponse`
+
+```json
+{
+  "total_count": 42,
+  "orders": [
+    {
+      "id": "019...",
+      "status": "delivered",
+      "payment_method": "contract",
+      "total_amount": 1800000,
+      "contract_id": "019...",
+      "reserved_credit_amount": 1800000,
+      "notes": "3 этаж, код 4512",
+      "cancellation_reason": null,
+      "items": [...],
+      "created_at": "2025-04-01T10:00:00+00:00",
+      "updated_at": "2025-04-01T14:30:00+00:00"
+    }
+  ]
+}
+```
+
+> **⚠️ BREAKING:** Ответ изменился с `OrderResponse[]` на `OrdersResponse`.
+> Используйте `response.orders` вместо прямого массива.
+> Поле `total_count` позволяет реализовать правильную пагинацию.
+
+> **IDOR-safe:** Сервер фильтрует заказы по `current_user.id` автоматически.
+
+---
+
+### 20.6 Отмена заказа клиентом (NEW v3.0)
+
+```
+POST /api/v1/client/orders/{order_id}/cancel
+```
+
+**Scope:** `orders:cancel`
+
+**Request Body:** `CancelOrderRequest` (опциональный)
+
+```json
+{
+  "reason": "Передумал, заказ больше не нужен"
+}
+```
+
+| Поле     | Тип            | Ограничения    | Обязательный |
+| -------- | -------------- | -------------- | :----------: |
+| `reason` | string \| null | ≤ 500 символов |      ❌      |
+
+**Ответ — 200:** `OrderResponse` с `status: "cancelled"`
+
+**Бизнес-логика:**
+
+- Только заказы в статусе `NEW` или `ASSIGNED` могут быть отменены клиентом
+- `cancellation_reason` записывается в заказ
+- Для CONTRACT-заказов: `credit_used` уменьшается на `reserved_credit_amount`
+- Создаётся запись `OrderStatusLog`
+- IDOR-safe: сервер проверяет, что заказ принадлежит `current_user`
+
+**Ошибки:**
+
+| HTTP | Код                        | Ситуация                             |
+| ---- | -------------------------- | ------------------------------------ |
+| 404  | `ORDER_NOT_FOUND`          | Заказ не найден или чужой            |
+| 409  | `ORDER_CANCEL_NOT_ALLOWED` | Статус ∉ {`new`, `assigned`}         |
+
+---
+
+### 20.7 Баланс тары клиента (NEW v3.0)
+
+```
+GET /api/v1/client/inventory/balance
+```
+
+**Scope:** `catalog:read`
+
+**Ответ — 200:** `BalanceResponse[]`
+
+```json
+[
+  {
+    "product": {
+      "id": "019...",
+      "name": "Бутыль 19л",
+      "sku": "BOTTLE-19L",
+      "type": "tara",
+      "price": 0
+    },
+    "quantity": 5
+  }
+]
+```
+
+> Показывает остатки тары на всех адресах клиента. Отрицательное значение
+> `quantity` означает тарный долг (клиент должен вернуть бутыли).
+
+---
+
+### 20.8 Остатки в машине курьера (NEW v3.0)
+
+```
+GET /api/v1/courier/inventory/my-stock
+```
+
+**Scope:** `catalog:read` (через `get_current_courier`)
+
+**Ответ — 200:** `BalanceResponse[]`
+
+> Показывает текущие остатки товаров в машине курьера. Только ненулевые позиции.
+
+---
+
 ## 21. Каталог ошибок (Error Code Catalog)
 
 | Код ошибки                         | HTTP | Триггер                                             | Ключи `details`                                                              |
@@ -1692,6 +2036,8 @@ GET /api/v1/client/contracts/my-contract/invoices/{invoice_id}
 | `DUPLICATE_INVOICE_PERIOD`         | 409  | Генерация инвойса за период с активным инвойсом     | `contract_id`, `period_from`, `period_to`                                    |
 | `DUPLICATE_AMENDMENT_NUMBER`       | 409  | Создание ДС с дублирующимся номером                 | `contract_id`, `number`                                                      |
 | `CREDIT_LIMIT_BELOW_USED`          | 400  | Уменьшение `credit_limit` ниже `credit_used`        | `new_limit`, `credit_used`                                                   |
+| `ORDER_NOT_FOUND`                  | 404  | Заказ не найден или не принадлежит пользователю      | `order_id`                                                                   |
+| `ORDER_CANCEL_NOT_ALLOWED`         | 409  | Отмена невозможна (статус ≠ new/assigned)            | `order_id`, `current_status`                                                 |
 
 ---
 
@@ -1951,9 +2297,9 @@ async function loadContracts(page: number, pageSize = 20) {
 }
 ```
 
-> **Примечание:** API возвращает массив без метаданных пагинации
-> (без `total_count`). Frontend должен определять «есть ли следующая
-> страница» по количеству возвращённых элементов:
+> **Примечание v3.0:** Для заказов (`OrdersResponse`) API возвращает
+> `total_count` — используйте его для пагинации. Для остальных сущностей
+> (договоры, инвойсы, ДС) по-прежнему применяется правило
 > `hasNextPage = items.length === limit`.
 
 ### 22.8 Форматирование дат
@@ -2008,6 +2354,8 @@ const canRead = hasScope(user.scopes, "contracts:read");
 // ✅ Показывать кнопку "Активировать" только при contracts:manage
 // ✅ Показывать форму создания только при contracts:write
 // ✅ Скрывать вкладку "Договоры" при отсутствии contracts:read
+// ✅ NEW v3.0: Кнопка "Новый заказ" требует orders:create (не orders:edit!)
+// ✅ NEW v3.0: Кнопка "Отменить заказ" требует orders:cancel
 
 // Матрица видимости элементов UI:
 const UI_VISIBILITY = {
@@ -2245,28 +2593,46 @@ function getInvoiceActions(status: InvoiceStatus): ActionButton[] {
 - [ ] GET /my-contract/invoices/{id} — конкретный счёт
 - [ ] IDOR: невозможно получить чужой договор/инвойс
 
-### 23.8 Доп. соглашения
+### 23.8 Клиентские заказы (NEW v3.0)
+
+- [ ] GET /client/orders/history — `OrdersResponse` с `total_count`
+- [ ] GET /client/orders/history?status=delivered — фильтр по статусу
+- [ ] GET /client/orders/history — пагинация (skip/limit)
+- [ ] GET /client/orders/{id} — IDOR: нельзя получить чужой заказ
+- [ ] POST /client/orders/{id}/cancel — отмена NEW заказа → 200
+- [ ] POST /client/orders/{id}/cancel — отмена ASSIGNED заказа → 200
+- [ ] POST /client/orders/{id}/cancel — отмена DELIVERED → 409
+- [ ] POST /client/orders/{id}/cancel — `cancellation_reason` записывается
+- [ ] POST /client/orders/{id}/cancel — credit_used уменьшается (CONTRACT)
+- [ ] GET /client/inventory/balance — список тары с количеством
+- [ ] Отрицательный `quantity` — тарный долг (визуальный индикатор)
+
+### 23.9 Доп. соглашения
 
 - [ ] Создание ДС → 201
 - [ ] Ошибка 409 при дубликате номера
 - [ ] Список ДС по договору (хронологически)
 
-### 23.9 Jobs
+### 23.10 Jobs
 
 - [ ] mark-overdue → `{updated: N}` (N ≥ 0)
 - [ ] expire-contracts → `{updated: N}` (N ≥ 0)
+- [ ] expire-contracts → in-flight заказы отменяются автоматически (NEW v3.0)
+- [ ] expire-stale → `{cancelled: N}` с NEW и ASSIGNED заказами (NEW v3.0)
 - [ ] Повторный вызов → `{updated: 0}` (идемпотентность)
 
-### 23.10 Авторизация
+### 23.11 Авторизация
 
 - [ ] `contracts:read` — доступ к GET-эндпоинтам
 - [ ] `contracts:write` — доступ к POST/PATCH/PUT/DELETE CRUD
 - [ ] `contracts:manage` — доступ к операциям смены статуса и jobs
+- [ ] `orders:create` — создание заказов (NEW v3.0: раньше был `orders:edit`)
+- [ ] `orders:cancel` — отмена заказов (NEW v3.0)
 - [ ] Без scope → 403 `INSUFFICIENT_SCOPE`
 - [ ] Без токена → 401 `NOT_AUTHENTICATED`
 - [ ] UI-элементы скрыты/заблокированы при отсутствии scope
 
-### 23.11 Edge Cases
+### 23.12 Edge Cases
 
 - [ ] Длинный `reason` (512 символов) — отображается корректно
 - [ ] Длинный `legal_name` (255 символов) — не ломает layout
@@ -2275,6 +2641,11 @@ function getInvoiceActions(status: InvoiceStatus): ActionButton[] {
 - [ ] Нулевая сумма инвойса (`amount = 0`) — за период не было заказов
 - [ ] Пустой прайс-лист — все товары по каталожным ценам
 - [ ] Пустой акт сверки — `orders: [], payments: [], balance: 0`
+- [ ] `cancellation_reason` отображается в карточке отменённого заказа (NEW v3.0)
+- [ ] `notes` отображается в карточке заказа (NEW v3.0)
+- [ ] `OrdersResponse.total_count = 0` при пустом списке (NEW v3.0)
+- [ ] Отмена CONTRACT-заказа → `credit_used` корректно уменьшается (NEW v3.0)
+- [ ] Suspend/Terminate → проверить что in-flight заказы отменены (NEW v3.0)
 
 ---
 
