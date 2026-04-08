@@ -74,7 +74,10 @@ async def get_order_history(
         limit=limit,
         status=status,
     )
-    return OrdersResponse(total_count=total, orders=orders)
+    return OrdersResponse(
+        total_count=total,
+        orders=[OrderResponse.model_validate(order) for order in orders],
+    )
 
 
 @orders_router.get("/{order_id}", response_model=OrderResponse)

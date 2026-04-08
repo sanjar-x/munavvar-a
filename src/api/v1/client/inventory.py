@@ -22,7 +22,10 @@ from src.infrastructure.database.models import User
 from src.modules.auth.dependencies import get_current_user
 from src.modules.inventory.dependencies import get_inventory_uow
 from src.modules.inventory.enums import InventoryType
-from src.modules.inventory.schemas import BalanceResponse
+from src.modules.inventory.schemas import (
+    BalanceResponse,
+    ProductSimpleResponse,
+)
 from src.modules.inventory.uow import InventoryUnitOfWork
 
 inventory_router = APIRouter()
@@ -57,7 +60,7 @@ async def get_my_tara_balance(
             return []
         return [
             BalanceResponse(
-                product=b.product,
+                product=ProductSimpleResponse.model_validate(b.product),
                 quantity=b.quantity,
             )
             for b in inv.balances
