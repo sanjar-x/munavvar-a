@@ -2,6 +2,8 @@ import uuid
 from collections.abc import Sequence
 from datetime import datetime
 
+from sqlalchemy.exc import IntegrityError
+
 from src.core.exceptions import (
     BadRequestError,
     ConflictError,
@@ -533,7 +535,14 @@ class StockTransferService:
                 for item in schema.items
             ]
             await self.uow.transfer_items.add_many(transfer_items_data)
-            await self.uow.transactions.add_many(stock_transactions_data)
+            try:
+                await self.uow.transactions.add_many(stock_transactions_data)
+            except IntegrityError as exc:
+                # Trigger rejects negative balances for
+                # non-virtual inventories — convert to
+                # domain error for a clean API response.
+                await self.uow.rollback()
+                raise InsufficientStockError(shortages={}) from exc
 
             await self.uow.commit()
             result = await self.uow.transfers.get_transfer(transfer.id)
