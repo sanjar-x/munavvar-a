@@ -28,7 +28,7 @@ from src.modules.contracts.schemas import (
     ReconciliationResponse,
 )
 from src.modules.contracts.services import ContractService
-from src.modules.orders.schemas import OrderResponse
+from src.modules.orders.schemas import OrdersResponse
 
 contracts_router = APIRouter()
 
@@ -245,7 +245,7 @@ async def delete_price_item(
 
 @contracts_router.get(
     "/{contract_id}/orders",
-    response_model=list[OrderResponse],
+    response_model=OrdersResponse,
     summary="Заказы по договору",
 )
 async def get_contract_orders(
@@ -257,11 +257,12 @@ async def get_contract_orders(
     skip: Annotated[int, Query(ge=0)] = 0,
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
 ):
-    return await service.list_contract_orders(
+    orders, total = await service.list_contract_orders(
         contract_id=contract_id,
         skip=skip,
         limit=limit,
     )
+    return OrdersResponse(total_count=total, orders=orders)
 
 
 @contracts_router.post(

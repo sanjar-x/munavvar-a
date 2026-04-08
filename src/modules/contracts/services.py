@@ -467,18 +467,18 @@ class ContractService:
         contract_id: uuid.UUID,
         skip: int = 0,
         limit: int = 50,
-    ) -> list:
+    ) -> tuple[list, int]:
         """Все заказы по договору (для backoffice)."""
         async with self.uow:
             contract = await self.uow.contracts.get(contract_id)
             if not contract:
                 raise ContractNotFoundError(contract_id)
-            orders = await self.uow.orders.search_orders(
+            orders, total = await self.uow.orders.search_orders(
                 contract_id=contract_id,
                 skip=skip,
                 limit=limit,
             )
-            return list(orders)
+            return list(orders), total
 
     async def generate_invoice(
         self,
