@@ -3,7 +3,7 @@ import uuid
 from collections.abc import Sequence
 from datetime import UTC, date, datetime, timedelta
 
-from sqlalchemy import Result, delete, desc, select, update
+from sqlalchemy import Result, delete, desc, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 
@@ -148,52 +148,64 @@ class OrderRepository(BaseRepository[Order]):
         min_amount: int | None = None,
         max_amount: int | None = None,
         contract_id: uuid.UUID | None = None,
-    ) -> Sequence[Order]:
+    ) -> tuple[Sequence[Order], int]:
         """
         Универсальный поиск заказов по всем доступным атрибутам модели.
+        Возвращает кортеж (список заказов, общее количество).
         """
-        query = select(self.model)
+        base_query = select(self.model).where(self.model.is_active.is_(True))
 
         if statuses:
-            query = query.where(self.model.status.in_(statuses))
+            base_query = base_query.where(self.model.status.in_(statuses))
         if payment_methods:
-            query = query.where(self.model.payment_method.in_(payment_methods))
+            base_query = base_query.where(
+                self.model.payment_method.in_(payment_methods)
+            )
 
         # Точные совпадения по ID
         if courier_id:
-            query = query.where(self.model.courier_id == courier_id)
+            base_query = base_query.where(self.model.courier_id == courier_id)
         if client_id:
-            query = query.where(self.model.client_id == client_id)
+            base_query = base_query.where(self.model.client_id == client_id)
         if client_inventory_id:
-            query = query.where(
+            base_query = base_query.where(
                 self.model.client_inventory_id == client_inventory_id
             )
         if sale_type:
-            query = query.where(self.model.sale_type == sale_type)
+            base_query = base_query.where(self.model.sale_type == sale_type)
         if contract_id:
-            query = query.where(self.model.contract_id == contract_id)
+            base_query = base_query.where(
+                self.model.contract_id == contract_id
+            )
 
         # Диапазоны дат (предполагается, что created_at есть в BaseModel)
         if date_from:
-            query = query.where(self.model.created_at >= date_from)
+            base_query = base_query.where(self.model.created_at >= date_from)
         if date_to:
-            query = query.where(self.model.created_at <= date_to)
+            base_query = base_query.where(self.model.created_at <= date_to)
 
         # Диапазоны сумм
         if min_amount is not None:
-            query = query.where(self.model.total_amount >= min_amount)
+            base_query = base_query.where(
+                self.model.total_amount >= min_amount
+            )
         if max_amount is not None:
-            query = query.where(self.model.total_amount <= max_amount)
+            base_query = base_query.where(
+                self.model.total_amount <= max_amount
+            )
 
-        query = (
-            query.options(*self._details_options())
-            .order_by(desc(self.model.updated_at))
+        count_query = select(func.count()).select_from(base_query.subquery())
+        total: int = await self.session.scalar(count_query) or 0
+
+        items_query = (
+            base_query.options(*self._details_options())
+            .order_by(desc(self.model.created_at))
             .offset(skip)
             .limit(limit)
         )
 
-        result: Result = await self.session.execute(query)
-        return result.scalars().all()
+        result: Result = await self.session.execute(items_query)
+        return result.scalars().all(), total
 
     async def get_delivered_by_contract(
         self,

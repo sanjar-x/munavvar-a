@@ -12,7 +12,6 @@ from src.modules.auth.dependencies import get_current_user
 from src.modules.inventory.dependencies import get_capitalize_tara_service
 from src.modules.inventory.schemas import (
     CapitalizeTaraItem,
-    CapitalizeTaraRequest,
 )
 from src.modules.inventory.services import CapitalizeTaraService
 from src.modules.orders.dependencies import get_base_order_service
@@ -21,6 +20,7 @@ from src.modules.orders.schemas import (
     OrderCreate,
     OrderDeliverRequest,
     OrderResponse,
+    OrdersResponse,
     TaraCheckRequest,
     TaraCheckResponse,
     WarehouseSaleCapitalizeTaraRequest,
@@ -46,7 +46,7 @@ async def _update_backoffice_order_status(
     )
 
 
-@orders_router.get("/", response_model=list[OrderResponse])
+@orders_router.get("/", response_model=OrdersResponse)
 async def search_orders(
     admin: Annotated[
         User, Security(get_current_user, scopes=[Scope.ORDERS_READ])
@@ -86,7 +86,7 @@ async def search_orders(
     ] = None,
 ):
     """Глобальный поиск заказов по фильтрам."""
-    return await base_order_service.search_orders(
+    orders, total = await base_order_service.search_orders(
         skip=skip,
         limit=limit,
         statuses=statuses,
@@ -100,6 +100,7 @@ async def search_orders(
         max_amount=max_amount,
         sale_type=sale_type,
     )
+    return OrdersResponse(total_count=total, orders=orders)
 
 
 @orders_router.post("/check-tara", response_model=TaraCheckResponse)
@@ -116,7 +117,7 @@ async def check_tara_availability(
     return await order_service.check_tara_availability(dto=dto)
 
 
-@orders_router.post("/", status_code=201)
+@orders_router.post("/", status_code=201, response_model=OrderResponse)
 async def create_order(
     client_id: Annotated[
         uuid.UUID, Query(alias="clientId", description="ID клиента")
@@ -193,28 +194,14 @@ async def capitalize_tara_for_sale(
     на склад перед самовывозом."""
     effective_client_id = client_id or WALKIN_USER_ID
 
-    async with capitalize_service.uow:
-        client_inv = (
-            await capitalize_service.uow.inventories.get_client_inventory(
-                effective_client_id
+    return await capitalize_service.capitalize_tara_for_client(
+        client_id=effective_client_id,
+        items=[
+            CapitalizeTaraItem(
+                product_id=item.product_id, quantity=item.quantity
             )
-        )
-        if not client_inv:
-            raise ValueError(
-                f"Инвентарь клиента {effective_client_id} не найден"
-            )
-        client_inventory_id = client_inv.id
-
-    return await capitalize_service.capitalize_tara(
-        dto=CapitalizeTaraRequest(
-            client_inventory_id=client_inventory_id,
-            items=[
-                CapitalizeTaraItem(
-                    product_id=item.product_id, quantity=item.quantity
-                )
-                for item in dto.items
-            ],
-        ),
+            for item in dto.items
+        ],
         created_by_id=admin.id,
     )
 

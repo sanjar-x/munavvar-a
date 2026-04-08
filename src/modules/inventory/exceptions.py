@@ -165,8 +165,7 @@ class InvalidTransferStatusError(ConflictError):
         current_status: str | Any,
         expected_status: str | list[str] | Any,
         message: str = (
-            "Недопустимый статус накладной"
-            " для данной бизнес-операции"
+            "Недопустимый статус накладной для данной бизнес-операции"
         ),
     ):
         curr_val = (
@@ -206,8 +205,7 @@ class TransferTypeMismatchError(ConflictError):
         expected_type: str | Any,
         actual_type: str | Any,
         message: str = (
-            "Несоответствие типа накладной"
-            " для данной бизнес-операции"
+            "Несоответствие типа накладной для данной бизнес-операции"
         ),
     ):
         exp_val = (
@@ -274,8 +272,7 @@ class ProductMismatchInTransitError(ConflictError):
         self,
         invalid_product_ids: list[uuid.UUID],
         message: str = (
-            "Попытка принять товар,"
-            " который не был отгружен в данной накладной"
+            "Попытка принять товар, который не был отгружен в данной накладной"
         ),
     ):
         stringified_ids = [str(p_id) for p_id in invalid_product_ids]
@@ -431,8 +428,7 @@ class ReversalNotAllowedError(ForbiddenError):
         transfer_id: uuid.UUID | str,
         transfer_type: str | Any,
         message: str = (
-            "Данный тип накладной не подлежит"
-            " автоматической отмене (Reversal)"
+            "Данный тип накладной не подлежит автоматической отмене (Reversal)"
         ),
     ):
         t_type = (

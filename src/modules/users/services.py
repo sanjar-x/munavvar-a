@@ -106,7 +106,7 @@ class UserService(BaseService[User, UserAdminCreate, UserUnitOfWork]):
         if phone is not None:
             identity_data["provider_identity_id"] = phone
         if password is not None:
-            identity_data["password_hash"] = get_password_hash(password)
+            identity_data["password_hash"] = await get_password_hash(password)
         try:
             if local_identity is None:
                 if phone is None:
@@ -224,7 +224,7 @@ class UserService(BaseService[User, UserAdminCreate, UserUnitOfWork]):
             user = await self.uow.users.add(user_data)
 
             # 3. Создаем запись Identity (учетные данные)
-            hashed_password = get_password_hash(schema.password)
+            hashed_password = await get_password_hash(schema.password)
             identity_data = {
                 "user_id": user.id,
                 "provider": AuthProvider.LOCAL,
@@ -314,7 +314,7 @@ class UserService(BaseService[User, UserAdminCreate, UserUnitOfWork]):
             user = await self.uow.users.add(user_data)
 
             # 3. Создаем запись Identity (учетные данные)
-            hashed_password = get_password_hash(schema.password)
+            hashed_password = await get_password_hash(schema.password)
             identity_data = {
                 "user_id": user.id,
                 "provider": AuthProvider.LOCAL,
@@ -359,9 +359,7 @@ class UserService(BaseService[User, UserAdminCreate, UserUnitOfWork]):
             changed = False
 
             if user_data:
-                user = await self._repo.update(
-                    id, user_data, active_only=False
-                )
+                user = await self._repo.update(id, user_data)
                 changed = True
 
             if phone is not None or password is not None:

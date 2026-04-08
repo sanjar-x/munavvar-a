@@ -51,6 +51,18 @@ async def create_order(
     )
 
 
+@orders_router.get("/history", response_model=list[OrderResponse])
+async def get_tasks(
+    client: Annotated[
+        User, Security(get_current_user, scopes=[Scope.ORDERS_READ])
+    ],
+    base_order_service: Annotated[
+        BaseOrderService, Depends(get_base_order_service)
+    ],
+):
+    return await base_order_service.get_client_history(client_id=client.id)
+
+
 @orders_router.get("/{order_id}", response_model=OrderResponse)
 async def get_order_details(
     order_id: uuid.UUID,
@@ -95,7 +107,7 @@ async def remove_product_from_order(
     order_id: uuid.UUID,
     product_id: uuid.UUID,
     client: Annotated[
-        User, Security(get_current_user, scopes=[Scope.ORDERS_CREATE])
+        User, Security(get_current_user, scopes=[Scope.ORDERS_CANCEL])
     ],
     base_order_service: Annotated[
         BaseOrderService, Depends(get_base_order_service)
@@ -107,15 +119,3 @@ async def remove_product_from_order(
         product_id=product_id,
         requesting_user_id=client.id,
     )
-
-
-@orders_router.get("/history", response_model=list[OrderResponse])
-async def get_tasks(
-    client: Annotated[
-        User, Security(get_current_user, scopes=[Scope.ORDERS_READ])
-    ],
-    base_order_service: Annotated[
-        BaseOrderService, Depends(get_base_order_service)
-    ],
-):
-    return await base_order_service.get_client_history(client_id=client.id)

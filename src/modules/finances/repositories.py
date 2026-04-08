@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased, joinedload
 
 from src.common.repository import BaseRepository
-from src.core.config import settings
+from src.core.constants import SYSTEM_USER_ID
 from src.infrastructure.database.models import Account, Transaction, User
 from src.modules.finances.enums import AccountType, TransactionStatus
 
@@ -89,7 +89,7 @@ class AccountRepository(BaseRepository[Account]):
         account_type: AccountType,
     ) -> Account | None:
         return await self.get_user_account_by_type(
-            user_id=settings.SYSTEM_USER_ID,
+            user_id=SYSTEM_USER_ID,
             account_type=account_type,
         )
 
@@ -137,7 +137,7 @@ class AccountRepository(BaseRepository[Account]):
         query = (
             select(self.model)
             .where(
-                self.model.user_id == settings.SYSTEM_USER_ID,
+                self.model.user_id == SYSTEM_USER_ID,
                 self.model.is_active.is_(True),
             )
             .order_by(self.model.type)

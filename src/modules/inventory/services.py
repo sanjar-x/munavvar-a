@@ -603,6 +603,65 @@ class CapitalizeTaraService:
                 ],
             }
 
+    async def capitalize_tara_for_client(
+        self,
+        client_id: uuid.UUID,
+        items: list[CapitalizeTaraItem],
+        created_by_id: uuid.UUID,
+    ) -> dict:
+        """
+        Оприходование тары для клиента по его user_id.
+        Разрешает client_id → client_inventory_id и выполняет
+        оприходование в одной атомарной транзакции.
+        """
+        async with self.uow:
+            client_inv = await self.uow.inventories.get_client_inventory(
+                client_id
+            )
+            if not client_inv:
+                raise InventoryNotFoundError(inventory_id=client_id)
+
+            vendor_inv = await self.uow.inventories.get_vendor_inventory()
+
+            transfer = await self.uow.transfers.add(
+                {
+                    "from_id": vendor_inv.id,
+                    "to_id": client_inv.id,
+                    "type": TransferType.INITIAL_BALANCE,
+                    "status": TransferStatus.COMPLETED,
+                    "created_by_id": created_by_id,
+                    "accepted_by_id": created_by_id,
+                }
+            )
+
+            for item in items:
+                await self.uow.transfer_items.add(
+                    {
+                        "transfer_id": transfer.id,
+                        "product_id": item.product_id,
+                        "quantity": item.quantity,
+                    }
+                )
+                await self.uow.transactions.add(
+                    {
+                        "product_id": item.product_id,
+                        "transfer_id": transfer.id,
+                        "from_id": vendor_inv.id,
+                        "to_id": client_inv.id,
+                        "quantity": item.quantity,
+                    }
+                )
+
+            await self.uow.commit()
+
+            return {
+                "transfer_id": transfer.id,
+                "capitalized_items": [
+                    {"product_id": item.product_id, "quantity": item.quantity}
+                    for item in items
+                ],
+            }
+
     async def capitalize_deficit(
         self,
         dto: CapitalizeDeficitRequest,

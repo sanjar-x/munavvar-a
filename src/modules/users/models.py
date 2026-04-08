@@ -59,8 +59,7 @@ class Identity(BaseModel):
         ),
         {
             "comment": (
-                "Учетные данные пользователей"
-                " и привязки к соцсетям (OAuth)"
+                "Учетные данные пользователей и привязки к соцсетям (OAuth)"
             ),
         },
     )
@@ -100,11 +99,8 @@ class User(BaseModel):
 
     @property
     def phone(self) -> str | None:
-        try:
-            if self.identities:
-                return self.identities[0].provider_identity_id
-        except Exception:
-            pass
+        if self.identities:
+            return self.identities[0].provider_identity_id
         return None
 
     client_orders: Mapped[list[Order]] = relationship(
@@ -112,12 +108,14 @@ class User(BaseModel):
         foreign_keys="[Order.client_id]",
         back_populates="client",
         order_by="desc(Order.created_at)",
+        lazy="raise",
     )
     courier_orders: Mapped[list[Order]] = relationship(
         "Order",
         foreign_keys="[Order.courier_id]",
         back_populates="courier",
         order_by="desc(Order.created_at)",
+        lazy="raise",
     )
 
     __table_args__ = (

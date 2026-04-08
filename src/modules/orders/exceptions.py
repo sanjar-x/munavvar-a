@@ -201,8 +201,7 @@ class CannotRemoveLastItemError(ConflictError):
     def __init__(self):
         super().__init__(
             message=(
-                "Нельзя удалить последний товар."
-                " Используйте отмену заказа."
+                "Нельзя удалить последний товар. Используйте отмену заказа."
             ),
             error_code="CANNOT_REMOVE_LAST_ITEM",
         )

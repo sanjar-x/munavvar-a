@@ -80,6 +80,3 @@ async def get_session():
         except Exception as e:
             await session.rollback()
             raise e
-        finally:
-            # Возвращаем соединение обратно в пул.
-            await session.close()

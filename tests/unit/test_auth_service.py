@@ -34,7 +34,7 @@ def make_identity(password_hash: str):
 @pytest.mark.asyncio
 async def test_local_login_returns_staff_token_with_role_scopes():
     user = make_user(Role.ADMIN)
-    identity = make_identity(get_password_hash("secret-123"))
+    identity = make_identity(await get_password_hash("secret-123"))
     service = AuthService(cast(UserService, FakeUserService((user, identity))))
 
     result = await service.local_login(
@@ -51,7 +51,7 @@ async def test_local_login_returns_staff_token_with_role_scopes():
 @pytest.mark.asyncio
 async def test_local_login_rejects_client_accounts_even_with_valid_password():
     user = make_user(Role.CLIENT_B2C)
-    identity = make_identity(get_password_hash("secret-123"))
+    identity = make_identity(await get_password_hash("secret-123"))
     service = AuthService(cast(UserService, FakeUserService((user, identity))))
 
     with pytest.raises(ForbiddenError) as exc:
@@ -65,7 +65,7 @@ async def test_local_login_rejects_client_accounts_even_with_valid_password():
 @pytest.mark.asyncio
 async def test_courier_login_returns_courier_token_with_role_scopes():
     user = make_user(Role.COURIER)
-    identity = make_identity(get_password_hash("secret-123"))
+    identity = make_identity(await get_password_hash("secret-123"))
     service = AuthService(cast(UserService, FakeUserService((user, identity))))
 
     result = await service.courier_login(
@@ -82,7 +82,7 @@ async def test_courier_login_returns_courier_token_with_role_scopes():
 @pytest.mark.asyncio
 async def test_courier_login_rejects_non_courier_staff_accounts():
     user = make_user(Role.ADMIN)
-    identity = make_identity(get_password_hash("secret-123"))
+    identity = make_identity(await get_password_hash("secret-123"))
     service = AuthService(cast(UserService, FakeUserService((user, identity))))
 
     with pytest.raises(ForbiddenError) as exc:
@@ -110,11 +110,13 @@ async def test_local_login_masks_invalid_hash_as_invalid_credentials():
 @pytest.mark.asyncio
 async def test_client_login_rejects_staff_accounts():
     user = make_user(Role.COURIER)
-    identity = make_identity(get_password_hash("secret-123"))
+    identity = make_identity(await get_password_hash("secret-123"))
     service = AuthService(cast(UserService, FakeUserService((user, identity))))
 
     with pytest.raises(ForbiddenError) as exc:
-        await service.client_login("+998901234567")
+        await service.client_login(
+            LocalLogin(phone="+998901234567", password="secret-123")
+        )
 
     assert exc.value.error_code == "CLIENT_LOGIN_ONLY"
 
@@ -122,10 +124,12 @@ async def test_client_login_rejects_staff_accounts():
 @pytest.mark.asyncio
 async def test_client_login_rejects_walkin_account():
     user = make_user(Role.CLIENT_B2C, user_id=WALKIN_USER_ID)
-    identity = make_identity("!disabled")
+    identity = make_identity(await get_password_hash("anything"))
     service = AuthService(cast(UserService, FakeUserService((user, identity))))
 
     with pytest.raises(ForbiddenError) as exc:
-        await service.client_login("00000000002")
+        await service.client_login(
+            LocalLogin(phone="00000000002", password="anything")
+        )
 
     assert exc.value.error_code == "WALKIN_LOGIN_FORBIDDEN"

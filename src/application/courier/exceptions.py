@@ -26,8 +26,7 @@ class CourierAlreadyExistsError(ConflictError):
     def __init__(self, phone: str):
         super().__init__(
             message=(
-                f"Курьер с номером телефона '{phone}'"
-                " уже зарегистрирован."
+                f"Курьер с номером телефона '{phone}' уже зарегистрирован."
             ),
             error_code="COURIER_ALREADY_EXISTS",
             details={"phone": phone},

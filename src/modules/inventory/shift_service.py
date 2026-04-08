@@ -1,5 +1,5 @@
 # src/modules/inventory/shift_service.py
-from src.core.config import settings
+from src.core.constants import SYSTEM_USER_ID
 from src.core.exceptions import BadRequestError
 from src.modules.finances.enums import AccountType, TransactionStatus
 from src.modules.inventory.enums import (
@@ -104,7 +104,7 @@ class ShiftService:
                         "type": TransferType.COURIER_RETURN,
                         "status": TransferStatus.COMPLETED,
                         "created_by_id": inventory.user_id,
-                        "accepted_by_id": settings.SYSTEM_USER_ID,
+                        "accepted_by_id": SYSTEM_USER_ID,
                     }
                 )
 

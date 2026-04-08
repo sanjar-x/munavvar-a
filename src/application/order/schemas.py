@@ -70,8 +70,7 @@ class OrderDeliveryCompleteRequest(BaseModel):
     actual_returned_tara: dict[uuid.UUID, int] = Field(
         default_factory=dict,
         description=(
-            "Фактически возвращенная тара"
-            " в формате {tara_id: количество}"
+            "Фактически возвращенная тара в формате {tara_id: количество}"
         ),
     )
 

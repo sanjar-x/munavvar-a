@@ -6,6 +6,7 @@ from typing import Any
 from sqlalchemy import delete, func, insert, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.core.exceptions import NotFoundError
 from src.infrastructure.database.base import BaseModel
 
 
@@ -86,7 +87,14 @@ class BaseRepository[ModelType: BaseModel]:
             .returning(self.model)
         )
         result = await self.session.execute(statement)
-        return result.scalar_one()
+        obj = result.scalar_one_or_none()
+        if obj is None:
+            raise NotFoundError(
+                message=f"Запись {self.model.__name__} с id={id} не найдена",
+                error_code="NOT_FOUND",
+                details={"id": str(id)},
+            )
+        return obj
 
     async def archive(self, id: uuid.UUID) -> bool:
         statement = (

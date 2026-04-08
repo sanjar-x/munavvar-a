@@ -161,7 +161,7 @@ class DashboardTotals(BaseModel):
     total_card_pending: int
     total_client_debt: int
     total_courier_cash: int
-    total_b2b_credit_used: int = 0   # in-flight B2B кредит
+    total_b2b_credit_used: int = 0  # in-flight B2B кредит
     total_b2b_settled_debt: int = 0  # погашённый долг B2B (account.balance)
 
 

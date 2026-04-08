@@ -1,10 +1,11 @@
 # src/core/init.py
-import logging
+from typing import Any
 
+import structlog
 from sqlalchemy import select
 
 from src.core.config import settings
-from src.core.constants import WALKIN_USER_ID
+from src.core.constants import SYSTEM_USER_ID, WALKIN_USER_ID
 from src.core.security.password import get_password_hash
 from src.infrastructure.database.models import (
     Account,
@@ -17,8 +18,7 @@ from src.modules.finances.enums import AccountType
 from src.modules.inventory.enums import InventoryType
 from src.modules.users.enums import AuthProvider, Role
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+logger: Any = structlog.get_logger(__name__)
 
 
 async def init_data() -> None:
@@ -33,7 +33,7 @@ async def init_data() -> None:
 
         if not system_user:
             system_user = User(
-                id=settings.SYSTEM_USER_ID,
+                id=SYSTEM_USER_ID,
                 username="Система (Служебный аккаунт)",
                 role=Role.SYSTEM,
                 is_active=True,
@@ -179,7 +179,7 @@ async def init_data() -> None:
                 session.add(admin_user)
                 await session.flush()
 
-                hashed_password = get_password_hash(admin_password)
+                hashed_password = await get_password_hash(admin_password)
                 admin_identity = Identity(
                     user_id=admin_user.id,
                     provider=AuthProvider.LOCAL,

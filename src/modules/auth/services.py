@@ -6,6 +6,7 @@ from src.core.exceptions import ForbiddenError, UnauthorizedError
 from src.core.security.jwt import create_access_token
 from src.core.security.password import verify_password
 from src.core.security.permissions import ROLE_SCOPES
+from src.infrastructure.database.models import User
 from src.modules.auth.schemas import LocalLogin, TokenResponse
 from src.modules.users.enums import Role
 from src.modules.users.services import UserService
@@ -26,7 +27,7 @@ class AuthService:
     def __init__(self, user_service: UserService):
         self.user_service = user_service
 
-    def _build_token_response(self, user) -> TokenResponse:
+    def _build_token_response(self, user: User) -> TokenResponse:
         user_scopes = ROLE_SCOPES.get(user.role, [])
         payload_data = {
             "sub": str(user.id),
@@ -56,7 +57,7 @@ class AuthService:
             )
 
         try:
-            is_valid_password = verify_password(
+            is_valid_password = await verify_password(
                 data.password, identity.password_hash
             )
         except UnknownHashError as exc:
@@ -97,27 +98,9 @@ class AuthService:
 
         return self._build_token_response(user)
 
-    async def client_login(self, phone: str) -> TokenResponse:
-        """Упрощенный вход только для клиентских аккаунтов."""
-
-        result = await self.user_service.get_user_local_identity(
-            identity_id=phone,
-        )
-
-        if not result:
-            raise UnauthorizedError(
-                message="Неверный номер телефона или пароль",
-                error_code="INVALID_CREDENTIALS",
-            )
-
-        user, identity = result
-
-        # 2. Базовые проверки целостности данных
-        if not user:
-            raise UnauthorizedError(
-                message="Неверный номер телефона",
-                error_code="INVALID_CREDENTIALS",
-            )
+    async def client_login(self, data: LocalLogin) -> TokenResponse:
+        """Вход только для клиентских аккаунтов по телефону и паролю."""
+        user = await self._authenticate_local_user(data)
 
         if user.id == WALKIN_USER_ID:
             raise ForbiddenError(

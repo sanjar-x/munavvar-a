@@ -3,6 +3,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, Security, status
 
+from src.core.exceptions import BadRequestError, ForbiddenError
 from src.core.security.permissions import Scope
 from src.infrastructure.database.models import User
 from src.modules.auth.dependencies import get_current_user
@@ -64,8 +65,7 @@ async def get_staff_users(
         list[Role] | None,
         Query(
             description=(
-                "Фильтр по staff-ролям."
-                " Можно передать несколько roles."
+                "Фильтр по staff-ролям. Можно передать несколько roles."
             ),
         ),
     ] = None,
@@ -111,6 +111,16 @@ async def update_user(
     ],
     user_service: Annotated[UserService, Depends(get_user_service)],
 ):
+    if user_id == current_admin.id:
+        raise BadRequestError(
+            message="Нельзя изменять собственный аккаунт через этот эндпоинт.",
+            error_code="SELF_MODIFICATION_FORBIDDEN",
+        )
+    if schema.role is not None and schema.role == Role.SYSTEM:
+        raise ForbiddenError(
+            message="Нельзя назначить системную роль через API.",
+            error_code="SYSTEM_ROLE_FORBIDDEN",
+        )
     updated_user = await user_service.update(user_id, schema)
     return updated_user
 

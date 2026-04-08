@@ -605,11 +605,12 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
 
             amount_to_add = current_price * quantity
             new_total = order.total_amount + amount_to_add
-            updated_order = await self.uow.orders.update(
-                order_id, {"total_amount": new_total}
-            )
+            await self.uow.orders.update(order_id, {"total_amount": new_total})
 
             await self.uow.commit()
+            updated_order = await self.uow.orders.get_with_details(order_id)
+            if not updated_order:
+                raise OrderNotFoundError(order_id=order_id)
             return updated_order
 
     async def remove_product_from_order(
@@ -670,11 +671,12 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
 
             new_total = max(0, order.total_amount - amount_to_subtract)
 
-            updated_order = await self.uow.orders.update(
-                order_id, {"total_amount": new_total}
-            )
+            await self.uow.orders.update(order_id, {"total_amount": new_total})
 
             await self.uow.commit()
+            updated_order = await self.uow.orders.get_with_details(order_id)
+            if not updated_order:
+                raise OrderNotFoundError(order_id=order_id)
             return updated_order
 
     async def assign_courier(
@@ -730,7 +732,7 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
                     reason="У курьера нет активного инвентаря (машины)",
                 )
 
-            updated_order = await self.uow.orders.update(
+            await self.uow.orders.update(
                 order_id,
                 {
                     "courier_id": courier_id,
@@ -739,6 +741,7 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
             )
             await self.uow.commit()
 
+            updated_order = await self.uow.orders.get_with_details(order_id)
             if not updated_order:
                 raise OrderNotFoundError(
                     order_id=order_id, message="Ошибка при обновлении заказа"
@@ -862,6 +865,14 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
         _get_and_validate_contract_locked (строка уже залочена).
         credit_limit = 0 означает безлимитный кредит.
         """
+        # Принудительно перечитываем credit_used из БД после захвата
+        # блокировки. Это защищает от stale identity-map: если объект
+        # был загружен ранее в той же сессии, session.refresh()
+        # гарантирует актуальное значение на момент проверки.
+        await self.uow.session.refresh(
+            contract, attribute_names=["credit_used"]
+        )
+
         if contract.credit_limit != 0:
             total_exposure = contract.credit_used + amount
             if total_exposure > contract.credit_limit:
@@ -1036,6 +1047,16 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
                 error_code="COURIER_INVENTORY_NOT_FOUND",
                 details={"courier_id": str(order.courier_id)},
             )
+
+        # Принудительно перечитываем балансы из БД после захвата блокировки
+        # инвентаря. Блокировка на строку inventories не распространяется на
+        # таблицу inventory_balances: параллельная транзакция (например,
+        # триггер по stock_transactions) могла обновить остатки между
+        # основным SELECT FOR UPDATE и selectinload. session.refresh()
+        # гарантирует актуальные данные на момент проверки.
+        await self.uow.session.refresh(
+            courier_inventory, attribute_names=["balances"]
+        )
 
         # Проверяем наличие товаров у курьера перед доставкой
         courier_balances = {
@@ -1256,17 +1277,22 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
                 courier_account = await self.uow.accounts.get_courier_account(
                     order.courier_id
                 )
-                if courier_account:
-                    financial_txns.append(
-                        {
-                            "from_id": client_account.id,
-                            "to_id": courier_account.id,
-                            "amount": order.total_amount,
-                            "order_id": order.id,
-                            "status": TransactionStatus.COMPLETED,
-                            "reason": "Оплата наличными курьеру",
-                        }
+                if not courier_account:
+                    raise NotFoundError(
+                        message="Счет курьера не найден",
+                        error_code="COURIER_ACCOUNT_NOT_FOUND",
+                        details={"courier_id": str(order.courier_id)},
                     )
+                financial_txns.append(
+                    {
+                        "from_id": client_account.id,
+                        "to_id": courier_account.id,
+                        "amount": order.total_amount,
+                        "order_id": order.id,
+                        "status": TransactionStatus.COMPLETED,
+                        "reason": "Оплата наличными курьеру",
+                    }
+                )
 
         elif order.payment_method == PaymentMethod.CARD:
             card_account = await self.uow.accounts.get_system_card_account()
@@ -1469,21 +1495,20 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
         date_to: datetime | None = None,
         min_amount: int | None = None,
         max_amount: int | None = None,
-    ) -> list[Order]:
+    ) -> tuple[list[Order], int]:
         async with self.uow:
-            return list(
-                await self.uow.orders.search_orders(
-                    skip=skip,
-                    limit=limit,
-                    statuses=statuses,
-                    payment_methods=payment_methods,
-                    courier_id=courier_id,
-                    client_id=client_id,
-                    client_inventory_id=client_inventory_id,
-                    sale_type=sale_type,
-                    date_from=date_from,
-                    date_to=date_to,
-                    min_amount=min_amount,
-                    max_amount=max_amount,
-                )
+            orders, total = await self.uow.orders.search_orders(
+                skip=skip,
+                limit=limit,
+                statuses=statuses,
+                payment_methods=payment_methods,
+                courier_id=courier_id,
+                client_id=client_id,
+                client_inventory_id=client_inventory_id,
+                sale_type=sale_type,
+                date_from=date_from,
+                date_to=date_to,
+                min_amount=min_amount,
+                max_amount=max_amount,
             )
+            return list(orders), total

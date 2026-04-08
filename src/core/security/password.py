@@ -1,3 +1,6 @@
+import asyncio
+from functools import partial
+
 from pwdlib import PasswordHash
 from pwdlib.hashers.bcrypt import BcryptHasher
 
@@ -7,16 +10,27 @@ from pwdlib.hashers.bcrypt import BcryptHasher
 password_hash = PasswordHash((BcryptHasher(),))
 
 
-def get_password_hash(password: str) -> str:
+async def get_password_hash(password: str) -> str:
     """
     Превращает открытый пароль в необратимый хеш.
     Именно этот результат мы сохраняем в колонку hashed_password.
+    Bcrypt занимает 100-500 мс; выполняется в пуле потоков,
+    чтобы не блокировать event loop.
     """
-    return password_hash.hash(password)
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(
+        None, partial(password_hash.hash, password)
+    )
 
 
-def verify_password(plain_password: str, hashed_password: str) -> bool:
+async def verify_password(plain_password: str, hashed_password: str) -> bool:
     """
     Проверяет, совпадает ли открытый пароль с хешем из базы данных.
+    Bcrypt занимает 100-500 мс; выполняется в пуле потоков,
+    чтобы не блокировать event loop.
     """
-    return password_hash.verify(plain_password, hashed_password)
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(
+        None,
+        partial(password_hash.verify, plain_password, hashed_password),
+    )

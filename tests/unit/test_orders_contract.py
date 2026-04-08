@@ -132,6 +132,7 @@ def _make_fake_uow(
     uow.commit = AsyncMock()
     uow.flush = AsyncMock()
     uow.rollback = AsyncMock()
+    uow.session.refresh = AsyncMock()
     uow.__aenter__ = AsyncMock(return_value=uow)
     uow.__aexit__ = AsyncMock(return_value=False)
 

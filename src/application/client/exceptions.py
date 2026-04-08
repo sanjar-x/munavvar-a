@@ -25,8 +25,7 @@ class ClientAlreadyExistsError(ConflictError):
     def __init__(self, phone: str):
         super().__init__(
             message=(
-                f"Клиент с номером телефона '{phone}'"
-                " уже зарегистрирован."
+                f"Клиент с номером телефона '{phone}' уже зарегистрирован."
             ),
             error_code="CLIENT_ALREADY_EXISTS",
             details={"phone": phone},

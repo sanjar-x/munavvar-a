@@ -96,13 +96,12 @@ async def create_client_inventory(
     response_model=ClientsResponse,
     summary="Получить список клиентов",
     description=(
-        "Возвращает список клиентов с пагинацией."
-        "  Поиск по ФИО/телефон."
+        "Возвращает список клиентов с пагинацией.  Поиск по ФИО/телефон."
     ),
 )
 async def get_clients(
     current_admin: Annotated[
-        User, Security(get_current_user, scopes=[Scope.USERS_WRITE])
+        User, Security(get_current_user, scopes=[Scope.USERS_READ])
     ],
     client_service: Annotated[ClientService, Depends(get_client_service)],
     skip: int = Query(0, ge=0, description="Сколько записей пропустить"),

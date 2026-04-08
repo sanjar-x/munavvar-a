@@ -38,7 +38,7 @@ class CourierService:
                     }
                 )
                 await self.uow.session.flush()
-                hashed_pwd = get_password_hash(data.password)
+                hashed_pwd = await get_password_hash(data.password)
                 await self.uow.identities.add(
                     {
                         "user_id": courier.id,
@@ -84,8 +84,7 @@ class CourierService:
                 if "uq_user_single_courier_inventory" in str(e.orig):
                     raise ConflictError(
                         message=(
-                            "У данного курьера"
-                            " уже зарегистрирована машина."
+                            "У данного курьера уже зарегистрирована машина."
                         ),
                         error_code="COURIER_INVENTORY_ALREADY_EXISTS",
                     ) from None

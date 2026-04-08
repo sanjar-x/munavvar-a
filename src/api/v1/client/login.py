@@ -5,7 +5,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, status
 
 from src.modules.auth.dependencies import get_auth_service
-from src.modules.auth.schemas import TokenResponse
+from src.modules.auth.schemas import LocalLogin, TokenResponse
 from src.modules.auth.services import AuthService
 
 login_router = APIRouter()
@@ -18,9 +18,9 @@ login_router = APIRouter()
     summary="Вход клиента (Получение Access Token)",
 )
 async def login(
-    phone: str,
+    data: LocalLogin,
     auth_service: Annotated[AuthService, Depends(get_auth_service)],
 ):
-    token_response = await auth_service.client_login(phone)
+    token_response = await auth_service.client_login(data)
 
     return token_response

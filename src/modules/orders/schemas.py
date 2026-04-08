@@ -197,3 +197,10 @@ class OrderResponse(BaseModel):
     updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class OrdersResponse(BaseModel):
+    """Постраничный список заказов с общим количеством."""
+
+    total_count: int
+    orders: list[OrderResponse]

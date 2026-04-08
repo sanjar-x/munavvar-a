@@ -1,4 +1,3 @@
-import uuid
 from functools import lru_cache
 from typing import Annotated, Any, Literal, Self
 
@@ -39,8 +38,6 @@ class Settings(BaseSettings):
 
     CORS_ORIGINS: Annotated[list[str] | str, BeforeValidator(parse_cors)] = []
 
-    SYSTEM_USER_ID: uuid.UUID = uuid.UUID(int=0)
-
     ADMIN_PHONE: str | None = None
     ADMIN_PASSWORD: SecretStr | None = None
 
@@ -59,10 +56,10 @@ class Settings(BaseSettings):
             f"@{self.PGHOST}:{self.PGPORT}/{self.PGDATABASE}"
         )
 
-    REDISHOST: str
-    REDISPORT: int
-    REDISUSER: str
-    REDISPASSWORD: SecretStr
+    REDISHOST: str = "localhost"
+    REDISPORT: int = 6379
+    REDISUSER: str = ""
+    REDISPASSWORD: SecretStr = SecretStr("")
 
     model_config = SettingsConfigDict(
         env_file=".env",

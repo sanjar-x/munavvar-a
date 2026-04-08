@@ -203,7 +203,7 @@ class Seeder:
     async def seed_users(self):
         logger.info("Step 3: Seeding users and their inventories...")
         async with self.session_factory() as session:
-            password_hash = get_password_hash("password123")
+            password_hash = await get_password_hash("password123")
 
             # Couriers
             couriers_data = [
