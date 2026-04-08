@@ -6,24 +6,30 @@
 
 | Реквизит             | Значение                                      |
 | -------------------- | --------------------------------------------- |
-| **Версия документа** | 3.1.0                                         |
+| **Версия документа** | 3.2.0                                         |
 | **Статус**           | APPROVED                                      |
 | **Аудитория**        | Frontend-разработчики, QA-инженеры, Tech Lead |
 | **Формат**           | BRD + FLOW + API SPEC                         |
 | **Base URL**         | `{API_BASE}/api/v1`                           |
-| **Источник истины**  | Backend-код: `src/modules/contracts/`         |
+| **Источник истины**  | Backend-код: `src/modules/contracts/` + смежные модули |
 
 > **Для Frontend-разработчика.** Данный документ объединяет бизнес-требования,
 > диаграммы процессов и полную спецификацию API. Каждый endpoint включает
 > TypeScript-типы, примеры запросов/ответов, таблицы валидации полей
 > и карту ошибок. Копируйте типы «как есть» — они сгенерированы из
 > Pydantic-схем backend'а.
+>
+> **v3.2+:** Помимо модуля Contracts, документ покрывает
+> платформенные изменения API (авторизация, инвентарь, финансы,
+> накладные), затрагивающие frontend-интеграцию. См. §19.26–19.28 и §20.9.
 
-## Changelog v2.0.0 → v3.1.0
+## Changelog v2.0.0 → v3.2.0
 
 > **⚠️ Внимание Frontend-разработчиков!** Данная секция перечисляет все
 > изменения между коммитами `19c2ccc` и `41c14e1`. Изменения сгруппированы
 > по типу: ломающие (breaking), новые возможности и исправления.
+> Начиная с v3.2.0 документ также покрывает **платформенные изменения API**,
+> влияющие на frontend-интеграцию за пределами модуля Contracts.
 
 ### 🔴 Breaking Changes
 
@@ -40,6 +46,10 @@
 | 9   | Scope `GET /backoffice/clients/`               | `users:write`     | `users:read`                               | —      |
 | 10  | Scope `GET /backoffice/clients/{id}`           | `users:write`     | `users:read`                               | —      |
 | 11  | **Валюта: тийинов нет**                        | Описания ссылались на «тийины» | **Все суммы — целые числа в сумах (UZS)** | §💰 |
+| 12  | `POST /client/login` — формат запроса          | `phone` как query-параметр | Request body `LocalLogin` `{phone, password}` | §18.3 |
+| 13  | `GET /health` — проверка БД                    | `{"status":"ok","environment":"..."}` | `{"status":"ok"}` / 503 `{"status":"db_unavailable"}` | — |
+| 14  | `POST /backoffice/shifts/close` **удалён**     | Роутер `/shifts` существовал | Роутер удалён полностью | — |
+| 15  | `PATCH /backoffice/users/{id}` — валидация     | Без ограничений на self-edit | Запрет self-edit (`SELF_MODIFICATION_FORBIDDEN`) и назначения роли SYSTEM (`SYSTEM_ROLE_FORBIDDEN`) | §21 |
 
 ### 🟢 New Features
 
@@ -58,6 +68,12 @@
 | 11  | Suspend/Terminate/Expire контракта автоматически отменяют NEW/ASSIGNED заказы                           | §19.6, §19.8, §19.24 |
 | 12  | `OrderCreate.notes` — заметки к доставке (код домофона, этаж и т.д.)                                    | §18.3                |
 | 13  | Секция «Валютная конвенция» — `formatMoney()` утилита, полный перечень денежных полей                    | §💰                  |
+| 14  | Фильтры накладных: `type`, `from_date`, `to_date`, `warehouse_id` на `GET /backoffice/transfers/`      | §19.28               |
+| 15  | `GET /backoffice/inventories/search` — поиск инвентарей по названию и типу                              | §19.27               |
+| 16  | `CourierCreate.password` теперь требует `min_length=8`                                                  | —                    |
+| 17  | `DashboardTotals` — 2 новых B2B поля: `total_b2b_credit_used`, `total_b2b_settled_debt`                | §18.2                |
+| 18  | `POST /backoffice/orders/` теперь возвращает `OrderResponse` (201)                                      | —                    |
+| 19  | `GET /backoffice/finances/b2b-debts` — дебиторка B2B по договорам (полная спецификация)                 | §19.26               |
 
 ### 🔧 Fixes
 
@@ -67,6 +83,7 @@
 | 2   | `expire-stale` теперь очищает и ASSIGNED заказы (72ч по `updated_at`)                               | Заказы в ASSIGNED не зависают бесконечно                |
 | 3   | Фактуры за оплату с отсутствующим платежом генерируют предупреждение (аудит)                        | Нет изменения API, внутренний лог                       |
 | 4   | `response_model` добавлен на все финансовые эндпоинты                                               | Ответы теперь строго типизированы                       |
+| 5   | `POST /backoffice/system/seed` заблокирован в production                                            | 403 `SEEDER_DISABLED_IN_PROD` в prod-среде              |
 
 ---
 
@@ -795,6 +812,35 @@ enum SaleType {
   DELIVERY = "delivery",
   WAREHOUSE_PICKUP = "warehouse_pickup",
 }
+
+/** Тип инвентаря. NEW v3.2 */
+enum InventoryType {
+  WAREHOUSE = "WAREHOUSE",
+  COURIER = "COURIER",
+  CLIENT = "CLIENT",
+  VIRTUAL_LOSS = "VIRTUAL_LOSS",
+  VIRTUAL_VENDOR = "VIRTUAL_VENDOR",
+}
+
+/** Тип накладной. NEW v3.2 */
+enum TransferType {
+  COURIER_LOAD = "COURIER_LOAD",
+  COURIER_RETURN = "COURIER_RETURN",
+  CLIENT_DELIVERY = "CLIENT_DELIVERY",
+  CLIENT_RETURN = "CLIENT_RETURN",
+  LOSS_WRITE_OFF = "LOSS_WRITE_OFF",
+  INVENTORY_FINDING = "INVENTORY_FINDING",
+  INITIAL_BALANCE = "INITIAL_BALANCE",
+  WAREHOUSE_SALE = "WAREHOUSE_SALE",
+  WAREHOUSE_TARA_RETURN = "WAREHOUSE_TARA_RETURN",
+}
+
+/** Статус накладной. NEW v3.2 */
+enum TransferStatus {
+  DRAFT = "DRAFT",
+  COMPLETED = "COMPLETED",
+  CANCELLED = "CANCELLED",
+}
 ```
 
 ### 18.2 Response Types
@@ -965,11 +1011,121 @@ interface OrderItemResponse {
   unit_price: number; // сум (UZS), историческая цена
   total: number; // сум (UZS), quantity × unit_price
 }
+
+// ─── Платформенные типы (NEW v3.2) ──────────────────────────
+
+/**
+ * Краткое представление пользователя.
+ * Вкладывается в WarehouseDetailResponse, TransferResponse и др.
+ */
+interface UserShortResponse {
+  id: string;
+  username: string;
+  phone: string | null;
+}
+
+/** Краткий ответ инвентаря (вложение в TransferResponse) */
+interface InventoryShortResponse {
+  id: string;
+  name: string;
+  type: InventoryType;
+}
+
+/** Упрощённый продукт (вложение в TransferItemResponse) */
+interface ProductSimpleResponse {
+  id: string;
+  name: string;
+  type: string; // ProductType
+  price: number; // сум (UZS), NEW v3.2
+  is_active: boolean;
+}
+
+/** Позиция накладной */
+interface TransferItemResponse {
+  product: ProductSimpleResponse;
+  quantity: number;
+}
+
+/** Накладная (полная модель). NEW v3.2 */
+interface TransferResponse {
+  id: string;
+  from_id: string;
+  to_id: string;
+  from_inventory: InventoryShortResponse | null;
+  to_inventory: InventoryShortResponse | null;
+  created_by_id: string;
+  created_by: UserShortResponse | null; // NEW v3.2
+  accepted_by_id: string | null;
+  accepted_by: UserShortResponse | null; // NEW v3.2
+  status: TransferStatus;
+  type: TransferType;
+  items: TransferItemResponse[];
+  reason: string | null;
+  route_sheet_id: string | null;
+  created_at: string; // ISO datetime
+}
+
+/** Детали склада. NEW v3.2 */
+interface WarehouseDetailResponse {
+  id: string;
+  name: string;
+  user_id: string;
+  user: UserShortResponse | null; // NEW v3.2
+  balances: BalanceItem[];
+}
+
+/** Результат поиска инвентаря. NEW v3.2 */
+interface InventorySearchResult {
+  id: string;
+  name: string;
+  type: InventoryType;
+  user_id: string;
+}
+
+/** Итоги финансового дашборда. NEW v3.2 — 2 новых B2B поля */
+interface DashboardTotals {
+  total_revenue: number; // сум (UZS)
+  total_cash_in_hand: number; // сум (UZS)
+  total_card_pending: number; // сум (UZS)
+  total_client_debt: number; // сум (UZS)
+  total_courier_cash: number; // сум (UZS)
+  total_b2b_credit_used: number; // сум (UZS), NEW v3.2 — in-flight B2B кредит
+  total_b2b_settled_debt: number; // сум (UZS), NEW v3.2 — погашённый долг B2B
+}
+
+/** Дебиторка по одному B2B-договору. NEW v3.2 */
+interface B2BContractDebt {
+  client_id: string;
+  client_name: string;
+  contract_id: string;
+  contract_number: string;
+  credit_limit: number; // сум (UZS), 0 = безлимитный
+  credit_used: number; // сум (UZS)
+  account_balance: number; // сум (UZS)
+  total_exposure: number; // сум (UZS), credit_used + |account_balance|
+  limit_utilization_pct: number; // 0.0–1.0 (float)
+  due_date_status: "ok" | "overdue" | "no_limit";
+}
+
+/** Список B2B-дебиторки с итогом. NEW v3.2 */
+interface B2BContractDebtsResponse {
+  items: B2BContractDebt[];
+  total_exposure: number; // сум (UZS), сумма по всем договорам
+}
 ```
 
 ### 18.3 Request Types
 
 ```typescript
+/**
+ * Вход клиента. NEW v3.2 (BREAKING: ранее phone был query-параметром)
+ * ⚠️ Теперь отправляется как JSON body, НЕ query string.
+ */
+interface LocalLogin {
+  phone: string;
+  password: string; // min_length=1
+}
+
 /** Создание договора */
 interface ContractCreateRequest {
   number: string; // 1–50 символов; "HOD-2025-001"
@@ -1899,6 +2055,110 @@ POST /api/v1/backoffice/orders/jobs/expire-stale
 
 ---
 
+### 19.26 Дебиторка B2B по договорам (NEW v3.2)
+
+```
+GET /api/v1/backoffice/finances/b2b-debts
+```
+
+**Scope:** `contracts:read`
+
+**Параметры:** нет (возвращает все активные договоры)
+
+**Ответ — 200:** `B2BContractDebtsResponse`
+
+```json
+{
+  "items": [
+    {
+      "client_id": "...",
+      "client_name": "ООО «Акватех»",
+      "contract_id": "...",
+      "contract_number": "HOD-2025-001",
+      "credit_limit": 5000000,
+      "credit_used": 3200000,
+      "account_balance": -1500000,
+      "total_exposure": 4700000,
+      "limit_utilization_pct": 0.64,
+      "due_date_status": "ok"
+    }
+  ],
+  "total_exposure": 4700000
+}
+```
+
+**Поля `B2BContractDebt`:**
+
+| Поле                    | Тип    | Описание                                          |
+| ----------------------- | ------ | ------------------------------------------------- |
+| `credit_limit`          | int    | Кредитный лимит (0 = безлимитный)                 |
+| `credit_used`           | int    | In-flight кредит (зарезервированный заказами)     |
+| `account_balance`       | int    | Баланс финансового счёта (< 0 = задолженность)    |
+| `total_exposure`        | int    | `credit_used + |account_balance|`                 |
+| `limit_utilization_pct` | float  | 0.0–1.0 (для шкалы в UI)                         |
+| `due_date_status`       | string | `ok` / `overdue` / `no_limit`                     |
+
+**UI-рекомендации:**
+
+- Цветовая индикация: `ok` → зелёный, `overdue` → красный, `no_limit` → серый
+- Шкала утилизации: `limit_utilization_pct × 100%`
+- Итого: отображать `total_exposure` из корня ответа
+
+---
+
+### 19.27 Поиск инвентарей (NEW v3.2)
+
+```
+GET /api/v1/backoffice/inventories/search
+```
+
+**Scope:** `inventory:read`
+
+**Параметры:**
+
+| Параметр | Тип           | Default | Описание                                         |
+| -------- | ------------- | ------- | ------------------------------------------------ |
+| `q`      | string        | `""`    | Поисковый запрос по названию                     |
+| `type`   | InventoryType | —       | Фильтр по типу (CLIENT, WAREHOUSE, COURIER, …) |
+| `limit`  | integer       | 50      | Макс. результатов (1–200)                        |
+
+**Ответ — 200:** `InventorySearchResult[]`
+
+```json
+[
+  {
+    "id": "...",
+    "name": "Клиент: ООО «Акватех»",
+    "type": "CLIENT",
+    "user_id": "..."
+  }
+]
+```
+
+**Использование:** Autocomplete / поиск при выборе инвентаря
+(например, при ручном создании накладной).
+
+---
+
+### 19.28 Фильтры журнала накладных (NEW v3.2)
+
+```
+GET /api/v1/backoffice/transfers/
+```
+
+**Scope:** `logistics:transfer`
+
+**Новые параметры (добавлены к существующим `page`, `size`):**
+
+| Параметр       | Тип           | Default | Описание                         |
+| -------------- | ------------- | ------- | -------------------------------- |
+| `type`         | TransferType  | —       | Фильтр по типу накладной        |
+| `from_date`    | date          | —       | Начальная дата (включительно)    |
+| `to_date`      | date          | —       | Конечная дата (включительно)     |
+| `warehouse_id` | UUID          | —       | Склад (from или to)             |
+
+---
+
 ## 20. Client B2B API — Endpoints
 
 > Все клиентские эндпоинты **IDOR-safe**: ID договора не передаётся
@@ -2105,6 +2365,66 @@ GET /api/v1/courier/inventory/my-stock
 
 ---
 
+### 20.9 Платформенные изменения API (NEW v3.2)
+
+> Ниже перечислены изменения API за пределами модуля Contracts,
+> затрагивающие frontend-интеграцию.
+
+#### 20.9.1 Авторизация клиента — BREAKING
+
+```
+POST /api/v1/client/login
+```
+
+**Было:** `phone` передавался как query-параметр.
+
+**Стало:** JSON body `LocalLogin`:
+
+```json
+{ "phone": "+998901234567", "password": "client_password" }
+```
+
+**Ответ — 200:** `TokenResponse` `{ access_token, token_type }`
+
+#### 20.9.2 Health Check — BREAKING
+
+```
+GET /health
+```
+
+**Было:** `{"status": "ok", "environment": "dev"}`
+
+**Стало:**
+- 200 — `{"status": "ok"}` (поле `environment` удалено)
+- 503 — `{"status": "db_unavailable"}` (БД недоступна)
+
+#### 20.9.3 Shifts — роутер удалён
+
+Эндпоинт `POST /backoffice/shifts/close` и связанные схемы
+(`CloseShiftRequest`, `ShiftReconciliationResponse`) **полностью удалены**.
+Если frontend использовал этот эндпоинт — удалите интеграцию.
+
+#### 20.9.4 Обновление пользователя — новые валидации
+
+`PATCH /backoffice/users/{user_id}` теперь проверяет:
+
+| Проверка           | Ошибка                         | HTTP |
+| ------------------ | ------------------------------ | ---- |
+| Self-edit          | `SELF_MODIFICATION_FORBIDDEN`  | 400  |
+| Назначение SYSTEM  | `SYSTEM_ROLE_FORBIDDEN`        | 403  |
+
+#### 20.9.5 Создание курьера — пароль
+
+`CourierCreate.password` теперь требует `min_length=8`.
+Frontend должен валидировать длину пароля ≥ 8 символов.
+
+#### 20.9.6 Создание заказа — ответ
+
+`POST /backoffice/orders/` теперь возвращает `OrderResponse` (201).
+Ранее эндпоинт не возвращал тело ответа.
+
+---
+
 ## 21. Каталог ошибок (Error Code Catalog)
 
 | Код ошибки                         | HTTP | Триггер                                             | Ключи `details`                                                              |
@@ -2125,6 +2445,9 @@ GET /api/v1/courier/inventory/my-stock
 | `CREDIT_LIMIT_BELOW_USED`          | 400  | Уменьшение `credit_limit` ниже `credit_used`        | `new_limit`, `credit_used`                                                   |
 | `ORDER_NOT_FOUND`                  | 404  | Заказ не найден или не принадлежит пользователю     | `order_id`                                                                   |
 | `ORDER_CANCEL_NOT_ALLOWED`         | 409  | Отмена невозможна (статус ≠ new/assigned)           | `order_id`, `current_status`                                                 |
+| `SELF_MODIFICATION_FORBIDDEN`      | 400  | Попытка изменить собственный аккаунт                | —                                                                            |
+| `SYSTEM_ROLE_FORBIDDEN`            | 403  | Попытка назначить роль SYSTEM через API             | —                                                                            |
+| `SEEDER_DISABLED_IN_PROD`          | 403  | Вызов `POST /system/seed` в production              | —                                                                            |
 
 ---
 
@@ -2701,6 +3024,22 @@ function getInvoiceActions(status: InvoiceStatus): ActionButton[] {
 - [ ] `OrdersResponse.total_count = 0` при пустом списке (NEW v3.0)
 - [ ] Отмена CONTRACT-заказа → `credit_used` корректно уменьшается (NEW v3.0)
 - [ ] Suspend/Terminate → проверить что in-flight заказы отменены (NEW v3.0)
+
+### 23.13 Платформенные изменения (NEW v3.2)
+
+- [ ] `POST /client/login` — отправляет JSON body `{phone, password}`, а НЕ query params
+- [ ] `GET /health` → 200 `{"status":"ok"}` (поле `environment` отсутствует)
+- [ ] `GET /health` → 503 `{"status":"db_unavailable"}` при недоступной БД
+- [ ] Shifts endpoints — удалены, код не обращается к `/backoffice/shifts/`
+- [ ] `PATCH /backoffice/users/{id}` — self-edit возвращает 400
+- [ ] `PATCH /backoffice/users/{id}` — role=system возвращает 403
+- [ ] Courier password ≥ 8 символов — валидация на frontend
+- [ ] `POST /backoffice/orders/` — ответ содержит `OrderResponse`
+- [ ] `GET /backoffice/finances/b2b-debts` — список дебиторки B2B
+- [ ] `GET /backoffice/inventories/search?q=…` — поиск инвентарей
+- [ ] `GET /backoffice/transfers/?type=…&from_date=…` — фильтры работают
+- [ ] `DashboardTotals` — отображение `total_b2b_credit_used`, `total_b2b_settled_debt`
+- [ ] `limit ≤ 100` на contracts/orders list (запрос с limit=200 → ошибка)
 
 ---
 
