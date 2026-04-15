@@ -483,7 +483,7 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
                     "client_id": effective_client_id,
                     "client_inventory_id": client_inventory.id,
                     "payment_method": PaymentMethod.CASH,
-                    "status": OrderStatus.NEW,
+                    "status": OrderStatus.PICKUP_COMPLETED,
                     "total_amount": total_amount,
                     "capitalization_applied": capitalization_applied,
                     "sale_type": SaleType.WAREHOUSE_PICKUP,
@@ -494,6 +494,22 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
             for item_data in order_items_data:
                 item_data["order_id"] = new_order.id
             await self.uow.order_items.add_many(order_items_data)
+
+            # flush чтобы order.items были доступны для settlement
+            await self.uow.flush()
+            order = await self.uow.orders.get_with_details(new_order.id)
+            if not order:
+                raise OrderNotFoundError(order_id=new_order.id)
+
+            # Складские перемещения + финансовое закрытие
+            await self._handle_warehouse_pickup(order, created_by_id)
+
+            await self.uow.status_logs.log_transition(
+                order_id=new_order.id,
+                old_status=None,
+                new_status=OrderStatus.PICKUP_COMPLETED,
+                changed_by_id=created_by_id,
+            )
 
             await self.uow.commit()
             result = await self.uow.orders.get_with_details(new_order.id)
