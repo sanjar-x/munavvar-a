@@ -1,8 +1,8 @@
 """init
 
-Revision ID: 3341b02e66e8
+Revision ID: 109a87243062
 Revises:
-Create Date: 2026-04-08 08:23:11.474643
+Create Date: 2026-04-15 23:58:45.101316
 
 """
 
@@ -15,7 +15,7 @@ from sqlalchemy.dialects import postgresql
 from alembic import op
 
 # revision identifiers, used by Alembic.
-revision: str = "3341b02e66e8"
+revision: str = "109a87243062"
 down_revision: str | Sequence[str] | None = None
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
@@ -59,9 +59,9 @@ def upgrade() -> None:
         sa.Column(
             "attributes",
             postgresql.JSONB(astext_type=sa.Text()),
-            server_default="{}",
+            server_default="[]",
             nullable=False,
-            comment="Динамические характеристики (объем, бренд, цвет, мощность)",
+            comment="Парные характеристики [{label, value}, ...]",
         ),
         sa.Column("id", sa.UUID(), nullable=False, comment="ID (UUIDv7)"),
         sa.Column(
@@ -84,6 +84,10 @@ def upgrade() -> None:
             server_default=sa.text("now()"),
             nullable=False,
             comment="Дата и время последнего обновления",
+        ),
+        sa.CheckConstraint(
+            "jsonb_typeof(attributes) = 'array'",
+            name="ck_product_attributes_is_array",
         ),
         sa.CheckConstraint("price >= 0", name="ck_product_price_pos"),
         sa.ForeignKeyConstraint(
@@ -516,6 +520,59 @@ def upgrade() -> None:
         postgresql_where=sa.text("type = 'COURIER' AND is_active = true"),
     )
     op.create_table(
+        "phone_numbers",
+        sa.Column(
+            "user_id",
+            sa.UUID(),
+            nullable=False,
+            comment="Ссылка на профиль пользователя",
+        ),
+        sa.Column(
+            "phone",
+            sa.String(length=20),
+            nullable=False,
+            comment="Дополнительный номер телефона",
+        ),
+        sa.Column(
+            "label",
+            sa.String(length=50),
+            nullable=True,
+            comment="Метка: Личный, Рабочий, Доп. и т.д.",
+        ),
+        sa.Column("id", sa.UUID(), nullable=False, comment="ID (UUIDv7)"),
+        sa.Column(
+            "is_active",
+            sa.BOOLEAN(),
+            server_default=sa.text("true"),
+            nullable=False,
+            comment="Флаг активности записи. False означает логическое удаление.",
+        ),
+        sa.Column(
+            "created_at",
+            sa.TIMESTAMP(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+            comment="Дата и время создания записи",
+        ),
+        sa.Column(
+            "updated_at",
+            sa.TIMESTAMP(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+            comment="Дата и время последнего обновления",
+        ),
+        sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
+        sa.PrimaryKeyConstraint("id"),
+        sa.UniqueConstraint("phone"),
+        comment="Дополнительные контактные номера телефонов пользователей (не для авторизации)",
+    )
+    op.create_index(
+        op.f("ix_phone_numbers_user_id"),
+        "phone_numbers",
+        ["user_id"],
+        unique=False,
+    )
+    op.create_table(
         "contract_amendments",
         sa.Column("contract_id", sa.UUID(), nullable=False),
         sa.Column(
@@ -762,9 +819,6 @@ def upgrade() -> None:
             server_default=sa.text("now()"),
             nullable=False,
             comment="Дата и время последнего обновления",
-        ),
-        sa.CheckConstraint(
-            "quantity >= 0", name="ck_inventory_balances_quantity_non_negative"
         ),
         sa.ForeignKeyConstraint(
             ["inventory_id"], ["inventories.id"], ondelete="CASCADE"
@@ -1687,6 +1741,8 @@ def downgrade() -> None:
         table_name="contract_amendments",
     )
     op.drop_table("contract_amendments")
+    op.drop_index(op.f("ix_phone_numbers_user_id"), table_name="phone_numbers")
+    op.drop_table("phone_numbers")
     op.drop_index(
         "uq_active_courier_inventory",
         table_name="inventories",

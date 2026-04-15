@@ -35,11 +35,11 @@
 
 ### Что менять на фронте
 
-| Место | Было | Стало |
-|-------|------|-------|
-| Отправка (`POST / PUT`) | `{ [key]: value }` | `[{ label, value }]` |
-| Чтение (`GET`) | `Object.entries(attributes)` | `attributes.map(a => [a.label, a.value])` |
-| Типы (TypeScript) | `Record<string, string>` | `Array<{ label: string; value: string }>` |
+| Место                   | Было                         | Стало                                     |
+| ----------------------- | ---------------------------- | ----------------------------------------- |
+| Отправка (`POST / PUT`) | `{ [key]: value }`           | `[{ label, value }]`                      |
+| Чтение (`GET`)          | `Object.entries(attributes)` | `attributes.map(a => [a.label, a.value])` |
+| Типы (TypeScript)       | `Record<string, string>`     | `Array<{ label: string; value: string }>` |
 
 ### Валидация
 
@@ -55,13 +55,13 @@
 PATCH /api/v1/backoffice/catalog/{product_id}/restore
 ```
 
-| Параметр | Описание |
-|----------|----------|
-| Метод | `PATCH` |
-| Авторизация | Scope `catalog:write` |
-| Тело запроса | Нет |
-| Успех | `204 No Content` |
-| Товар не найден | `404` — `PRODUCT_NOT_FOUND` |
+| Параметр          | Описание                          |
+| ----------------- | --------------------------------- |
+| Метод             | `PATCH`                           |
+| Авторизация       | Scope `catalog:write`             |
+| Тело запроса      | Нет                               |
+| Успех             | `204 No Content`                  |
+| Товар не найден   | `404` — `PRODUCT_NOT_FOUND`       |
 | Тара архивирована | `422` — `INVALID_RETURNABLE_ITEM` |
 
 ### Логика

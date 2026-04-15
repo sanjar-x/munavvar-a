@@ -83,7 +83,6 @@
   // ── Git ───────────────────────────────────────────────
   "git.autofetch": true,
   "git.autofetchPeriod": 180,
-  "git.blame.enabled": true,
   "git.branchProtection": ["main"],
   "git.confirmSync": false,
   "git.enableSmartCommit": true,
@@ -399,20 +398,20 @@
   // ══════════════════════════════════════════════════════════
 
   // ── ty — Type Checker ─────────────────────────────────
-  "ty.diagnosticMode": "workspace",
-  "ty.showSyntaxErrors": true,
-  "ty.inlayHints.variableTypes": true,
-  "ty.inlayHints.callArgumentNames": true,
-  "ty.completions.autoImport": true,
+  // "ty.diagnosticMode": "workspace",
+  // "ty.showSyntaxErrors": true,
+  // "ty.inlayHints.variableTypes": true,
+  // "ty.inlayHints.callArgumentNames": true,
+  // "ty.completions.autoImport": true,
 
-  "ty.configuration": {
-    "rules": {
-      "unresolved-reference": "error",
-      "invalid-type-form": "error",
-      "invalid-assignment": "warn",
-      "possibly-unbound": "warn"
-    }
-  },
+  // "ty.configuration": {
+  //   "rules": {
+  //     "unresolved-reference": "error",
+  //     "invalid-type-form": "error",
+  //     "invalid-assignment": "warn",
+  //     "possibly-unbound": "warn"
+  //   }
+  // },
 
   // ── Ruff — Linter + Formatter ─────────────────────────
   // pyproject.toml (filesystemFirst) управляет: select, ignore,
@@ -433,7 +432,5 @@
     },
     "editor.guides.bracketPairs": true,
     "editor.rulers": [79] // matches pyproject.toml line-length = 79
-  },
-
-  "python-envs.defaultEnvManager": "ms-python.python:venv"
+  }
 }

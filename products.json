@@ -1,0 +1,196 @@
+[
+  {
+    "name": "Hayot PET",
+    "price": 30000,
+    "attributes": [
+      {
+        "label": "volume",
+        "value": "19"
+      },
+      {
+        "label": "material",
+        "value": "PET"
+      }
+    ],
+    "returnable_item_id": null,
+    "type": "container"
+  },
+  {
+    "name": "Hayot PC",
+    "price": 75000,
+    "attributes": [
+      {
+        "label": "volume",
+        "value": "19"
+      },
+      {
+        "label": "material",
+        "value": "PC"
+      }
+    ],
+    "returnable_item_id": null,
+    "type": "container"
+  },
+  {
+    "name": "Hayot buloq suvi PET",
+    "price": 25000,
+    "attributes": [
+      {
+        "label": "volume",
+        "value": "19"
+      },
+      {
+        "label": "material",
+        "value": "PET"
+      }
+    ],
+    "returnable_item_id": "019d6d3d-df1c-7288-8889-c6efae77da2a",
+    "type": "water"
+  },
+  {
+    "name": "Hayot buloq suvi PC",
+    "price": 25000,
+    "attributes": [
+      {
+        "label": "volume",
+        "value": "19"
+      },
+      {
+        "label": "material",
+        "value": "PC"
+      }
+    ],
+    "returnable_item_id": "019d6d3d-153c-7044-a0fd-86683b771c0e",
+    "type": "water"
+  },
+  {
+    "name": "MunavvarA buloq suvi",
+    "price": 19000,
+    "attributes": [
+      {
+        "label": "volume",
+        "value": "18.9"
+      },
+      {
+        "label": "material",
+        "value": "PET"
+      }
+    ],
+    "returnable_item_id": "019d6d3a-82cf-70e9-a6de-533e313e463a",
+    "type": "water"
+  },
+  {
+    "name": "MunavvarA PET",
+    "price": 30000,
+    "attributes": [
+      {
+        "label": "volume",
+        "value": "18.9"
+      },
+      {
+        "label": "material",
+        "value": "PET"
+      }
+    ],
+    "returnable_item_id": null,
+    "type": "container"
+  },
+  {
+    "name": "Hayot PC 13x",
+    "price": 35000,
+    "attributes": [
+      {
+        "label": "volume",
+        "value": "12.9"
+      },
+      {
+        "label": "material",
+        "value": "PC"
+      }
+    ],
+    "returnable_item_id": null,
+    "type": "container"
+  },
+  {
+    "name": "Hayot buloq suvi 13x PC",
+    "price": 17000,
+    "attributes": [
+      {
+        "label": "volume",
+        "value": "12.9"
+      },
+      {
+        "label": "material",
+        "value": "PC"
+      }
+    ],
+    "returnable_item_id": "019d6d41-aad5-75aa-bf23-e8e6f81f5d99",
+    "type": "water"
+  },
+  {
+    "name": "MunavvarA Life",
+    "price": 15000,
+    "attributes": [
+      {
+        "label": "volume",
+        "value": "18.9"
+      },
+      {
+        "label": "material",
+        "value": "PET"
+      }
+    ],
+    "returnable_item_id": "019d6d3a-82cf-70e9-a6de-533e313e463a",
+    "type": "water"
+  },
+  {
+    "name": "NASOS (Elektron)",
+    "price": 45000,
+    "attributes": [],
+    "returnable_item_id": null,
+    "type": "equipment"
+  },
+  {
+    "name": "Stakan tutqich (derjatel)",
+    "price": 110000,
+    "attributes": [],
+    "returnable_item_id": null,
+    "type": "equipment"
+  },
+  {
+    "name": "Tutqich (butil ko'tarish uchun)",
+    "price": 25000,
+    "attributes": [],
+    "returnable_item_id": null,
+    "type": "equipment"
+  },
+  {
+    "name": "Plastik KULLER",
+    "price": 150000,
+    "attributes": [],
+    "returnable_item_id": null,
+    "type": "equipment"
+  },
+  {
+    "name": "Podstavka (butil uchun)",
+    "price": 600000,
+    "attributes": [],
+    "returnable_item_id": null,
+    "type": "equipment"
+  },
+  {
+    "name": "Mexanik NASOS",
+    "price": 25000,
+    "attributes": [],
+    "returnable_item_id": null,
+    "type": "equipment"
+  },
+  {
+    "name": "KULLER SOKANY (Suv sovutgich va isitgich qurulma, muzlatgich kabinali))",
+    "price": 1200000,
+    "attributes": [],
+    "returnable_item_id": null,
+    "type": "equipment",
+    "is_active": false
+  }
+]
