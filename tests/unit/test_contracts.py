@@ -76,14 +76,10 @@ class FakeContractRepo:
         self.get_active_for_client = AsyncMock(return_value=None)
         self.get_with_price_items = AsyncMock(return_value=None)
         self.get_with_client = AsyncMock(return_value=None)
-        self.get_multi_with_client = AsyncMock(
-            return_value=(0, [])
-        )
+        self.get_multi_with_client = AsyncMock(return_value=(0, []))
         self.increment_credit_used = AsyncMock()
         self.decrement_credit_used = AsyncMock()
-        self.get_price_map_for_products = AsyncMock(
-            return_value={}
-        )
+        self.get_price_map_for_products = AsyncMock(return_value={})
         self.get_expirable = AsyncMock(return_value=[])
 
 
@@ -675,9 +671,7 @@ class TestInvoiceLifecycle:
     @pytest.mark.asyncio
     async def test_generate_invoice_creates_draft(self):
         contract_id = uuid.uuid4()
-        contract = make_contract_with_payment_days(
-            contract_id=contract_id
-        )
+        contract = make_contract_with_payment_days(contract_id=contract_id)
         invoice_repo = FakeInvoiceRepo()
         invoice_repo.get_for_period.return_value = None
         invoice_repo.get_by_contract.return_value = []
@@ -719,9 +713,7 @@ class TestInvoiceLifecycle:
         invoice_repo = FakeInvoiceRepo()
         invoice_repo.get_for_period.return_value = None
         invoice_repo.get_by_contract.return_value = []
-        invoice_repo.add.return_value = make_invoice(
-            contract_id=contract_id
-        )
+        invoice_repo.add.return_value = make_invoice(contract_id=contract_id)
         contracts_repo = FakeContractRepo()
         contracts_repo.get.return_value = contract
         order_repo = FakeOrderRepo()
@@ -747,9 +739,7 @@ class TestInvoiceLifecycle:
     @pytest.mark.asyncio
     async def test_generate_invoice_duplicate_period_rejected(self):
         contract_id = uuid.uuid4()
-        contract = make_contract_with_payment_days(
-            contract_id=contract_id
-        )
+        contract = make_contract_with_payment_days(contract_id=contract_id)
         existing_invoice = make_invoice(contract_id=contract_id)
         invoice_repo = FakeInvoiceRepo()
         # Simulate existing non-CANCELLED invoice for period
@@ -757,9 +747,7 @@ class TestInvoiceLifecycle:
         contracts_repo = FakeContractRepo()
         contracts_repo.get.return_value = contract
 
-        uow = make_uow(
-            contracts=contracts_repo, invoices=invoice_repo
-        )
+        uow = make_uow(contracts=contracts_repo, invoices=invoice_repo)
         service = ContractService(uow=uow)
 
         with pytest.raises(DuplicateInvoicePeriodError):
@@ -1146,9 +1134,7 @@ class TestContractAmendments:
             effective_date=date.today(),
         )
         with pytest.raises(DuplicateAmendmentNumberError):
-            await service.create_amendment(
-                contract_id=contract_id, dto=dto
-            )
+            await service.create_amendment(contract_id=contract_id, dto=dto)
 
     @pytest.mark.asyncio
     async def test_create_amendment_contract_not_found_raises(self):
@@ -1164,9 +1150,7 @@ class TestContractAmendments:
             effective_date=date.today(),
         )
         with pytest.raises(ContractNotFoundError):
-            await service.create_amendment(
-                contract_id=uuid.uuid4(), dto=dto
-            )
+            await service.create_amendment(contract_id=uuid.uuid4(), dto=dto)
 
     @pytest.mark.asyncio
     async def test_list_amendments_returns_sorted(self):

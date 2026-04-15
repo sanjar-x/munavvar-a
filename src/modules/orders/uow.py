@@ -39,9 +39,7 @@ class BaseOrderUnitOfWork(BaseSQLAlchemyUoW):
 
         self.orders = OrderRepository(session=self.session)
         self.order_items = OrderItemRepository(session=self.session)
-        self.status_logs = OrderStatusLogRepository(
-            session=self.session
-        )
+        self.status_logs = OrderStatusLogRepository(session=self.session)
         self.users = UserRepository(session=self.session)
         self.inventories = InventoryRepository(session=self.session)
         self.transfers = StockTransferRepository(session=self.session)

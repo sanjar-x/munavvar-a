@@ -37,9 +37,7 @@ class ContractUnitOfWork(BaseSQLAlchemyUoW, IContractUnitOfWork):
         self.price_items = ContractPriceItemRepository(session=self.session)
         self.invoices = InvoiceRepository(session=self.session)
         self.orders = OrderRepository(session=self.session)
-        self.order_status_logs = OrderStatusLogRepository(
-            session=self.session
-        )
+        self.order_status_logs = OrderStatusLogRepository(session=self.session)
         self.accounts = AccountRepository(session=self.session)
         self.transactions = TransactionRepository(session=self.session)
         self.status_logs = ContractStatusLogRepository(session=self.session)

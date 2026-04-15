@@ -1119,9 +1119,9 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
         """
         Автоматическое создание и проведение StockTransfer при доставке.
         1. [NEW] Корректировка заказа (если переданы actual_items)
-        2. Начисление тары курьеру: VIRTUAL_VENDOR -> Курьер
-        3. Доставка воды + тары: Курьер -> Клиент
-        4. Забор пустой тары: Клиент -> Курьер
+        2. Доставка воды + тары: Курьер -> Клиент
+        3. Забор пустой тары: Клиент -> Курьер
+        4. Финансовое закрытие заказа
         """
         if not order.courier_id:
             raise BadRequestError(
@@ -1214,22 +1214,8 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
         if stock_shortages:
             raise InsufficientStockError(shortages=stock_shortages)
 
-        # 1. Начисляем тару курьеру из виртуального склада
         returnable_items = self._build_returnable_items(order.items)
-        if returnable_items:
-            vendor_inv = await self.uow.inventories.get_vendor_inventory()
-            await self._create_stock_transfer(
-                from_id=vendor_inv.id,
-                to_id=courier_inventory.id,
-                transfer_type=TransferType.INITIAL_BALANCE,
-                items=returnable_items,
-                created_by_id=order.courier_id,
-                accepted_by_id=order.courier_id,
-                order_id=order.id,
-                reason="Container issued with delivery",
-            )
-
-        # 2. Накладная на доставку (вода + тара): Курьер → Клиент
+        # 1. Накладная на доставку (вода + тара): Курьер → Клиент
         delivery_items = [
             {"product_id": i.product_id, "quantity": i.quantity}
             for i in order.items
@@ -1246,7 +1232,7 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
             order_id=order.id,
         )
 
-        # 3. Возврат тары: Клиент → Курьер
+        # 2. Возврат тары: Клиент → Курьер
         if returnable_items:
             await self._create_stock_transfer(
                 from_id=order.client_inventory_id,
@@ -1258,7 +1244,7 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
                 order_id=order.id,
             )
 
-        # 4. Финансовое закрытие заказа
+        # 3. Финансовое закрытие заказа
         await self._process_financial_settlement(order)
 
     async def _handle_warehouse_pickup(

@@ -136,8 +136,7 @@ class Order(BaseModel):
         nullable=True,
         default=None,
         comment=(
-            "Заметки / инструкции по доставке "
-            "(например, код домофона, этаж)"
+            "Заметки / инструкции по доставке (например, код домофона, этаж)"
         ),
     )
     client: Mapped[User] = relationship(
@@ -272,9 +271,5 @@ class OrderStatusLog(BaseModel):
     order: Mapped["Order"] = relationship()
 
     __table_args__ = (
-        {
-            "comment": (
-                "Аудит-лог всех переходов статуса заказа"
-            )
-        },
+        {"comment": ("Аудит-лог всех переходов статуса заказа")},
     )
