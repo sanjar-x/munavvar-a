@@ -221,6 +221,7 @@ async def upsert_price_item(
         contract_id=contract_id,
         product_id=product_id,
         price=data.price,
+        quantity=data.quantity,
     )
 
 

@@ -112,8 +112,7 @@ class BillingService:
         sql = text(
             """
             SELECT
-                COALESCE(SUM(c.credit_used), 0) AS credit_used,
-                COALESCE(SUM(a.balance), 0)      AS settled_debt
+                COALESCE(SUM(a.balance), 0) AS settled_debt
             FROM contracts c
             JOIN accounts a ON a.user_id = c.client_id
                 AND a.type = 'client'
@@ -123,7 +122,6 @@ class BillingService:
         )
         row = (await self.uow.session.execute(sql)).one()
         return {
-            "total_b2b_credit_used": int(row.credit_used),
             "total_b2b_settled_debt": int(row.settled_debt),
         }
 
@@ -144,8 +142,6 @@ class BillingService:
                     u.username          AS client_name,
                     c.id                AS contract_id,
                     c.number            AS contract_number,
-                    c.credit_limit,
-                    c.credit_used,
                     a.balance           AS account_balance,
                     c.payment_due_days
                 FROM contracts c
@@ -154,47 +150,34 @@ class BillingService:
                     AND a.type = 'client'
                 WHERE c.status = 'active'
                   AND c.is_active = TRUE
-                ORDER BY (c.credit_used + a.balance) DESC
+                ORDER BY a.balance DESC
                 """
             )
             rows = (await self.uow.session.execute(sql)).all()
 
             items = []
-            total_exposure = 0
+            total_debt = 0
             for r in rows:
-                exposure = int(r.credit_used) + int(r.account_balance)
-                total_exposure += exposure
-                if r.credit_limit == 0:
-                    due_date_status = "no_limit"
-                    util_pct = 0.0
-                else:
-                    util_pct = round(
-                        (int(r.credit_used) / int(r.credit_limit)) * 100,
-                        2,
-                    )
-                    due_date_status = (
-                        "overdue"
-                        if int(r.account_balance) > 0
-                        and int(r.payment_due_days) == 0
-                        else "ok"
-                    )
+                balance = int(r.account_balance)
+                total_debt += balance
+                due_date_status = (
+                    "overdue"
+                    if balance > 0 and int(r.payment_due_days) == 0
+                    else "ok"
+                )
                 items.append(
                     B2BContractDebt(
                         client_id=r.client_id,
                         client_name=r.client_name,
                         contract_id=r.contract_id,
                         contract_number=r.contract_number,
-                        credit_limit=int(r.credit_limit),
-                        credit_used=int(r.credit_used),
-                        account_balance=int(r.account_balance),
-                        total_exposure=exposure,
-                        limit_utilization_pct=util_pct,
+                        account_balance=balance,
                         due_date_status=due_date_status,
                     )
                 )
             return B2BContractDebtsResponse(
                 items=items,
-                total_exposure=total_exposure,
+                total_debt=total_debt,
             )
 
     # ----------------------------------------------------------

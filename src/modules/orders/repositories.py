@@ -34,6 +34,14 @@ class OrderItemRepository(BaseRepository[OrderItem]):
         result = await self.session.execute(query)
         return result.scalar_one_or_none()
 
+    async def get_by_order(self, order_id: uuid.UUID) -> Sequence[OrderItem]:
+        """Все позиции одного заказа."""
+        query = select(self.model).where(
+            self.model.order_id == order_id,
+        )
+        result = await self.session.execute(query)
+        return result.scalars().all()
+
     async def delete_by_order_and_product(
         self, order_id: uuid.UUID, product_id: uuid.UUID
     ) -> None:
@@ -52,6 +60,19 @@ class OrderItemRepository(BaseRepository[OrderItem]):
             .values(quantity=new_quantity)
         )
         await self.session.execute(stmt)
+
+    async def get_by_orders(
+        self,
+        order_ids: list[uuid.UUID],
+    ) -> Sequence[OrderItem]:
+        """Все позиции для списка заказов (bulk cancel)."""
+        if not order_ids:
+            return []
+        query = select(self.model).where(
+            self.model.order_id.in_(order_ids),
+        )
+        result = await self.session.execute(query)
+        return result.scalars().all()
 
 
 class OrderRepository(BaseRepository[Order]):
@@ -288,21 +309,20 @@ class OrderRepository(BaseRepository[Order]):
     async def bulk_cancel_by_contract(
         self,
         contract_id: uuid.UUID,
-    ) -> list[tuple[uuid.UUID, OrderStatus, int | None]]:
+    ) -> list[tuple[uuid.UUID, OrderStatus, bool]]:
         """Отмена всех NEW/ASSIGNED заказов по договору.
 
         Сначала SELECT FOR UPDATE для захвата old_status
-        и reserved_credit_amount до обновления, затем UPDATE.
-        Возвращает (order_id, old_status, reserved_credit_amount).
+        и quantities_reserved до обновления, затем UPDATE.
+        Возвращает (order_id, old_status, quantities_reserved).
         """
         cancellable = [OrderStatus.NEW, OrderStatus.ASSIGNED]
 
-        # Захватить до UPDATE — RETURNING даёт NEW-значения
         select_stmt = (
             select(
                 self.model.id,
                 self.model.status,
-                self.model.reserved_credit_amount,
+                self.model.quantities_reserved,
             )
             .where(
                 self.model.contract_id == contract_id,
@@ -321,7 +341,7 @@ class OrderRepository(BaseRepository[Order]):
             .where(self.model.id.in_(ids))
             .values(
                 status=OrderStatus.CANCELLED,
-                reserved_credit_amount=0,
+                quantities_reserved=False,
             )
         )
         await self.session.execute(update_stmt)

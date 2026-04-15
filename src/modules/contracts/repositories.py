@@ -32,8 +32,8 @@ class ContractRepository(BaseRepository[Contract]):
         with_for_update: bool = False,
     ) -> Contract | None:
         """Активный договор клиента.
-        with_for_update=True — при проверке кредитного лимита
-        для предотвращения race condition (TOCTOU).
+        with_for_update=True — блокировка строки для проверки
+        статуса/срока (TOCTOU) при создании заказа.
         """
         query = select(Contract).where(
             Contract.client_id == client_id,
@@ -128,60 +128,6 @@ class ContractRepository(BaseRepository[Contract]):
         )
         return total, result.scalars().unique().all()
 
-    async def increment_credit_used(
-        self,
-        contract_id: uuid.UUID,
-        amount: int,
-    ) -> None:
-        """Атомарный инкремент credit_used при создании заказа.
-        Вызывается ПОСЛЕ lock на строку договора (with_for_update=True).
-        """
-        stmt = (
-            sa.update(Contract)
-            .where(Contract.id == contract_id)
-            .values(credit_used=Contract.credit_used + amount)
-        )
-        await self.session.execute(stmt)
-        log.info(
-            "credit_reserved",
-            contract_id=str(contract_id),
-            amount=amount,
-        )
-
-    async def decrement_credit_used(
-        self,
-        contract_id: uuid.UUID,
-        amount: int,
-    ) -> None:
-        """Уменьшение credit_used при завершении доставки/отмене.
-        Долг переходит с credit_used на account.balance (через триггер).
-        """
-        # Проверяем текущее значение для обнаружения аномалий
-        current = await self.session.scalar(
-            sa.select(Contract.credit_used).where(Contract.id == contract_id)
-        )
-        if current is not None and current < amount:
-            log.warning(
-                "credit_underflow_detected",
-                contract_id=str(contract_id),
-                current_credit_used=current,
-                decrement_amount=amount,
-                deficit=amount - current,
-            )
-        stmt = (
-            sa.update(Contract)
-            .where(Contract.id == contract_id)
-            .values(
-                credit_used=sa.func.greatest(Contract.credit_used - amount, 0)
-            )
-        )
-        await self.session.execute(stmt)
-        log.info(
-            "credit_released",
-            contract_id=str(contract_id),
-            amount=amount,
-        )
-
     async def get_expirable(self) -> Sequence[Contract]:
         """ACTIVE договоры с истёкшим end_date (кандидаты → EXPIRED).
 
@@ -212,6 +158,73 @@ class ContractPriceItemRepository(BaseRepository[ContractPriceItem]):
             contract_id=contract_id,
             product_id=product_id,
         )
+
+    async def get_for_products_locked(
+        self,
+        contract_id: uuid.UUID,
+        product_ids: list[uuid.UUID],
+    ) -> Sequence[ContractPriceItem]:
+        """SELECT FOR UPDATE на позиции прайс-листа.
+        ORDER BY product_id — детерминированный порядок
+        блокировки для предотвращения deadlock.
+        """
+        if not product_ids:
+            return []
+        query = (
+            select(ContractPriceItem)
+            .where(
+                ContractPriceItem.contract_id == contract_id,
+                ContractPriceItem.product_id.in_(product_ids),
+                ContractPriceItem.is_active.is_(True),
+            )
+            .order_by(ContractPriceItem.product_id)
+            .with_for_update()
+        )
+        result = await self.session.execute(query)
+        return result.scalars().all()
+
+    async def increment_quantities_used(
+        self,
+        items: list[tuple[uuid.UUID, int]],
+    ) -> None:
+        """Атомарный инкремент quantity_used.
+        items: [(price_item_id, delta), ...]
+        """
+        for item_id, delta in items:
+            stmt = (
+                sa.update(ContractPriceItem)
+                .where(ContractPriceItem.id == item_id)
+                .values(
+                    quantity_used=(ContractPriceItem.quantity_used + delta)
+                )
+            )
+            await self.session.execute(stmt)
+
+    async def decrement_quantities_used(
+        self,
+        contract_id: uuid.UUID,
+        product_quantities: list[tuple[uuid.UUID, int]],
+    ) -> None:
+        """Уменьшение quantity_used при отмене заказа.
+        product_quantities: [(product_id, delta), ...]
+        Использует greatest(0) для защиты от underflow.
+        """
+        for product_id, delta in product_quantities:
+            stmt = (
+                sa.update(ContractPriceItem)
+                .where(
+                    ContractPriceItem.contract_id == contract_id,
+                    ContractPriceItem.product_id == product_id,
+                    ContractPriceItem.is_active.is_(True),
+                )
+                .values(
+                    quantity_used=sa.func.greatest(
+                        ContractPriceItem.quantity_used - delta,
+                        0,
+                    )
+                )
+            )
+            await self.session.execute(stmt)
 
 
 class InvoiceRepository(BaseRepository[Invoice]):

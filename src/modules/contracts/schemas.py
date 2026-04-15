@@ -17,11 +17,6 @@ class ContractCreate(BaseModel):
     )
     start_date: date
     end_date: date | None = None
-    credit_limit: int = Field(
-        default=0,
-        ge=0,
-        description="0 = без ограничений",
-    )
     payment_due_days: int = Field(default=30, gt=0, le=365)
     legal_name: str = Field(min_length=1, max_length=255)
     inn: str = Field(min_length=9, max_length=14)
@@ -31,7 +26,6 @@ class ContractCreate(BaseModel):
 class ContractUpdate(BaseModel):
     """Частичное обновление условий договора (только DRAFT/ACTIVE)."""
 
-    credit_limit: int | None = Field(default=None, ge=0)
     payment_due_days: int | None = Field(default=None, gt=0, le=365)
     end_date: date | None = None
     notes: str | None = Field(default=None, max_length=2000)
@@ -52,8 +46,6 @@ class ContractResponse(BaseModel):
     status: ContractStatus
     start_date: date
     end_date: date | None
-    credit_limit: int
-    credit_used: int
     payment_due_days: int
     legal_name: str
     inn: str
@@ -82,6 +74,11 @@ class ContractDetailResponse(ContractResponse):
 
 class PriceItemCreate(BaseModel):
     price: int = Field(ge=0, description="Договорная цена в сумах")
+    quantity: int = Field(
+        default=0,
+        ge=0,
+        description="Квота (макс. кол-во единиц). 0 = без ограничений.",
+    )
 
 
 class PriceItemResponse(BaseModel):
@@ -89,6 +86,8 @@ class PriceItemResponse(BaseModel):
     contract_id: uuid.UUID
     product_id: uuid.UUID
     price: int
+    quantity: int
+    quantity_used: int
     is_active: bool
     created_at: datetime
     updated_at: datetime

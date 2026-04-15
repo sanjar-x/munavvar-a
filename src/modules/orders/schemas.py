@@ -188,8 +188,6 @@ class ContractBrief(BaseModel):
     number: str
     status: ContractStatus
     legal_name: str
-    credit_limit: int
-    credit_used: int
     start_date: date
     end_date: date | None
 
@@ -232,10 +230,10 @@ class OrderResponse(BaseModel):
         default=None,
         description="Данные договора (только для CONTRACT оплаты)",
     )
-    reserved_credit_amount: int | None = Field(
-        default=None,
+    quantities_reserved: bool = Field(
+        default=False,
         description=(
-            "Зарезервированная сумма кредита (только для CONTRACT оплаты)"
+            "Квоты по договору зарезервированы (только для CONTRACT оплаты)"
         ),
     )
     notes: str | None = Field(

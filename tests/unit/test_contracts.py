@@ -24,7 +24,6 @@ from src.modules.contracts.exceptions import (
 from src.modules.contracts.schemas import (
     AmendmentCreate,
     ContractCreate,
-    ContractUpdate,
 )
 from src.modules.contracts.services import ContractService
 from src.modules.orders.enums import OrderStatus
@@ -35,8 +34,6 @@ from src.modules.orders.enums import OrderStatus
 def make_contract(
     status: ContractStatus = ContractStatus.DRAFT,
     client_id: uuid.UUID | None = None,
-    credit_limit: int = 500_000,
-    credit_used: int = 0,
     contract_id: uuid.UUID | None = None,
     end_date: date | None = None,
 ) -> SimpleNamespace:
@@ -44,8 +41,6 @@ def make_contract(
         id=contract_id or uuid.uuid4(),
         client_id=client_id or uuid.uuid4(),
         status=status,
-        credit_limit=credit_limit,
-        credit_used=credit_used,
         number="HOD-2025-001",
         start_date=date.today(),
         end_date=end_date,
@@ -56,12 +51,16 @@ def make_price_item(
     contract_id: uuid.UUID,
     product_id: uuid.UUID,
     price: int = 15_000,
+    quantity: int = 0,
+    quantity_used: int = 0,
 ) -> SimpleNamespace:
     return SimpleNamespace(
         id=uuid.uuid4(),
         contract_id=contract_id,
         product_id=product_id,
         price=price,
+        quantity=quantity,
+        quantity_used=quantity_used,
     )
 
 
@@ -77,8 +76,6 @@ class FakeContractRepo:
         self.get_with_price_items = AsyncMock(return_value=None)
         self.get_with_client = AsyncMock(return_value=None)
         self.get_multi_with_client = AsyncMock(return_value=(0, []))
-        self.increment_credit_used = AsyncMock()
-        self.decrement_credit_used = AsyncMock()
         self.get_price_map_for_products = AsyncMock(return_value={})
         self.get_expirable = AsyncMock(return_value=[])
 
@@ -90,6 +87,9 @@ class FakePriceItemRepo:
         self.update = AsyncMock()
         self.delete = AsyncMock()
         self.get_by_contract_and_product = AsyncMock(return_value=None)
+        self.get_for_products_locked = AsyncMock(return_value=[])
+        self.increment_quantities_used = AsyncMock()
+        self.decrement_quantities_used = AsyncMock()
 
 
 class FakeInvoiceRepo:
@@ -117,6 +117,11 @@ class FakeOrderRepo:
         self.update = AsyncMock()
 
 
+class FakeOrderItemRepo:
+    def __init__(self):
+        self.get_by_orders = AsyncMock(return_value=[])
+
+
 class FakeStatusLogRepo:
     def __init__(self):
         self.add = AsyncMock()
@@ -135,6 +140,7 @@ def make_uow(
     price_items: FakePriceItemRepo | None = None,
     invoices: FakeInvoiceRepo | None = None,
     orders: FakeOrderRepo | None = None,
+    order_items: FakeOrderItemRepo | None = None,
     status_logs: FakeStatusLogRepo | None = None,
     amendments: FakeAmendmentRepo | None = None,
 ) -> MagicMock:
@@ -144,6 +150,7 @@ def make_uow(
     uow.price_items = price_items or FakePriceItemRepo()
     uow.invoices = invoices or FakeInvoiceRepo()
     uow.orders = orders or FakeOrderRepo()
+    uow.order_items = order_items or FakeOrderItemRepo()
     uow.order_status_logs = FakeOrderStatusLogRepo()
     uow.accounts = MagicMock()
     uow.transactions = MagicMock()
@@ -176,7 +183,6 @@ class TestContractLifecycle:
         dto = ContractCreate(
             number="HOD-2025-001",
             start_date=date.today(),
-            credit_limit=0,
             payment_due_days=30,
             legal_name="ООО Рога и Копыта",
             inn="123456789012",
@@ -208,7 +214,6 @@ class TestContractLifecycle:
         dto = ContractCreate(
             number="HOD-2025-002",
             start_date=date.today(),
-            credit_limit=0,
             payment_due_days=30,
             legal_name="ООО Рога и Копыта",
             inn="123456789012",
@@ -458,89 +463,6 @@ class TestContractLifecycle:
             )
 
 
-# ─── Tests: credit guard ──────────────────────────────────
-
-
-class TestContractCreditGuard:
-    """
-    These tests invoke update_contract() to verify credit_limit
-    validation (the service rejects new_limit < credit_used).
-    """
-
-    @pytest.mark.asyncio
-    async def test_update_limit_below_used_raises(self):
-        from src.core.exceptions import BadRequestError
-
-        contract_id = uuid.uuid4()
-        contract = make_contract(
-            contract_id=contract_id,
-            credit_limit=500_000,
-            credit_used=300_000,
-        )
-        contracts_repo = FakeContractRepo()
-        contracts_repo.get.return_value = contract
-
-        uow = make_uow(contracts=contracts_repo)
-        service = ContractService(uow=uow)
-
-        dto = ContractUpdate(credit_limit=100_000)
-        with pytest.raises(BadRequestError) as exc:
-            await service.update_contract(contract_id=contract_id, dto=dto)
-        assert exc.value.error_code == "CREDIT_LIMIT_BELOW_USED"
-
-    @pytest.mark.asyncio
-    async def test_update_limit_equal_to_used_succeeds(self):
-        contract_id = uuid.uuid4()
-        contract = make_contract(
-            contract_id=contract_id,
-            credit_limit=300_000,
-            credit_used=300_000,
-        )
-        updated = make_contract(
-            contract_id=contract_id,
-            credit_limit=300_000,
-            credit_used=300_000,
-        )
-        contracts_repo = FakeContractRepo()
-        contracts_repo.get.return_value = contract
-        contracts_repo.update.return_value = updated
-
-        uow = make_uow(contracts=contracts_repo)
-        service = ContractService(uow=uow)
-
-        dto = ContractUpdate(credit_limit=300_000)
-        result = await service.update_contract(
-            contract_id=contract_id, dto=dto
-        )
-        assert result is updated
-
-    @pytest.mark.asyncio
-    async def test_unlimited_contract_zero_limit_ignores_check(
-        self,
-    ):
-        """credit_limit=0 means unlimited — any new_limit=0 is OK."""
-        contract_id = uuid.uuid4()
-        contract = make_contract(
-            contract_id=contract_id,
-            credit_limit=0,
-            credit_used=9_999_999,
-        )
-        updated = make_contract(contract_id=contract_id, credit_limit=0)
-        contracts_repo = FakeContractRepo()
-        contracts_repo.get.return_value = contract
-        contracts_repo.update.return_value = updated
-
-        uow = make_uow(contracts=contracts_repo)
-        service = ContractService(uow=uow)
-
-        # Setting limit to 0 (unlimited) should never raise
-        dto = ContractUpdate(credit_limit=0)
-        result = await service.update_contract(
-            contract_id=contract_id, dto=dto
-        )
-        assert result is updated
-
-
 # ─── Tests: price items ───────────────────────────────────
 
 
@@ -549,7 +471,9 @@ class TestContractPriceItems:
     async def test_set_price_item_creates_new_if_absent(self):
         contract_id = uuid.uuid4()
         product_id = uuid.uuid4()
-        expected_item = make_price_item(contract_id, product_id, price=15_000)
+        expected_item = make_price_item(
+            contract_id, product_id, price=15_000, quantity=100
+        )
 
         price_items_repo = FakePriceItemRepo()
         price_items_repo.get_by_contract_and_product.return_value = None
@@ -562,19 +486,25 @@ class TestContractPriceItems:
             contract_id=contract_id,
             product_id=product_id,
             price=15_000,
+            quantity=100,
         )
 
         price_items_repo.add.assert_awaited_once()
         call_data = price_items_repo.add.call_args[0][0]
         assert call_data["price"] == 15_000
+        assert call_data["quantity"] == 100
         assert result is expected_item
 
     @pytest.mark.asyncio
     async def test_set_price_item_updates_existing(self):
         contract_id = uuid.uuid4()
         product_id = uuid.uuid4()
-        existing = make_price_item(contract_id, product_id, price=10_000)
-        updated = make_price_item(contract_id, product_id, price=12_000)
+        existing = make_price_item(
+            contract_id, product_id, price=10_000, quantity=50
+        )
+        updated = make_price_item(
+            contract_id, product_id, price=12_000, quantity=80
+        )
 
         price_items_repo = FakePriceItemRepo()
         price_items_repo.get_by_contract_and_product.return_value = existing
@@ -587,13 +517,47 @@ class TestContractPriceItems:
             contract_id=contract_id,
             product_id=product_id,
             price=12_000,
+            quantity=80,
         )
 
         price_items_repo.update.assert_awaited_once_with(
-            existing.id, {"price": 12_000}
+            existing.id, {"price": 12_000, "quantity": 80}
         )
         price_items_repo.add.assert_not_awaited()
         assert result is updated
+
+    @pytest.mark.asyncio
+    async def test_set_price_item_rejects_lowering_below_used(
+        self,
+    ):
+        """Cannot lower quantity below quantity_used."""
+        from src.modules.contracts.exceptions import (
+            PriceItemHasUsageError,
+        )
+
+        contract_id = uuid.uuid4()
+        product_id = uuid.uuid4()
+        existing = make_price_item(
+            contract_id,
+            product_id,
+            price=10_000,
+            quantity=100,
+            quantity_used=60,
+        )
+
+        price_items_repo = FakePriceItemRepo()
+        price_items_repo.get_by_contract_and_product.return_value = existing
+
+        uow = make_uow(price_items=price_items_repo)
+        service = ContractService(uow=uow)
+
+        with pytest.raises(PriceItemHasUsageError):
+            await service.set_price_item(
+                contract_id=contract_id,
+                product_id=product_id,
+                price=10_000,
+                quantity=50,  # < 60 used
+            )
 
     @pytest.mark.asyncio
     async def test_remove_price_item_raises_if_not_found(self):
@@ -626,6 +590,34 @@ class TestContractPriceItems:
         )
 
         price_items_repo.delete.assert_awaited_once_with(item.id)
+
+    @pytest.mark.asyncio
+    async def test_remove_price_item_rejects_if_has_usage(self):
+        """Cannot delete price item with quantity_used > 0."""
+        from src.modules.contracts.exceptions import (
+            PriceItemHasUsageError,
+        )
+
+        contract_id = uuid.uuid4()
+        product_id = uuid.uuid4()
+        item = make_price_item(
+            contract_id,
+            product_id,
+            quantity=100,
+            quantity_used=5,
+        )
+
+        price_items_repo = FakePriceItemRepo()
+        price_items_repo.get_by_contract_and_product.return_value = item
+
+        uow = make_uow(price_items=price_items_repo)
+        service = ContractService(uow=uow)
+
+        with pytest.raises(PriceItemHasUsageError):
+            await service.remove_price_item(
+                contract_id=contract_id,
+                product_id=product_id,
+            )
 
 
 # ─── Tests: Invoice lifecycle ─────────────────────────────
@@ -1293,30 +1285,46 @@ class TestAutomationJobs:
 
 class TestSuspensionCancelsOrders:
     @pytest.mark.asyncio
-    async def test_suspend_cancels_new_orders(self):
-        """Suspension cancels NEW/ASSIGNED orders and releases credit."""
+    async def test_suspend_cancels_new_orders_and_releases_quotas(
+        self,
+    ):
+        """Suspension cancels NEW/ASSIGNED orders and
+        releases per-product quotas."""
         contract_id = uuid.uuid4()
         contract = make_contract(
             contract_id=contract_id,
             status=ContractStatus.ACTIVE,
-            credit_used=100_000,
         )
 
         contracts_repo = FakeContractRepo()
         contracts_repo.get.return_value = contract
         contracts_repo.update.return_value = contract
 
+        order_id_1 = uuid.uuid4()
+        order_id_2 = uuid.uuid4()
         orders_repo = FakeOrderRepo()
-        # Two orders cancelled, each with 50_000 reserved
         orders_repo.bulk_cancel_by_contract.return_value = [
-            (uuid.uuid4(), OrderStatus.NEW, 50_000),
-            (uuid.uuid4(), OrderStatus.ASSIGNED, 50_000),
+            (order_id_1, OrderStatus.NEW, True),
+            (order_id_2, OrderStatus.ASSIGNED, True),
         ]
         orders_repo.count_inflight_by_contract.return_value = 0
+
+        product_a = uuid.uuid4()
+        product_b = uuid.uuid4()
+        order_items_repo = FakeOrderItemRepo()
+        order_items_repo.get_by_orders.return_value = [
+            SimpleNamespace(product_id=product_a, quantity=5),
+            SimpleNamespace(product_id=product_b, quantity=3),
+            SimpleNamespace(product_id=product_a, quantity=2),
+        ]
+
+        price_items_repo = FakePriceItemRepo()
 
         uow = make_uow(
             contracts=contracts_repo,
             orders=orders_repo,
+            order_items=order_items_repo,
+            price_items=price_items_repo,
         )
         service = ContractService(uow=uow)
 
@@ -1328,9 +1336,10 @@ class TestSuspensionCancelsOrders:
         orders_repo.bulk_cancel_by_contract.assert_awaited_once_with(
             contract_id
         )
-        contracts_repo.decrement_credit_used.assert_awaited_once_with(
-            contract_id, 100_000
+        order_items_repo.get_by_orders.assert_awaited_once_with(
+            [order_id_1, order_id_2]
         )
+        price_items_repo.decrement_quantities_used.assert_awaited_once()
 
     @pytest.mark.asyncio
     async def test_terminate_cancels_new_orders(self):
@@ -1339,7 +1348,6 @@ class TestSuspensionCancelsOrders:
         contract = make_contract(
             contract_id=contract_id,
             status=ContractStatus.ACTIVE,
-            credit_used=30_000,
         )
 
         contracts_repo = FakeContractRepo()
@@ -1348,7 +1356,7 @@ class TestSuspensionCancelsOrders:
 
         orders_repo = FakeOrderRepo()
         orders_repo.bulk_cancel_by_contract.return_value = [
-            (uuid.uuid4(), OrderStatus.NEW, 30_000),
+            (uuid.uuid4(), OrderStatus.NEW, True),
         ]
         orders_repo.count_inflight_by_contract.return_value = 0
 
@@ -1369,7 +1377,7 @@ class TestSuspensionCancelsOrders:
 
     @pytest.mark.asyncio
     async def test_suspend_no_orders_skips_decrement(self):
-        """If no in-flight orders, credit decrement is skipped."""
+        """If no in-flight orders, quantity release is skipped."""
         contract_id = uuid.uuid4()
         contract = make_contract(
             contract_id=contract_id,
@@ -1384,9 +1392,12 @@ class TestSuspensionCancelsOrders:
         orders_repo.bulk_cancel_by_contract.return_value = []
         orders_repo.count_inflight_by_contract.return_value = 0
 
+        price_items_repo = FakePriceItemRepo()
+
         uow = make_uow(
             contracts=contracts_repo,
             orders=orders_repo,
+            price_items=price_items_repo,
         )
         service = ContractService(uow=uow)
 
@@ -1395,4 +1406,4 @@ class TestSuspensionCancelsOrders:
             reason="Тестовая приостановка",
         )
 
-        contracts_repo.decrement_credit_used.assert_not_awaited()
+        price_items_repo.decrement_quantities_used.assert_not_awaited()

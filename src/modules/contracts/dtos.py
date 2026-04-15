@@ -12,8 +12,6 @@ class ContractDTO:
     client_id: uuid.UUID
     number: str
     status: ContractStatus
-    credit_limit: int
-    credit_used: int
     payment_due_days: int
     start_date: date
     end_date: date | None

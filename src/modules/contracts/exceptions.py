@@ -50,28 +50,52 @@ class ContractExpiredError(BadRequestError):
         )
 
 
-class CreditLimitExceededError(BadRequestError):
-    """Заказ превысит кредитный лимит."""
+class QuantityLimitExceededError(BadRequestError):
+    """Заказ превысит квоту по продукту в договоре."""
 
     def __init__(
         self,
         contract_id: uuid.UUID | str,
-        credit_limit: int,
-        current_exposure: int,
-        order_amount: int,
+        product_id: uuid.UUID | str,
+        quantity_limit: int,
+        quantity_used: int,
+        requested: int,
     ):
         super().__init__(
             message=(
-                "Кредитный лимит по договору будет превышен. "
-                "Погасите задолженность или уменьшите заказ."
+                "Квота по продукту в договоре будет превышена. "
+                "Уменьшите количество или обратитесь к менеджеру."
             ),
-            error_code="CREDIT_LIMIT_EXCEEDED",
+            error_code="QUANTITY_LIMIT_EXCEEDED",
             details={
                 "contract_id": str(contract_id),
-                "credit_limit": credit_limit,
-                "current_exposure": current_exposure,
-                "order_amount": order_amount,
-                "overage": (current_exposure + order_amount - credit_limit),
+                "product_id": str(product_id),
+                "quantity_limit": quantity_limit,
+                "quantity_used": quantity_used,
+                "requested": requested,
+                "available": quantity_limit - quantity_used,
+            },
+        )
+
+
+class ProductNotInContractError(BadRequestError):
+    """Продукт отсутствует в прайс-листе договора."""
+
+    def __init__(
+        self,
+        contract_id: uuid.UUID | str,
+        product_id: uuid.UUID | str,
+    ):
+        super().__init__(
+            message=(
+                "Данный продукт отсутствует в прайс-листе договора. "
+                "Заказ по договору возможен только для товаров из "
+                "договорного прайс-листа."
+            ),
+            error_code="PRODUCT_NOT_IN_CONTRACT",
+            details={
+                "contract_id": str(contract_id),
+                "product_id": str(product_id),
             },
         )
 
@@ -130,6 +154,29 @@ class ContractRequiredError(BadRequestError):
             ),
             error_code="CONTRACT_REQUIRED",
             details={"client_id": str(client_id)},
+        )
+
+
+class PriceItemHasUsageError(ConflictError):
+    """Нельзя удалить/уменьшить квоту позиции с использованием."""
+
+    def __init__(
+        self,
+        contract_id: uuid.UUID | str,
+        product_id: uuid.UUID | str,
+        quantity_used: int,
+    ):
+        super().__init__(
+            message=(
+                "Невозможно удалить позицию прайс-листа: "
+                "есть активные заказы с этим продуктом."
+            ),
+            error_code="PRICE_ITEM_HAS_USAGE",
+            details={
+                "contract_id": str(contract_id),
+                "product_id": str(product_id),
+                "quantity_used": quantity_used,
+            },
         )
 
 

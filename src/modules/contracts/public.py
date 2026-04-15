@@ -12,7 +12,9 @@ from src.modules.contracts.exceptions import (
     ContractNotFoundError,
     ContractRequiredError,
     ContractStatusTransitionError,
-    CreditLimitExceededError,
+    PriceItemHasUsageError,
+    ProductNotInContractError,
+    QuantityLimitExceededError,
 )
 from src.modules.contracts.models import Contract, ContractPriceItem, Invoice
 from src.modules.contracts.repositories import ContractRepository
@@ -31,7 +33,9 @@ __all__ = [
     "ContractNotFoundError",
     "ContractRequiredError",
     "ContractStatusTransitionError",
-    "CreditLimitExceededError",
+    "PriceItemHasUsageError",
+    "ProductNotInContractError",
+    "QuantityLimitExceededError",
     "Invoice",
     "InvoiceStatus",
 ]

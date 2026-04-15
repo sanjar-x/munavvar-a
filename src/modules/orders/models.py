@@ -114,15 +114,14 @@ class Order(BaseModel):
             "договор с привязанными заказами."
         ),
     )
-    reserved_credit_amount: Mapped[int | None] = mapped_column(
-        BIGINT,
-        nullable=True,
-        default=None,
+    quantities_reserved: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
         comment=(
-            "Зарезервированная сумма кредита при создании заказа. "
-            "Используется для корректного возврата credit_used "
-            "при частичной доставке или отмене. "
-            "NULL для не-CONTRACT заказов."
+            "Флаг: квоты по договору зарезервированы. "
+            "Защита от повторного возврата quantity_used. "
+            "True после create_order, False после отмены."
         ),
     )
     cancellation_reason: Mapped[str | None] = mapped_column(

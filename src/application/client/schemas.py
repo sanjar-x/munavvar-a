@@ -110,8 +110,6 @@ class ContractSummary(BaseModel):
     status: ContractStatus
     start_date: date
     end_date: date | None
-    credit_limit: int
-    credit_used: int
 
 
 class PhoneNumberShort(BaseModel):

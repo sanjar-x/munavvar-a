@@ -67,22 +67,6 @@ class Contract(BaseModel):
     )
 
     # Финансовые условия
-    credit_limit: Mapped[int] = mapped_column(
-        BigInteger,
-        nullable=False,
-        default=0,
-        comment="Кредитный лимит в сумах (UZS). 0 = без ограничений.",
-    )
-    credit_used: Mapped[int] = mapped_column(
-        BigInteger,
-        nullable=False,
-        default=0,
-        comment=(
-            "In-flight: сумма заказов в статусах NEW..ARRIVED, "
-            "ещё не попавших на счёт. Обновляется приложением "
-            "(не триггером) при create_order/complete_delivery."
-        ),
-    )
     payment_due_days: Mapped[int] = mapped_column(
         Integer,
         nullable=False,
@@ -168,23 +152,6 @@ class Contract(BaseModel):
 
     __table_args__ = (
         CheckConstraint(
-            "credit_limit >= 0",
-            name="ck_contract_credit_limit_non_neg",
-        ),
-        CheckConstraint(
-            "credit_used >= 0",
-            name="ck_contract_credit_used_non_neg",
-        ),
-        CheckConstraint(
-            "credit_used <= credit_limit OR credit_limit = 0",
-            name="ck_contract_credit_used_le_limit",
-        ),
-        # ⚠️ Если admin уменьшает credit_limit ниже текущего
-        # credit_used, любой последующий UPDATE строки contracts
-        # завершится ошибкой CHECK constraint violation.
-        # Решение: сервисный слой должен проверять
-        # new_credit_limit >= credit_used перед UPDATE.
-        CheckConstraint(
             "payment_due_days > 0",
             name="ck_contract_payment_due_days_pos",
         ),
@@ -226,6 +193,23 @@ class ContractPriceItem(BaseModel):
         nullable=False,
         comment="Договорная цена в сумах (UZS)",
     )
+    quantity: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=0,
+        comment=(
+            "Квота по договору (макс. кол-во единиц). 0 = без ограничений."
+        ),
+    )
+    quantity_used: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=0,
+        comment=(
+            "Использовано единиц: увеличивается при создании заказа, "
+            "уменьшается при отмене. Не сбрасывается при доставке."
+        ),
+    )
 
     contract: Mapped[Contract] = relationship(
         back_populates="price_items",
@@ -242,10 +226,22 @@ class ContractPriceItem(BaseModel):
             "price >= 0",
             name="ck_contract_price_item_price_non_neg",
         ),
+        CheckConstraint(
+            "quantity >= 0",
+            name="ck_contract_price_item_quantity_non_neg",
+        ),
+        CheckConstraint(
+            "quantity_used >= 0",
+            name="ck_contract_price_item_qty_used_non_neg",
+        ),
+        CheckConstraint(
+            "quantity_used <= quantity OR quantity = 0",
+            name="ck_contract_price_item_qty_used_le_qty",
+        ),
         {
             "comment": (
-                "Индивидуальный прайс-лист по договору. "
-                "При отсутствии позиции — фолбэк на products.price."
+                "Индивидуальный прайс-лист по договору с квотами. "
+                "При отсутствии позиции — заказ по договору невозможен."
             )
         },
     )

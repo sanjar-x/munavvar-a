@@ -15,6 +15,7 @@ from src.modules.contracts.exceptions import (
     DuplicateInvoicePeriodError,
     InvalidInvoiceTransitionError,
     InvoiceNotFoundError,
+    PriceItemHasUsageError,
 )
 from src.modules.contracts.models import (
     Contract,
@@ -42,8 +43,8 @@ class ContractService:
 
     Бизнес-инварианты:
     - Один клиент → один ACTIVE договор (partial unique index)
-    - credit_used: обновляется приложением (не триггером)
-    - credit_limit == 0 → безлимитный договор
+    - quantity_used: обновляется приложением (не триггером)
+    - quantity == 0 → безлимитная квота на продукт
     - Только ACTIVE договоры разрешают создание заказов
     - Snapshot pricing: цена фиксируется в OrderItem.unit_price
     """
@@ -77,7 +78,6 @@ class ContractService:
                     "status": ContractStatus.DRAFT,
                     "start_date": dto.start_date,
                     "end_date": dto.end_date,
-                    "credit_limit": dto.credit_limit,
                     "payment_due_days": dto.payment_due_days,
                     "legal_name": dto.legal_name,
                     "inn": dto.inn,
@@ -294,7 +294,7 @@ class ContractService:
         contract_id: uuid.UUID,
         reason: str = "Отмена по договору",
     ) -> None:
-        """Отмена NEW/ASSIGNED заказов и возврат кредита.
+        """Отмена NEW/ASSIGNED заказов и возврат квот.
 
         Вызывается при suspend/terminate/expire внутри
         открытого UoW. IN_TRANSIT/ARRIVED заказы не
@@ -303,14 +303,32 @@ class ContractService:
         Для каждого заказа пишет:
         - cancellation_reason на заказ
         - OrderStatusLog (аудит перехода)
+        - Возврат quantity_used по каждому продукту
         """
         cancelled = await self.uow.orders.bulk_cancel_by_contract(contract_id)
-        total_released = 0
-        for order_id, old_status, reserved in cancelled:
-            if reserved and reserved > 0:
-                total_released += reserved
 
-            # Аудит: причина + лог перехода
+        # Собираем order_ids с зарезервированными квотами
+        reserved_ids = [
+            oid for oid, _, had_reserved in cancelled if had_reserved
+        ]
+
+        # Загружаем позиции для возврата квот
+        if reserved_ids:
+            items = await self.uow.order_items.get_by_orders(reserved_ids)
+            # Агрегируем по product_id
+            product_totals: dict[uuid.UUID, int] = {}
+            for item in items:
+                pid = item.product_id
+                product_totals[pid] = (
+                    product_totals.get(pid, 0) + item.quantity
+                )
+            if product_totals:
+                await self.uow.price_items.decrement_quantities_used(
+                    contract_id,
+                    list(product_totals.items()),
+                )
+
+        for order_id, old_status, _ in cancelled:
             await self.uow.orders.update(
                 order_id,
                 {"cancellation_reason": reason},
@@ -323,16 +341,11 @@ class ContractService:
                 reason=reason,
             )
 
-        if total_released > 0:
-            await self.uow.contracts.decrement_credit_used(
-                contract_id, total_released
-            )
         if cancelled:
             log.info(
                 "inflight_orders_cancelled",
                 contract_id=str(contract_id),
                 cancelled_count=len(cancelled),
-                credit_released=total_released,
             )
 
         # Предупреждение о заказах в пути
@@ -359,27 +372,6 @@ class ContractService:
             data = dto.model_dump(exclude_unset=True)
             if not data:
                 return contract
-            # Защита от credit_limit < credit_used
-            new_limit = data.get("credit_limit")
-            if (
-                new_limit is not None
-                and new_limit > 0
-                and new_limit < contract.credit_used
-            ):
-                from src.core.exceptions import BadRequestError
-
-                raise BadRequestError(
-                    message=(
-                        "Новый кредитный лимит меньше текущего "
-                        "зарезервированного объёма. "
-                        "Дождитесь завершения заказов."
-                    ),
-                    error_code="CREDIT_LIMIT_BELOW_USED",
-                    details={
-                        "new_limit": new_limit,
-                        "credit_used": contract.credit_used,
-                    },
-                )
             updated = await self.uow.contracts.update(contract_id, data)
             await self.uow.commit()
             return updated
@@ -391,15 +383,25 @@ class ContractService:
         contract_id: uuid.UUID,
         product_id: uuid.UUID,
         price: int,
+        quantity: int = 0,
     ) -> ContractPriceItem:
-        """Установить/обновить договорную цену на товар (upsert)."""
+        """Установить/обновить договорную цену и квоту (upsert).
+
+        quantity=0 означает «без ограничений».
+        При обновлении: нельзя уменьшить quantity ниже quantity_used.
+        """
         async with self.uow:
             existing = await self.uow.price_items.get_by_contract_and_product(
                 contract_id, product_id
             )
             if existing:
+                if quantity > 0 and quantity < existing.quantity_used:
+                    raise PriceItemHasUsageError(
+                        contract_id, product_id, existing.quantity_used
+                    )
                 item = await self.uow.price_items.update(
-                    existing.id, {"price": price}
+                    existing.id,
+                    {"price": price, "quantity": quantity},
                 )
             else:
                 item = await self.uow.price_items.add(
@@ -407,6 +409,7 @@ class ContractService:
                         "contract_id": contract_id,
                         "product_id": product_id,
                         "price": price,
+                        "quantity": quantity,
                     }
                 )
             await self.uow.commit()
@@ -417,13 +420,20 @@ class ContractService:
         contract_id: uuid.UUID,
         product_id: uuid.UUID,
     ) -> None:
-        """Удалить позицию из прайс-листа → фолбэк на каталог."""
+        """Удалить позицию из прайс-листа.
+
+        Запрещено, если quantity_used > 0 (есть активные заказы).
+        """
         async with self.uow:
             item = await self.uow.price_items.get_by_contract_and_product(
                 contract_id, product_id
             )
             if not item:
                 raise ContractPriceItemNotFoundError(contract_id, product_id)
+            if item.quantity_used > 0:
+                raise PriceItemHasUsageError(
+                    contract_id, product_id, item.quantity_used
+                )
             await self.uow.price_items.delete(item.id)
             await self.uow.commit()
 

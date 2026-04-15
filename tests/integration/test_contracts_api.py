@@ -8,8 +8,8 @@ Coverage:
   3. Admin price-item upsert (PUT /prices/{product_id}).
   4. Full B2B order flow with CONTRACT payment method:
      - price override from contract price items is applied
-     - contract.credit_used incremented on order creation
-     - credit_used decremented when order is CANCELLED
+     - per-product quantity_used incremented on order creation
+     - quantity_used decremented when order is CANCELLED
   5. Bank payment via POST /cashbox/accept-payment (payment_method=bank).
 """
 
@@ -22,6 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.infrastructure.database.models import (
     Account,
     Contract,
+    ContractPriceItem,
     Identity,
     Inventory,
     User,
@@ -126,8 +127,6 @@ async def draft_contract(db_session: AsyncSession, b2b_user):
         number="HOD-TEST-001",
         status=ContractStatus.DRAFT,
         start_date="2025-01-01",
-        credit_limit=0,
-        credit_used=0,
         payment_due_days=30,
         legal_name="LLC Aqua Corp",
         inn="123456789",
@@ -174,7 +173,6 @@ async def test_admin_create_contract(
         json={
             "number": "HOD-2025-HTTP-001",
             "start_date": "2025-01-01",
-            "credit_limit": 0,
             "payment_due_days": 30,
             "legal_name": "LLC Aqua Corp",
             "inn": "123456789",
@@ -326,21 +324,23 @@ async def test_admin_set_price_item(
     resp = await client.put(
         f"/api/v1/backoffice/contracts/{active_contract.id}/prices/{water.id}",
         headers=headers,
-        json={"price": contract_price},
+        json={"price": contract_price, "quantity": 200},
     )
     assert resp.status_code in (200, 201), resp.text
     data = resp.json()
     assert data["price"] == contract_price
     assert data["product_id"] == str(water.id)
+    assert data["quantity"] == 200
 
-    # Upsert: update the price
+    # Upsert: update the price and quantity
     resp2 = await client.put(
         f"/api/v1/backoffice/contracts/{active_contract.id}/prices/{water.id}",
         headers=headers,
-        json={"price": 12_000},
+        json={"price": 12_000, "quantity": 300},
     )
     assert resp2.status_code in (200, 201), resp2.text
     assert resp2.json()["price"] == 12_000
+    assert resp2.json()["quantity"] == 300
 
 
 # ──────────────────────────────────────────────────────────────────
@@ -364,26 +364,22 @@ async def test_b2b_order_with_contract_price_override(
     Full B2B order with CONTRACT payment:
     - contract price (15 000) overrides catalog price (20 000)
     - total_amount = 15 000 × 2 = 30 000
-    - contract.credit_used is incremented by 30 000
+    - quantity_used on price item is incremented by 2
     """
     from sqlalchemy import select
 
     water = products["water"]
 
-    # 1. Set a contract price override (water: 15 000)
+    # 1. Set a contract price override (water: 15 000, quota: 100)
     headers = make_auth_headers(admin_user.id, Role.ADMIN)
     pi_resp = await client.put(
         f"/api/v1/backoffice/contracts/{active_contract.id}/prices/{water.id}",
         headers=headers,
-        json={"price": 15_000},
+        json={"price": 15_000, "quantity": 100},
     )
     assert pi_resp.status_code in (200, 201), pi_resp.text
 
-    # 2. Load stock isn't needed — we use capitalize_missing_tara
-    # (auto-capitalises missing tara bottles from VIRTUAL_VENDOR)
-
-    # 3. Create the B2B order via CLIENT API
-    #    (the client route now passes client_role=CLIENT_B2B)
+    # 2. Create the B2B order via CLIENT API
     b2b_headers = make_auth_headers(b2b_user.id, Role.CLIENT_B2B)
     order_resp = await client.post(
         "/api/v1/client/orders/",
@@ -402,16 +398,19 @@ async def test_b2b_order_with_contract_price_override(
     # Price override: 15 000 × 2
     assert order["total_amount"] == 30_000
 
-    # 4. Verify credit_used was incremented
+    # 3. Verify quantity_used was incremented
     result = await db_session.execute(
-        select(Contract.credit_used).where(Contract.id == active_contract.id)
+        select(ContractPriceItem.quantity_used).where(
+            ContractPriceItem.contract_id == active_contract.id,
+            ContractPriceItem.product_id == water.id,
+        )
     )
-    credit_used = result.scalar_one()
-    assert credit_used == 30_000
+    quantity_used = result.scalar_one()
+    assert quantity_used == 2
 
 
 @pytest.mark.anyio
-async def test_b2b_order_cancel_decrements_credit(
+async def test_b2b_order_cancel_releases_quantities(
     client: AsyncClient,
     admin_user,
     b2b_user,
@@ -423,12 +422,21 @@ async def test_b2b_order_cancel_decrements_credit(
     db_session: AsyncSession,
 ):
     """
-    When a CONTRACT order is cancelled, contract.credit_used is
-    decremented back to 0.
+    When a CONTRACT order is cancelled, the per-product
+    quantity_used is decremented back to 0.
     """
     from sqlalchemy import select
 
     water = products["water"]
+
+    # Set price item with quota
+    adm_headers = make_auth_headers(admin_user.id, Role.ADMIN)
+    pi_resp = await client.put(
+        f"/api/v1/backoffice/contracts/{active_contract.id}/prices/{water.id}",
+        headers=adm_headers,
+        json={"price": 15_000, "quantity": 50},
+    )
+    assert pi_resp.status_code in (200, 201), pi_resp.text
 
     # Create the order
     b2b_headers = make_auth_headers(b2b_user.id, Role.CLIENT_B2B)
@@ -454,12 +462,15 @@ async def test_b2b_order_cancel_decrements_credit(
     assert cancel_resp.status_code == 200, cancel_resp.text
     assert cancel_resp.json()["status"] == "cancelled"
 
-    # Verify credit_used is back to 0
+    # Verify quantity_used is back to 0
     result = await db_session.execute(
-        select(Contract.credit_used).where(Contract.id == active_contract.id)
+        select(ContractPriceItem.quantity_used).where(
+            ContractPriceItem.contract_id == active_contract.id,
+            ContractPriceItem.product_id == water.id,
+        )
     )
-    credit_used = result.scalar_one()
-    assert credit_used == 0
+    quantity_used = result.scalar_one()
+    assert quantity_used == 0
 
 
 @pytest.mark.anyio

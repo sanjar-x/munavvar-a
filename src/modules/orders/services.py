@@ -14,7 +14,8 @@ from src.modules.contracts.exceptions import (
     ContractExpiredError,
     ContractNotActiveError,
     ContractRequiredError,
-    CreditLimitExceededError,
+    ProductNotInContractError,
+    QuantityLimitExceededError,
 )
 from src.modules.contracts.models import Contract
 from src.modules.finances.enums import TransactionStatus
@@ -216,13 +217,25 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
                     client_id=client_id,
                     client_role=client.role,
                 )
-                # Переопределяем каталожные цены договорными ценами
-                contract_prices = (
-                    await self.uow.contracts.get_price_map_for_products(
+                # Блокируем позиции прайс-листа (ORDER BY product_id)
+                # и проверяем квоты + переопределяем цены
+                locked_items = (
+                    await self.uow.price_items.get_for_products_locked(
                         contract.id, product_ids
                     )
                 )
-                price_map.update(contract_prices)
+                price_item_map = {pi.product_id: pi for pi in locked_items}
+                # Все товары должны быть в договоре
+                for pid in product_ids:
+                    if pid not in price_item_map:
+                        raise ProductNotInContractError(
+                            contract_id=contract.id,
+                            product_id=pid,
+                        )
+                # Переопределяем каталожные цены договорными
+                price_map.update(
+                    {pi.product_id: pi.price for pi in locked_items}
+                )
 
             # 2. Высчитываем стоимость строк и итоговую сумму
             #    (ВНУТРИ транзакции, чтобы использовать
@@ -240,11 +253,12 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
                     }
                 )
 
-            # --- Блок B: Проверка и резервирование кредитного лимита ---
+            # --- Блок B: Проверка и резервирование квот ---
             if contract is not None:
-                await self._check_and_reserve_credit(
+                await self._check_and_reserve_quantities(
                     contract=contract,
-                    amount=total_amount,
+                    items=dto.items,
+                    price_item_map=price_item_map,
                 )
 
             if exchange_items:
@@ -324,9 +338,7 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
                     "total_amount": total_amount,
                     "capitalization_applied": capitalization_applied,
                     "contract_id": contract.id if contract else None,
-                    "reserved_credit_amount": (
-                        total_amount if contract else None
-                    ),
+                    "quantities_reserved": contract is not None,
                     "notes": dto.notes,
                 }
             )
@@ -642,6 +654,49 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
                 )
             )
 
+            # CONTRACT: проверяем квоту и используем договорную цену
+            if (
+                order.payment_method == PaymentMethod.CONTRACT
+                and order.contract_id is not None
+            ):
+                contract = await self.uow.contracts.get(
+                    order.contract_id, with_for_update=True
+                )
+                if not contract:
+                    raise ContractRequiredError(
+                        client_id=order.client_id,
+                    )
+                if contract.status != ContractStatus.ACTIVE:
+                    raise ContractNotActiveError(
+                        contract_id=contract.id,
+                        status=str(contract.status),
+                    )
+                locked = await self.uow.price_items.get_for_products_locked(
+                    contract.id, [product_id]
+                )
+                if not locked:
+                    raise ProductNotInContractError(
+                        contract_id=contract.id,
+                        product_id=product_id,
+                    )
+                pi = locked[0]
+                # Используем договорную цену
+                current_price = pi.price
+                # Проверяем квоту
+                if pi.quantity != 0:
+                    available = pi.quantity - pi.quantity_used
+                    if quantity > available:
+                        raise QuantityLimitExceededError(
+                            contract_id=contract.id,
+                            product_id=product_id,
+                            quantity_limit=pi.quantity,
+                            quantity_used=pi.quantity_used,
+                            requested=quantity,
+                        )
+                await self.uow.price_items.increment_quantities_used(
+                    [(pi.id, quantity)]
+                )
+
             if existing_item:
                 new_quantity = existing_item.quantity + quantity
                 await self.uow.order_items.update_quantity(
@@ -660,42 +715,6 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
             amount_to_add = current_price * quantity
             new_total = order.total_amount + amount_to_add
             update_data: dict[str, Any] = {"total_amount": new_total}
-
-            # CONTRACT: синхронизируем кредитный резерв
-            if (
-                order.payment_method == PaymentMethod.CONTRACT
-                and order.contract_id is not None
-            ):
-                contract = await self.uow.contracts.get(
-                    order.contract_id, with_for_update=True
-                )
-                if not contract:
-                    raise ContractRequiredError(
-                        client_id=order.client_id,
-                    )
-                if contract.status != ContractStatus.ACTIVE:
-                    raise ContractNotActiveError(
-                        contract_id=contract.id,
-                        status=str(contract.status),
-                    )
-                await self.uow.session.refresh(
-                    contract, attribute_names=["credit_used"]
-                )
-                if contract.credit_limit != 0:
-                    new_exposure = contract.credit_used + amount_to_add
-                    if new_exposure > contract.credit_limit:
-                        raise CreditLimitExceededError(
-                            contract_id=contract.id,
-                            credit_limit=contract.credit_limit,
-                            current_exposure=contract.credit_used,
-                            order_amount=amount_to_add,
-                        )
-                await self.uow.contracts.increment_credit_used(
-                    contract.id, amount_to_add
-                )
-                update_data["reserved_credit_amount"] = (
-                    order.reserved_credit_amount or 0
-                ) + amount_to_add
 
             await self.uow.orders.update(order_id, update_data)
 
@@ -764,18 +783,15 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
             new_total = max(0, order.total_amount - amount_to_subtract)
             update_data: dict[str, Any] = {"total_amount": new_total}
 
-            # CONTRACT: возвращаем часть кредитного резерва
+            # CONTRACT: возвращаем квоту по продукту
             if (
                 order.payment_method == PaymentMethod.CONTRACT
                 and order.contract_id is not None
-                and order.reserved_credit_amount
+                and order.quantities_reserved
             ):
-                await self.uow.contracts.decrement_credit_used(
-                    order.contract_id, amount_to_subtract
-                )
-                update_data["reserved_credit_amount"] = max(
-                    0,
-                    (order.reserved_credit_amount or 0) - amount_to_subtract,
+                await self.uow.price_items.decrement_quantities_used(
+                    order.contract_id,
+                    [(product_id, existing_item.quantity)],
                 )
 
             await self.uow.orders.update(order_id, update_data)
@@ -913,11 +929,9 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
                     cast(Order, updated_order), actual_items
                 )
 
-            # CONTRACT: возврат зарезервированного кредита при отмене.
-            # decrement вызывается только если заказ ещё не был исполнен
-            # (DELIVERED/PICKUP_COMPLETED уже сделали decrement в settlement).
-            # Защита от повторного вызова: проверяем reserved_credit_amount > 0
-            # и обнуляем его атомарно после декремента.
+            # CONTRACT: возврат зарезервированных квот при отмене.
+            # Квоты возвращаются только при отмене до доставки.
+            # Защита от повторного вызова: проверяем quantities_reserved
             _settled_statuses = {
                 OrderStatus.DELIVERED,
                 OrderStatus.PICKUP_COMPLETED,
@@ -927,16 +941,10 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
                 and old_status != OrderStatus.CANCELLED
                 and order.payment_method == PaymentMethod.CONTRACT
                 and order.contract_id is not None
-                and order.reserved_credit_amount
+                and order.quantities_reserved
                 and old_status not in _settled_statuses
             ):
-                await self.uow.contracts.decrement_credit_used(
-                    order.contract_id,
-                    order.reserved_credit_amount,
-                )
-                await self.uow.orders.update(
-                    order.id, {"reserved_credit_amount": 0}
-                )
+                await self._release_order_quantities(order)
 
             # Сохраняем причину отмены
             if new_status == OrderStatus.CANCELLED and cancellation_reason:
@@ -998,36 +1006,54 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
 
         return contract
 
-    async def _check_and_reserve_credit(
+    async def _check_and_reserve_quantities(
         self,
         contract: Contract,
-        amount: int,
+        items: list,
+        price_item_map: dict[uuid.UUID, Any],
     ) -> None:
-        """Проверить кредитный лимит и зарезервировать сумму.
+        """Проверить квоты и зарезервировать количества.
 
         Вызывается ВНУТРИ async with self.uow ПОСЛЕ
-        _get_and_validate_contract_locked (строка уже залочена).
-        credit_limit = 0 означает безлимитный кредит.
+        get_for_products_locked (строки уже залочены).
+        quantity = 0 означает «без ограничений».
         """
-        # Принудительно перечитываем credit_used из БД после захвата
-        # блокировки. Это защищает от stale identity-map: если объект
-        # был загружен ранее в той же сессии, session.refresh()
-        # гарантирует актуальное значение на момент проверки.
-        await self.uow.session.refresh(
-            contract, attribute_names=["credit_used"]
-        )
+        increments: list[tuple[uuid.UUID, int]] = []
+        for item in items:
+            pi = price_item_map[item.product_id]
+            if pi.quantity != 0:
+                available = pi.quantity - pi.quantity_used
+                if item.quantity > available:
+                    raise QuantityLimitExceededError(
+                        contract_id=contract.id,
+                        product_id=item.product_id,
+                        quantity_limit=pi.quantity,
+                        quantity_used=pi.quantity_used,
+                        requested=item.quantity,
+                    )
+            increments.append((pi.id, item.quantity))
 
-        if contract.credit_limit != 0:
-            total_exposure = contract.credit_used + amount
-            if total_exposure > contract.credit_limit:
-                raise CreditLimitExceededError(
-                    contract_id=contract.id,
-                    credit_limit=contract.credit_limit,
-                    current_exposure=contract.credit_used,
-                    order_amount=amount,
-                )
+        await self.uow.price_items.increment_quantities_used(increments)
 
-        await self.uow.contracts.increment_credit_used(contract.id, amount)
+    async def _release_order_quantities(
+        self,
+        order: Order,
+    ) -> None:
+        """Возвращает зарезервированные квоты для CONTRACT-заказа.
+
+        Загружает позиции заказа, формирует декременты по product_id
+        и обнуляет флаг quantities_reserved.
+        """
+        items = await self.uow.order_items.get_by_order(order.id)
+        if items:
+            decrements: list[tuple[uuid.UUID, int]] = [
+                (it.product_id, it.quantity) for it in items
+            ]
+            await self.uow.price_items.decrement_quantities_used(
+                order.contract_id,  # type: ignore[arg-type]
+                decrements,
+            )
+        await self.uow.orders.update(order.id, {"quantities_reserved": False})
 
     @staticmethod
     def _build_returnable_items(
@@ -1449,19 +1475,9 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
 
         await self.uow.financial_transactions.add_many(financial_txns)
 
-        # При CONTRACT-оплате — возвращаем зарезервированный кредит,
-        # т.к. долг теперь перешёл в финансовый баланс клиента.
-        if (
-            order.payment_method == PaymentMethod.CONTRACT
-            and order.contract_id is not None
-            and order.reserved_credit_amount
-        ):
-            await self.uow.contracts.decrement_credit_used(
-                order.contract_id, order.reserved_credit_amount
-            )
-            await self.uow.orders.update(
-                order.id, {"reserved_credit_amount": 0}
-            )
+        # Квоты по договору не возвращаются при доставке —
+        # quantity_used является «пожизненным» счётчиком.
+        # Возврат происходит только при отмене заказа.
 
     async def _process_pickup_settlement(self, order: Order) -> None:
         """
@@ -1542,18 +1558,8 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
 
         await self.uow.financial_transactions.add_many(financial_txns)
 
-        # При CONTRACT-оплате — возвращаем зарезервированный кредит.
-        if (
-            order.payment_method == PaymentMethod.CONTRACT
-            and order.contract_id is not None
-            and order.reserved_credit_amount
-        ):
-            await self.uow.contracts.decrement_credit_used(
-                order.contract_id, order.reserved_credit_amount
-            )
-            await self.uow.orders.update(
-                order.id, {"reserved_credit_amount": 0}
-            )
+        # Квоты по договору не возвращаются при самовывозе —
+        # quantity_used является «пожизненным» счётчиком.
 
     async def check_tara_availability(
         self, dto: TaraCheckRequest, client_id: uuid.UUID | None = None
@@ -1777,16 +1783,9 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
                     if (
                         order.payment_method == PaymentMethod.CONTRACT
                         and order.contract_id is not None
-                        and order.reserved_credit_amount
+                        and order.quantities_reserved
                     ):
-                        await self.uow.contracts.decrement_credit_used(
-                            order.contract_id,
-                            order.reserved_credit_amount,
-                        )
-                        await self.uow.orders.update(
-                            order.id,
-                            {"reserved_credit_amount": 0},
-                        )
+                        await self._release_order_quantities(order)
 
                     await self.uow.orders.update(
                         order.id,

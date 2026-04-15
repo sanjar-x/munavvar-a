@@ -2,9 +2,9 @@
 
 Tests the B2B contract integration in BaseOrderService.create_order():
 - TOCTOU-safe contract lock (Block A)
-- Credit limit reservation (Block B)
+- Per-product quantity quota reservation (Block B)
 - Price override from contract price items
-- Credit decrement on cancel/delivery
+- Quantity release on cancel
 """
 
 import uuid
@@ -19,7 +19,8 @@ from src.modules.contracts.enums import ContractStatus
 from src.modules.contracts.exceptions import (
     ContractNotActiveError,
     ContractRequiredError,
-    CreditLimitExceededError,
+    ProductNotInContractError,
+    QuantityLimitExceededError,
 )
 from src.modules.orders.enums import OrderStatus, PaymentMethod
 from src.modules.orders.schemas import Item, OrderCreate
@@ -47,17 +48,31 @@ def make_contract(
     contract_id: uuid.UUID | None = None,
     client_id: uuid.UUID | None = None,
     status: ContractStatus = ContractStatus.ACTIVE,
-    credit_limit: int = 0,
-    credit_used: int = 0,
     end_date: date | None = None,
 ) -> SimpleNamespace:
     return SimpleNamespace(
         id=contract_id or uuid.uuid4(),
         client_id=client_id or uuid.uuid4(),
         status=status,
-        credit_limit=credit_limit,
-        credit_used=credit_used,
         end_date=end_date,
+    )
+
+
+def make_price_item(
+    price_item_id: uuid.UUID | None = None,
+    contract_id: uuid.UUID | None = None,
+    product_id: uuid.UUID | None = None,
+    price: int = 20_000,
+    quantity: int = 0,
+    quantity_used: int = 0,
+) -> SimpleNamespace:
+    return SimpleNamespace(
+        id=price_item_id or uuid.uuid4(),
+        contract_id=contract_id or uuid.uuid4(),
+        product_id=product_id or uuid.uuid4(),
+        price=price,
+        quantity=quantity,
+        quantity_used=quantity_used,
     )
 
 
@@ -67,7 +82,7 @@ def make_order(
     payment_method: PaymentMethod = PaymentMethod.CONTRACT,
     total_amount: int = 20_000,
     contract_id: uuid.UUID | None = None,
-    reserved_credit_amount: int | None = None,
+    quantities_reserved: bool = False,
 ) -> SimpleNamespace:
     return SimpleNamespace(
         id=order_id or uuid.uuid4(),
@@ -75,7 +90,7 @@ def make_order(
         payment_method=payment_method,
         total_amount=total_amount,
         contract_id=contract_id,
-        reserved_credit_amount=reserved_credit_amount,
+        quantities_reserved=quantities_reserved,
         items=[],
         sale_type=None,
         courier_id=None,
@@ -85,22 +100,25 @@ def make_order(
 
 def _make_fake_uow(
     contract: SimpleNamespace | None = None,
-    price_map: dict | None = None,
+    price_items: list[SimpleNamespace] | None = None,
     saved_order: SimpleNamespace | None = None,
 ) -> MagicMock:
-    """
-    Build a MagicMock UoW with all repos needed by
+    """Build a MagicMock UoW with all repos needed by
     BaseOrderService.create_order().
     """
     uow = MagicMock()
 
     # Contracts repo
-    uow.contracts.get_active_for_client = AsyncMock(return_value=contract)
-    uow.contracts.get_price_map_for_products = AsyncMock(
-        return_value=price_map or {}
+    uow.contracts.get_active_for_client = AsyncMock(
+        return_value=contract,
     )
-    uow.contracts.increment_credit_used = AsyncMock()
-    uow.contracts.decrement_credit_used = AsyncMock()
+
+    # Price items repo
+    uow.price_items.get_for_products_locked = AsyncMock(
+        return_value=price_items or [],
+    )
+    uow.price_items.increment_quantities_used = AsyncMock()
+    uow.price_items.decrement_quantities_used = AsyncMock()
 
     # Orders repo
     order_obj = saved_order or SimpleNamespace(
@@ -108,7 +126,7 @@ def _make_fake_uow(
         total_amount=20_000,
         payment_method=PaymentMethod.CONTRACT,
         contract_id=(contract.id if contract else None),
-        reserved_credit_amount=(20_000 if contract else None),
+        quantities_reserved=contract is not None,
         status=OrderStatus.NEW,
         items=[],
         sale_type=None,
@@ -116,20 +134,23 @@ def _make_fake_uow(
         client_id=uuid.uuid4(),
     )
     uow.orders.add = AsyncMock(return_value=order_obj)
-    uow.orders.get_with_details = AsyncMock(return_value=order_obj)
+    uow.orders.get_with_details = AsyncMock(
+        return_value=order_obj,
+    )
     uow.orders.update_status = AsyncMock(return_value=order_obj)
     uow.orders.update = AsyncMock(return_value=order_obj)
 
     # Order items repo
     uow.order_items.add_many = AsyncMock()
+    uow.order_items.get_by_order = AsyncMock(return_value=[])
 
     # Inventories repo (for tara exchange check)
     fake_inv = SimpleNamespace(id=uuid.uuid4(), balances=[])
     uow.inventories.get_inventory_with_balances = AsyncMock(
-        return_value=fake_inv
+        return_value=fake_inv,
     )
     uow.inventories.get_vendor_inventory = AsyncMock(
-        return_value=SimpleNamespace(id=uuid.uuid4())
+        return_value=SimpleNamespace(id=uuid.uuid4()),
     )
 
     # Misc
@@ -172,7 +193,9 @@ def _make_user_service(
 
 class TestContractRoleGuard:
     @pytest.mark.asyncio
-    async def test_contract_payment_b2c_raises_bad_request(self):
+    async def test_contract_payment_b2c_raises_bad_request(
+        self,
+    ):
         """CLIENT_B2C cannot use CONTRACT payment method."""
         product = make_product()
         uow = _make_fake_uow()
@@ -203,7 +226,9 @@ class TestContractRoleGuard:
 
 class TestContractValidation:
     @pytest.mark.asyncio
-    async def test_contract_required_when_no_active_contract(self):
+    async def test_contract_required_when_no_active_contract(
+        self,
+    ):
         """No ACTIVE contract → ContractRequiredError."""
         product = make_product()
         uow = _make_fake_uow(contract=None)
@@ -232,7 +257,9 @@ class TestContractValidation:
     async def test_suspended_contract_raises_not_active(self):
         """SUSPENDED contract → ContractNotActiveError."""
         product = make_product()
-        suspended = make_contract(status=ContractStatus.SUSPENDED)
+        suspended = make_contract(
+            status=ContractStatus.SUSPENDED,
+        )
         uow = _make_fake_uow(contract=suspended)
         catalog_svc = _make_catalog_service([product])
 
@@ -264,7 +291,7 @@ class TestContractValidation:
         product = make_product()
         expired_contract = make_contract(
             status=ContractStatus.ACTIVE,
-            end_date=date(2020, 1, 1),  # past date
+            end_date=date(2020, 1, 1),
         )
         uow = _make_fake_uow(contract=expired_contract)
         catalog_svc = _make_catalog_service([product])
@@ -289,20 +316,28 @@ class TestContractValidation:
         assert exc.value.error_code == "CONTRACT_EXPIRED"
 
 
-# ─── Tests: credit limit ──────────────────────────────────
+# ─── Tests: per-product quantity quota ────────────────────
 
 
-class TestCreditLimit:
+class TestQuantityLimit:
     @pytest.mark.asyncio
-    async def test_credit_limit_exceeded_raises(self):
-        """Order amount > remaining credit → CreditLimitExceededError."""
-        product = make_product(price=100_000)
-        active = make_contract(
-            status=ContractStatus.ACTIVE,
-            credit_limit=150_000,
-            credit_used=100_000,  # only 50_000 left
+    async def test_quantity_limit_exceeded_raises(self):
+        """quantity_used + order_qty > quantity →
+        QuantityLimitExceededError."""
+        product = make_product(price=20_000)
+        active = make_contract(status=ContractStatus.ACTIVE)
+
+        pi = make_price_item(
+            contract_id=active.id,
+            product_id=product.id,
+            price=20_000,
+            quantity=10,
+            quantity_used=8,  # only 2 left
         )
-        uow = _make_fake_uow(contract=active)
+        uow = _make_fake_uow(
+            contract=active,
+            price_items=[pi],
+        )
         catalog_svc = _make_catalog_service([product])
 
         user_svc = _make_user_service(role=Role.CLIENT_B2B)
@@ -313,31 +348,38 @@ class TestCreditLimit:
         )
         dto = OrderCreate(
             items=[
-                Item(product_id=product.id, quantity=1)
-            ],  # 100_000 > 50_000 remaining
+                Item(product_id=product.id, quantity=5),
+            ],  # 5 > 2 available
             payment_method=PaymentMethod.CONTRACT,
             client_inventory_id=uuid.uuid4(),
         )
 
-        with pytest.raises(CreditLimitExceededError) as exc:
+        with pytest.raises(QuantityLimitExceededError) as exc:
             await svc.create_order(
                 client_id=uuid.uuid4(),
                 dto=dto,
             )
-        assert exc.value.error_code == "CREDIT_LIMIT_EXCEEDED"
-        # Ensure credit was NOT incremented (rollback scenario)
-        uow.contracts.increment_credit_used.assert_not_awaited()
+        assert exc.value.error_code == "QUANTITY_LIMIT_EXCEEDED"
+        # Quantities NOT incremented on failure
+        uow.price_items.increment_quantities_used.assert_not_awaited()
 
     @pytest.mark.asyncio
-    async def test_unlimited_credit_zero_limit_always_passes(self):
-        """credit_limit=0 means unlimited — large order still passes."""
-        product = make_product(price=99_999_999)
-        active = make_contract(
-            status=ContractStatus.ACTIVE,
-            credit_limit=0,  # unlimited
-            credit_used=0,
+    async def test_unlimited_quantity_zero_passes(self):
+        """quantity=0 means unlimited — large order passes."""
+        product = make_product(price=20_000)
+        active = make_contract(status=ContractStatus.ACTIVE)
+
+        pi = make_price_item(
+            contract_id=active.id,
+            product_id=product.id,
+            price=20_000,
+            quantity=0,  # unlimited
+            quantity_used=0,
         )
-        uow = _make_fake_uow(contract=active)
+        uow = _make_fake_uow(
+            contract=active,
+            price_items=[pi],
+        )
         catalog_svc = _make_catalog_service([product])
 
         user_svc = _make_user_service(role=Role.CLIENT_B2B)
@@ -347,29 +389,36 @@ class TestCreditLimit:
             user_service=user_svc,
         )
         dto = OrderCreate(
-            items=[Item(product_id=product.id, quantity=1)],
+            items=[
+                Item(product_id=product.id, quantity=9999),
+            ],
             payment_method=PaymentMethod.CONTRACT,
             client_inventory_id=uuid.uuid4(),
         )
 
-        # Should not raise
         await svc.create_order(
             client_id=uuid.uuid4(),
             dto=dto,
         )
-        # Credit was incremented
-        uow.contracts.increment_credit_used.assert_awaited_once()
+        uow.price_items.increment_quantities_used.assert_awaited_once()
 
     @pytest.mark.asyncio
-    async def test_credit_exactly_at_limit_passes(self):
-        """credit_used + amount == credit_limit → allowed."""
-        product = make_product(price=50_000)
-        active = make_contract(
-            status=ContractStatus.ACTIVE,
-            credit_limit=150_000,
-            credit_used=100_000,  # 50_000 remaining = exact match
+    async def test_quantity_exactly_at_limit_passes(self):
+        """quantity_used + order_qty == quantity → allowed."""
+        product = make_product(price=20_000)
+        active = make_contract(status=ContractStatus.ACTIVE)
+
+        pi = make_price_item(
+            contract_id=active.id,
+            product_id=product.id,
+            price=20_000,
+            quantity=10,
+            quantity_used=7,  # 3 remaining = exact match
         )
-        uow = _make_fake_uow(contract=active)
+        uow = _make_fake_uow(
+            contract=active,
+            price_items=[pi],
+        )
         catalog_svc = _make_catalog_service([product])
 
         user_svc = _make_user_service(role=Role.CLIENT_B2B)
@@ -379,7 +428,9 @@ class TestCreditLimit:
             user_service=user_svc,
         )
         dto = OrderCreate(
-            items=[Item(product_id=product.id, quantity=1)],
+            items=[
+                Item(product_id=product.id, quantity=3),
+            ],
             payment_method=PaymentMethod.CONTRACT,
             client_inventory_id=uuid.uuid4(),
         )
@@ -388,17 +439,54 @@ class TestCreditLimit:
             client_id=uuid.uuid4(),
             dto=dto,
         )
-        uow.contracts.increment_credit_used.assert_awaited_once()
+        uow.price_items.increment_quantities_used.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_product_not_in_contract_raises(self):
+        """Product missing from contract price list →
+        ProductNotInContractError."""
+        product = make_product(price=20_000)
+        active = make_contract(status=ContractStatus.ACTIVE)
+
+        # Empty price items — product not in contract
+        uow = _make_fake_uow(
+            contract=active,
+            price_items=[],
+        )
+        catalog_svc = _make_catalog_service([product])
+
+        user_svc = _make_user_service(role=Role.CLIENT_B2B)
+        svc = BaseOrderService(
+            uow=uow,
+            catalog_service=catalog_svc,
+            user_service=user_svc,
+        )
+        dto = OrderCreate(
+            items=[
+                Item(product_id=product.id, quantity=1),
+            ],
+            payment_method=PaymentMethod.CONTRACT,
+            client_inventory_id=uuid.uuid4(),
+        )
+
+        with pytest.raises(ProductNotInContractError) as exc:
+            await svc.create_order(
+                client_id=uuid.uuid4(),
+                dto=dto,
+            )
+        assert exc.value.error_code == "PRODUCT_NOT_IN_CONTRACT"
 
 
-# ─── Tests: price override ────────────────────────────────
+# ─── Tests: contract price override ──────────────────────
 
 
 class TestContractPriceOverride:
     @pytest.mark.asyncio
-    async def test_contract_price_overrides_catalog_price(self):
-        """If contract has a price for a product, it replaces catalog
-        price in the OrderItem snapshot and total_amount."""
+    async def test_contract_price_overrides_catalog_price(
+        self,
+    ):
+        """Contract price item replaces catalog price in the
+        OrderItem snapshot and total_amount."""
         product_id = uuid.uuid4()
         product = make_product(
             product_id=product_id,
@@ -406,10 +494,14 @@ class TestContractPriceOverride:
         )
         active = make_contract(status=ContractStatus.ACTIVE)
 
-        # Contract overrides to 15_000
+        pi = make_price_item(
+            contract_id=active.id,
+            product_id=product_id,
+            price=15_000,  # contract overrides to 15_000
+        )
         uow = _make_fake_uow(
             contract=active,
-            price_map={product_id: 15_000},
+            price_items=[pi],
         )
         catalog_svc = _make_catalog_service([product])
 
@@ -430,56 +522,20 @@ class TestContractPriceOverride:
             dto=dto,
         )
 
-        # Check order was added with total = 15_000 * 2 = 30_000
+        # total = 15_000 * 2 = 30_000
         order_add_call = uow.orders.add.call_args[0][0]
         assert order_add_call["total_amount"] == 30_000
 
-        # OrderItem snapshot should use contract price
+        # OrderItem snapshot uses contract price
         items_call = uow.order_items.add_many.call_args[0][0]
         assert items_call[0]["unit_price"] == 15_000
 
     @pytest.mark.asyncio
-    async def test_catalog_price_used_when_no_contract_override(
+    async def test_contract_id_and_quantities_reserved_saved(
         self,
     ):
-        """If no contract price for product → catalog price used."""
-        product_id = uuid.uuid4()
-        product = make_product(
-            product_id=product_id,
-            price=20_000,
-        )
-        active = make_contract(status=ContractStatus.ACTIVE)
-
-        # No price override
-        uow = _make_fake_uow(contract=active, price_map={})
-        catalog_svc = _make_catalog_service([product])
-
-        user_svc = _make_user_service(role=Role.CLIENT_B2B)
-        svc = BaseOrderService(
-            uow=uow,
-            catalog_service=catalog_svc,
-            user_service=user_svc,
-        )
-        dto = OrderCreate(
-            items=[Item(product_id=product_id, quantity=1)],
-            payment_method=PaymentMethod.CONTRACT,
-            client_inventory_id=uuid.uuid4(),
-        )
-
-        await svc.create_order(
-            client_id=uuid.uuid4(),
-            dto=dto,
-        )
-
-        order_add_call = uow.orders.add.call_args[0][0]
-        assert order_add_call["total_amount"] == 20_000
-
-        items_call = uow.order_items.add_many.call_args[0][0]
-        assert items_call[0]["unit_price"] == 20_000
-
-    @pytest.mark.asyncio
-    async def test_contract_id_saved_on_order(self):
-        """contract_id is stored on the order row."""
+        """contract_id and quantities_reserved=True are stored
+        on the order row."""
         product_id = uuid.uuid4()
         product = make_product(product_id=product_id)
         contract_id = uuid.uuid4()
@@ -488,7 +544,14 @@ class TestContractPriceOverride:
             status=ContractStatus.ACTIVE,
         )
 
-        uow = _make_fake_uow(contract=active)
+        pi = make_price_item(
+            contract_id=contract_id,
+            product_id=product_id,
+        )
+        uow = _make_fake_uow(
+            contract=active,
+            price_items=[pi],
+        )
         catalog_svc = _make_catalog_service([product])
 
         user_svc = _make_user_service(role=Role.CLIENT_B2B)
@@ -510,10 +573,10 @@ class TestContractPriceOverride:
 
         order_add_call = uow.orders.add.call_args[0][0]
         assert order_add_call["contract_id"] == contract_id
-        assert order_add_call["reserved_credit_amount"] == 20_000
+        assert order_add_call["quantities_reserved"] is True
 
 
-# ─── Tests: cash/card order doesn't touch contracts ──────
+# ─── Tests: non-contract orders ──────────────────────────
 
 
 class TestNonContractOrders:
@@ -542,33 +605,43 @@ class TestNonContractOrders:
         )
 
         uow.contracts.get_active_for_client.assert_not_awaited()
-        uow.contracts.increment_credit_used.assert_not_awaited()
+        uow.price_items.get_for_products_locked.assert_not_awaited()
+        uow.price_items.increment_quantities_used.assert_not_awaited()
 
         order_add_call = uow.orders.add.call_args[0][0]
         assert order_add_call.get("contract_id") is None
-        assert order_add_call.get("reserved_credit_amount") is None
+        assert order_add_call["quantities_reserved"] is False
 
 
-# ─── Tests: credit decrement on cancel ───────────────────
+# ─── Tests: quantity release on cancel ───────────────────
 
 
-class TestCreditDecrement:
+class TestQuantityRelease:
     @pytest.mark.asyncio
-    async def test_cancel_order_decrements_credit(self):
-        """Cancelling a CONTRACT order in NEW status returns credit
-        using reserved_credit_amount (not total_amount)."""
+    async def test_cancel_order_releases_quantities(self):
+        """Cancelling a CONTRACT order in NEW status releases
+        reserved quantities via order items."""
         from src.modules.orders.enums import SaleType
 
         contract_id = uuid.uuid4()
         order_id = uuid.uuid4()
+        product_id = uuid.uuid4()
+
+        order_item = SimpleNamespace(
+            id=uuid.uuid4(),
+            order_id=order_id,
+            product_id=product_id,
+            quantity=3,
+            unit_price=20_000,
+        )
 
         order = SimpleNamespace(
             id=order_id,
             status=OrderStatus.NEW,
             payment_method=PaymentMethod.CONTRACT,
             contract_id=contract_id,
-            total_amount=50_000,
-            reserved_credit_amount=80_000,  # original reservation
+            total_amount=60_000,
+            quantities_reserved=True,
             items=[],
             sale_type=SaleType.DELIVERY,
             courier_id=None,
@@ -576,9 +649,16 @@ class TestCreditDecrement:
         )
 
         uow = _make_fake_uow()
-        uow.orders.get_with_details = AsyncMock(return_value=order)
-        uow.orders.update_status = AsyncMock(return_value=order)
+        uow.orders.get_with_details = AsyncMock(
+            return_value=order,
+        )
+        uow.orders.update_status = AsyncMock(
+            return_value=order,
+        )
         uow.orders.update = AsyncMock()
+        uow.order_items.get_by_order = AsyncMock(
+            return_value=[order_item],
+        )
 
         catalog_svc = _make_catalog_service([])
         user_svc = _make_user_service()
@@ -593,30 +673,36 @@ class TestCreditDecrement:
             new_status=OrderStatus.CANCELLED,
         )
 
-        # Must use reserved_credit_amount, not total_amount
-        uow.contracts.decrement_credit_used.assert_awaited_once_with(
-            contract_id, 80_000
+        # Order items fetched to build decrements
+        uow.order_items.get_by_order.assert_awaited_once_with(
+            order_id,
         )
-        # reserved_credit_amount zeroed after release
-        uow.orders.update.assert_awaited_once_with(
-            order_id, {"reserved_credit_amount": 0}
+        # Quantities decremented per product
+        uow.price_items.decrement_quantities_used.assert_awaited_once_with(
+            contract_id,
+            [(product_id, 3)],
+        )
+        # quantities_reserved flag cleared
+        uow.orders.update.assert_any_await(
+            order_id,
+            {"quantities_reserved": False},
         )
 
     @pytest.mark.asyncio
-    async def test_cancel_delivered_order_does_not_decrement(self):
-        """DELIVERED order already decremented — cancel must NOT
-        decrement again."""
+    async def test_cancel_cash_order_skips_quantity_release(
+        self,
+    ):
+        """CASH order cancel does not touch quantity release."""
         from src.modules.orders.enums import SaleType
 
-        contract_id = uuid.uuid4()
         order_id = uuid.uuid4()
-
         order = SimpleNamespace(
             id=order_id,
-            status=OrderStatus.DELIVERED,
-            payment_method=PaymentMethod.CONTRACT,
-            contract_id=contract_id,
-            total_amount=50_000,
+            status=OrderStatus.NEW,
+            payment_method=PaymentMethod.CASH,
+            contract_id=None,
+            total_amount=20_000,
+            quantities_reserved=False,
             items=[],
             sale_type=SaleType.DELIVERY,
             courier_id=None,
@@ -624,8 +710,12 @@ class TestCreditDecrement:
         )
 
         uow = _make_fake_uow()
-        uow.orders.get_with_details = AsyncMock(return_value=order)
-        uow.orders.update_status = AsyncMock(return_value=order)
+        uow.orders.get_with_details = AsyncMock(
+            return_value=order,
+        )
+        uow.orders.update_status = AsyncMock(
+            return_value=order,
+        )
 
         catalog_svc = _make_catalog_service([])
         user_svc = _make_user_service()
@@ -635,19 +725,11 @@ class TestCreditDecrement:
             user_service=user_svc,
         )
 
-        # DELIVERED → CANCELLED is not a valid transition, but we test
-        # the guard logic directly; the FSM check happens before credit
-        # decrement. Use a mock order where DELIVERED is "old_status".
-        # Bypass FSM check by directly calling the internal path:
-        # Test that the settled status guard works.
-        # old_status = DELIVERED → skip decrement
-        order.status = OrderStatus.NEW
-        order.payment_method = PaymentMethod.CASH  # CASH: no decrement
         await svc.update_status(
             order_id=order_id,
             new_status=OrderStatus.CANCELLED,
         )
-        uow.contracts.decrement_credit_used.assert_not_awaited()
+        uow.price_items.decrement_quantities_used.assert_not_awaited()
 
     @pytest.mark.asyncio
     async def test_empty_cart_raises(self):
@@ -663,11 +745,12 @@ class TestCreditDecrement:
         )
 
         dto = OrderCreate(
-            items=[Item(product_id=uuid.uuid4(), quantity=1)],
+            items=[
+                Item(product_id=uuid.uuid4(), quantity=1),
+            ],
             payment_method=PaymentMethod.CASH,
             client_inventory_id=uuid.uuid4(),
         )
-        # Clear items after creation to simulate empty cart
         dto.items = []
 
         with pytest.raises(BadRequestError):
@@ -682,8 +765,11 @@ class TestCreditDecrement:
 
 class TestDoubleCancelProtection:
     @pytest.mark.asyncio
-    async def test_cancel_already_cancelled_skips_decrement(self):
-        """CANCELLED → CANCELLED (no-op) must NOT decrement credit."""
+    async def test_cancel_already_cancelled_skips_release(
+        self,
+    ):
+        """CANCELLED → CANCELLED (no-op) must NOT release
+        quantities."""
         from src.modules.orders.enums import SaleType
 
         contract_id = uuid.uuid4()
@@ -695,7 +781,7 @@ class TestDoubleCancelProtection:
             payment_method=PaymentMethod.CONTRACT,
             contract_id=contract_id,
             total_amount=50_000,
-            reserved_credit_amount=0,  # already released
+            quantities_reserved=False,  # already released
             items=[],
             sale_type=SaleType.DELIVERY,
             courier_id=None,
@@ -703,8 +789,12 @@ class TestDoubleCancelProtection:
         )
 
         uow = _make_fake_uow()
-        uow.orders.get_with_details = AsyncMock(return_value=order)
-        uow.orders.update_status = AsyncMock(return_value=order)
+        uow.orders.get_with_details = AsyncMock(
+            return_value=order,
+        )
+        uow.orders.update_status = AsyncMock(
+            return_value=order,
+        )
 
         catalog_svc = _make_catalog_service([])
         user_svc = _make_user_service()
@@ -720,14 +810,14 @@ class TestDoubleCancelProtection:
             new_status=OrderStatus.CANCELLED,
         )
 
-        uow.contracts.decrement_credit_used.assert_not_awaited()
+        uow.price_items.decrement_quantities_used.assert_not_awaited()
 
     @pytest.mark.asyncio
-    async def test_cancel_with_zero_reservation_skips_decrement(
+    async def test_cancel_with_quantities_not_reserved_skips(
         self,
     ):
-        """If reserved_credit_amount=0 (already released),
-        cancel skips decrement."""
+        """If quantities_reserved=False (already released),
+        cancel skips release."""
         from src.modules.orders.enums import SaleType
 
         contract_id = uuid.uuid4()
@@ -739,7 +829,7 @@ class TestDoubleCancelProtection:
             payment_method=PaymentMethod.CONTRACT,
             contract_id=contract_id,
             total_amount=50_000,
-            reserved_credit_amount=0,  # edge: already zeroed
+            quantities_reserved=False,
             items=[],
             sale_type=SaleType.DELIVERY,
             courier_id=None,
@@ -747,8 +837,12 @@ class TestDoubleCancelProtection:
         )
 
         uow = _make_fake_uow()
-        uow.orders.get_with_details = AsyncMock(return_value=order)
-        uow.orders.update_status = AsyncMock(return_value=order)
+        uow.orders.get_with_details = AsyncMock(
+            return_value=order,
+        )
+        uow.orders.update_status = AsyncMock(
+            return_value=order,
+        )
 
         catalog_svc = _make_catalog_service([])
         user_svc = _make_user_service()
@@ -763,20 +857,28 @@ class TestDoubleCancelProtection:
             new_status=OrderStatus.CANCELLED,
         )
 
-        # reserved_credit_amount=0 → no decrement
-        uow.contracts.decrement_credit_used.assert_not_awaited()
+        # quantities_reserved=False → no release
+        uow.price_items.decrement_quantities_used.assert_not_awaited()
 
 
-# ─── Tests: reserved_credit_amount in create_order ───────
+# ─── Tests: quantities_reserved in create_order ──────────
 
 
-class TestReservedCreditAmount:
+class TestQuantitiesReserved:
     @pytest.mark.asyncio
-    async def test_create_order_stores_reserved_credit(self):
-        """CONTRACT order creation stores reserved_credit_amount."""
+    async def test_create_order_sets_quantities_reserved(self):
+        """CONTRACT order sets quantities_reserved=True."""
         product = make_product(price=25_000)
         active = make_contract(status=ContractStatus.ACTIVE)
-        uow = _make_fake_uow(contract=active)
+        pi = make_price_item(
+            contract_id=active.id,
+            product_id=product.id,
+            price=25_000,
+        )
+        uow = _make_fake_uow(
+            contract=active,
+            price_items=[pi],
+        )
         catalog_svc = _make_catalog_service([product])
 
         user_svc = _make_user_service(role=Role.CLIENT_B2B)
@@ -786,7 +888,9 @@ class TestReservedCreditAmount:
             user_service=user_svc,
         )
         dto = OrderCreate(
-            items=[Item(product_id=product.id, quantity=2)],
+            items=[
+                Item(product_id=product.id, quantity=2),
+            ],
             payment_method=PaymentMethod.CONTRACT,
             client_inventory_id=uuid.uuid4(),
         )
@@ -797,11 +901,13 @@ class TestReservedCreditAmount:
         )
 
         order_add_call = uow.orders.add.call_args[0][0]
-        assert order_add_call["reserved_credit_amount"] == 50_000
+        assert order_add_call["quantities_reserved"] is True
 
     @pytest.mark.asyncio
-    async def test_cash_order_has_null_reserved_credit(self):
-        """CASH order has no reserved_credit_amount."""
+    async def test_cash_order_has_false_quantities_reserved(
+        self,
+    ):
+        """CASH order has quantities_reserved=False."""
         product = make_product()
         uow = _make_fake_uow(contract=None)
         catalog_svc = _make_catalog_service([product])
@@ -813,7 +919,9 @@ class TestReservedCreditAmount:
             user_service=user_svc,
         )
         dto = OrderCreate(
-            items=[Item(product_id=product.id, quantity=1)],
+            items=[
+                Item(product_id=product.id, quantity=1),
+            ],
             payment_method=PaymentMethod.CASH,
             client_inventory_id=uuid.uuid4(),
         )
@@ -824,4 +932,4 @@ class TestReservedCreditAmount:
         )
 
         order_add_call = uow.orders.add.call_args[0][0]
-        assert order_add_call["reserved_credit_amount"] is None
+        assert order_add_call["quantities_reserved"] is False

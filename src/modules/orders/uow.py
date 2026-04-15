@@ -1,6 +1,9 @@
 # src/modules/orders/uow.py
 from src.infrastructure.database.uow import BaseSQLAlchemyUoW
-from src.modules.contracts.repositories import ContractRepository
+from src.modules.contracts.repositories import (
+    ContractPriceItemRepository,
+    ContractRepository,
+)
 from src.modules.finances.repositories import (
     AccountRepository,
 )
@@ -33,6 +36,7 @@ class BaseOrderUnitOfWork(BaseSQLAlchemyUoW):
     accounts: AccountRepository
     financial_transactions: FinancialTransactionRepository
     contracts: ContractRepository
+    price_items: ContractPriceItemRepository
 
     async def __aenter__(self) -> BaseOrderUnitOfWork:
         await super().__aenter__()
@@ -50,5 +54,6 @@ class BaseOrderUnitOfWork(BaseSQLAlchemyUoW):
             session=self.session
         )
         self.contracts = ContractRepository(session=self.session)
+        self.price_items = ContractPriceItemRepository(session=self.session)
 
         return self
