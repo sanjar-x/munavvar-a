@@ -579,16 +579,16 @@ CLIENT_B2B                   API                         DB
 ### 13.6 Клиентское управление заказами (NEW v3.0)
 
 ```
-CLIENT (B2B/B2C)              API                         DB
-  │                            │                           │
+CLIENT (B2B/B2C)                 API                         DB
+  │                               │                           │
   ├── GET /client/orders/history ►│                        │
-  │   ?skip=0&limit=20&status=.. ├── filter by user_id ──► │
-  │   ◄── OrdersResponse ──── │  {total_count, orders[]}  │
-  │                            │                           │
-  ├── GET /client/orders/{id} ─► │                          │
-  │                            ├── check owner (IDOR) ───► │
-  │   ◄── 200 OrderResponse ── │                           │
-  │                            │                           │
+  │   ?skip=0&limit=20&status=..  ├── filter by user_id ──► │
+  │   ◄──── OrdersResponse ────── │  {total_count, orders[]}  │
+  │                               │                           │
+  ├── GET /client/orders/{id} ──► │                          │
+  │                               ├── check owner (IDOR) ───► │
+  │   ◄─── 200 OrderResponse ──── │                           │
+  │                               │                           │
   ├── POST /client/orders/{id}/cancel ►│                   │
   │   {reason?: "..."} ◄────── ├── check owner (IDOR) ──► │
   │                            ├── status ∈ {NEW,ASSIGNED}│

@@ -232,11 +232,11 @@ class ContractPriceItem(BaseModel):
         ),
         CheckConstraint(
             "quantity_used >= 0",
-            name="ck_contract_price_item_qty_used_non_neg",
+            name="ck_contract_price_item_quantity_used_non_neg",
         ),
         CheckConstraint(
             "quantity_used <= quantity OR quantity = 0",
-            name="ck_contract_price_item_qty_used_le_qty",
+            name="ck_contract_price_item_quantity_used_le_limit",
         ),
         {
             "comment": (
