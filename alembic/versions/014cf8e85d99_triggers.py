@@ -29,45 +29,65 @@ _SCRIPTS = (
 )
 
 
-def _read_sql(name: str) -> str:
-    return (_SCRIPTS / name).read_text()
+def _split_sql(raw: str) -> list[str]:
+    """Split multi-statement SQL respecting $$ dollar-quoting.
+
+    asyncpg cannot execute multiple statements in one prepared
+    statement, so we must split CREATE FUNCTION / DROP TRIGGER /
+    CREATE TRIGGER into separate calls.
+    """
+    stmts: list[str] = []
+    buf: list[str] = []
+    inside_dollar = False
+
+    for line in raw.splitlines():
+        buf.append(line)
+        # Odd number of $$ on a line toggles the flag
+        if line.count("$$") % 2 == 1:
+            inside_dollar = not inside_dollar
+        # Statement boundary: line ends with `;` outside $$
+        if not inside_dollar and line.rstrip().endswith(";"):
+            stmt = "\n".join(buf).strip()
+            if stmt:
+                stmts.append(stmt)
+            buf = []
+
+    # Leftover (shouldn't happen with well-formed SQL)
+    tail = "\n".join(buf).strip()
+    if tail:
+        stmts.append(tail)
+    return stmts
+
+
+def _exec_sql_file(name: str) -> None:
+    """Read a .sql file and execute each statement separately."""
+    raw = (_SCRIPTS / name).read_text()
+    for stmt in _split_sql(raw):
+        op.execute(text(stmt))
 
 
 # ---------------------------------------------------------------------------
-# Downgrade SQL
+# Downgrade SQL (single statements — safe to inline)
 # ---------------------------------------------------------------------------
-DROP_ACCOUNT_BALANCES_TRIGGER = """
-DROP TRIGGER IF EXISTS trigger_update_account_balances
-    ON transactions;
-"""
-
-DROP_INVENTORY_BALANCES_TRIGGER = """
-DROP TRIGGER IF EXISTS trigger_update_inventory_balances
-    ON stock_transactions;
-"""
-
-DROP_ACCOUNT_FUNCTION = """
-DROP FUNCTION IF EXISTS update_account_balances();
-"""
-
-DROP_INVENTORY_FUNCTION = """
-DROP FUNCTION IF EXISTS update_inventory_balances();
-"""
+_DROP_ACCOUNT_TRIGGER = (
+    "DROP TRIGGER IF EXISTS trigger_update_account_balances ON transactions"
+)
+_DROP_INVENTORY_TRIGGER = (
+    "DROP TRIGGER IF EXISTS"
+    " trigger_update_inventory_balances"
+    " ON stock_transactions"
+)
+_DROP_ACCOUNT_FN = "DROP FUNCTION IF EXISTS update_account_balances()"
+_DROP_INVENTORY_FN = "DROP FUNCTION IF EXISTS update_inventory_balances()"
 
 
 def upgrade() -> None:
-    # Читаем SQL из source-файлов (содержат $$-кавычки,
-    # которые asyncpg ломает если вставить как строку).
-    # text() говорит SQLAlchemy не парсить параметры.
-    account_sql = _read_sql("update_account_balances.sql")
-    inventory_sql = _read_sql("update_inventory_balances.sql")
-
-    op.execute(text(account_sql))
-    op.execute(text(inventory_sql))
+    _exec_sql_file("update_account_balances.sql")
+    _exec_sql_file("update_inventory_balances.sql")
 
 
 def downgrade() -> None:
-    op.execute(text(DROP_INVENTORY_BALANCES_TRIGGER))
-    op.execute(text(DROP_INVENTORY_FUNCTION))
-    op.execute(text(DROP_ACCOUNT_BALANCES_TRIGGER))
-    op.execute(text(DROP_ACCOUNT_FUNCTION))
+    op.execute(text(_DROP_INVENTORY_TRIGGER))
+    op.execute(text(_DROP_INVENTORY_FN))
+    op.execute(text(_DROP_ACCOUNT_TRIGGER))
+    op.execute(text(_DROP_ACCOUNT_FN))
