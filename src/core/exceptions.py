@@ -5,16 +5,24 @@ from typing import Any
 from fastapi import status  # Оставляем только статусы для удобства
 
 
+def _sanitize_value(value: Any) -> Any:
+    """Рекурсивно приводит UUID → str на любой глубине вложенности."""
+    if isinstance(value, uuid.UUID):
+        return str(value)
+    if isinstance(value, dict):
+        return {k: _sanitize_value(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_sanitize_value(item) for item in value]
+    return value
+
+
 def _sanitize_details(
     details: dict[str, Any] | None,
 ) -> dict[str, Any]:
     """UUID → str, чтобы json.dumps в JSONResponse не падал."""
     if not details:
         return {}
-    return {
-        k: str(v) if isinstance(v, uuid.UUID) else v
-        for k, v in details.items()
-    }
+    return {k: _sanitize_value(v) for k, v in details.items()}
 
 
 class AppException(Exception):
