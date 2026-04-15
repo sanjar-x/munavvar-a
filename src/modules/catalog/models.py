@@ -1,6 +1,5 @@
 # src/modules/catalog/models.py
 import uuid
-from typing import Any
 
 from sqlalchemy import CheckConstraint, Enum, ForeignKey, Index, String
 from sqlalchemy.dialects.postgresql import BIGINT, JSONB, UUID
@@ -49,11 +48,11 @@ class Product(BaseModel):
         default=0,
         comment="Базовая стоимость товара",
     )
-    attributes: Mapped[dict[str, Any]] = mapped_column(
+    attributes: Mapped[list[dict[str, str]]] = mapped_column(
         JSONB,
         nullable=False,
-        server_default="{}",
-        comment="Динамические характеристики (объем, бренд, цвет, мощность)",
+        server_default="[]",
+        comment="Парные характеристики [{label, value}, ...]",
     )
 
     returnable_item: Mapped[Product | None] = relationship(
@@ -66,6 +65,10 @@ class Product(BaseModel):
 
     __table_args__ = (
         CheckConstraint("price >= 0", name="ck_product_price_pos"),
+        CheckConstraint(
+            "jsonb_typeof(attributes) = 'array'",
+            name="ck_product_attributes_is_array",
+        ),
         Index(
             "idx_product_attributes_gin", "attributes", postgresql_using="gin"
         ),

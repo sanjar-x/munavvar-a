@@ -1,7 +1,7 @@
 import enum
 import uuid
 from datetime import date, datetime
-from typing import Any, Literal
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field
 
@@ -49,7 +49,7 @@ class Product(BaseModel):
     type: ProductType
     name: str
     price: int
-    attributes: dict[str, Any] = Field(default_factory=dict)
+    attributes: list[dict[str, str]] = Field(default_factory=list)
 
 
 class Balance(BaseModel):

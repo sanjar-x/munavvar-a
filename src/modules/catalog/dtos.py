@@ -18,7 +18,7 @@ class ProductDTO:
     type: ProductType
     name: str
     price: int
-    attributes: dict[str, Any]
+    attributes: list[dict[str, str]]
     is_active: bool
     created_at: datetime
     updated_at: datetime
@@ -32,7 +32,7 @@ def product_to_dto(product: Any) -> ProductDTO:
         type=product.type,
         name=product.name,
         price=product.price,
-        attributes=dict(product.attributes),
+        attributes=list(product.attributes),
         is_active=product.is_active,
         created_at=product.created_at,
         updated_at=product.updated_at,

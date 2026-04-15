@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from typing import Annotated, Any
+from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -162,11 +162,16 @@ class InventoryProduct(BaseModel):
         title="Название товара",
         examples=["Вода MunavvarA 19Л ПК"],
     )
-    attributes: dict[str, Any] = Field(
-        default_factory=dict,
+    attributes: list[dict[str, str]] = Field(
+        default_factory=list,
         title="Характеристики",
-        description="JSON с физическими свойствами (volume, material)",
-        examples=[{"volume": 18.9, "material": "PC"}],
+        description=("Список парных характеристик товара"),
+        examples=[
+            [
+                {"label": "Объём", "value": "19Л"},
+                {"label": "Материал", "value": "ПК"},
+            ]
+        ],
     )
     quantity: int = Field(description="Количество")
 

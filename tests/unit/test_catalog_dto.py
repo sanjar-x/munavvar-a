@@ -18,7 +18,7 @@ class TestProductDTO:
             type=ProductType.WATER,
             name="Test Water",
             price=20000,
-            attributes={"volume": 18.9},
+            attributes=[{"label": "Объём", "value": "18.9Л"}],
             is_active=True,
             created_at=datetime.now(UTC),
             updated_at=datetime.now(UTC),
@@ -47,9 +47,9 @@ class TestProductDTO:
             "updated_at",
         ]
 
-    def test_converter_copies_attributes_dict(self):
-        """Converter must copy mutable dict, not share reference."""
-        original_attrs = {"volume": 18.9}
+    def test_converter_copies_attributes_list(self):
+        """Converter must copy mutable list, not share reference."""
+        original_attrs = [{"label": "Объём", "value": "18.9Л"}]
 
         class FakeProduct:
             id = uuid.uuid4()

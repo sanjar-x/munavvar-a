@@ -70,17 +70,26 @@ class ProductRepository(BaseRepository[Product]):
         result = await self.session.execute(query)
         return (result.scalar() or 0) > 0
 
-    async def get_by_json_attribute(
-        self, key: str, value: Any, skip: int = 0, limit: int = 100
+    async def get_by_attribute(
+        self,
+        label: str,
+        value: str,
+        skip: int = 0,
+        limit: int = 100,
     ) -> Sequence[Product]:
+        """Поиск товаров по парной характеристике внутри JSONB-массива.
+
+        Использует оператор @> (contains) — GIN-индекс ускоряет.
+        Пример: await uow.products.get_by_attribute("Материал", "ПК")
         """
-        DBA МАГИЯ: Поиск товаров по значению внутри JSONB поля attributes.
-        Например: await uow.products.get_by_json_attribute("material", "PC")
-        """
+        from sqlalchemy.dialects.postgresql import JSONB as PG_JSONB
+        from sqlalchemy.sql.expression import cast
+
+        pattern = cast([{"label": label, "value": value}], PG_JSONB)
         query = (
             select(self.model)
             .where(
-                self.model.attributes.op("->>")(key) == str(value),
+                self.model.attributes.op("@>")(pattern),
                 self.model.is_active.is_(True),
             )
             .offset(skip)

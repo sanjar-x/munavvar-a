@@ -1,7 +1,6 @@
 # src/modules/catalog/services.py
 import uuid
 from collections.abc import Sequence
-from typing import Any
 
 from src.common.service import BaseService
 from src.infrastructure.database.models import Product
@@ -71,8 +70,8 @@ class CatalogService(
 
     async def search_by_attribute(
         self,
-        key: str,
-        value: Any,
+        label: str,
+        value: str,
         skip: int = 0,
         limit: int = 100,
     ) -> Sequence[ProductDTO]:
@@ -82,8 +81,8 @@ class CatalogService(
         или компрессорного типа охлаждения.
         """
         async with self.uow:
-            products = await self._repo.get_by_json_attribute(
-                key=key,
+            products = await self._repo.get_by_attribute(
+                label=label,
                 value=value,
                 skip=skip,
                 limit=limit,

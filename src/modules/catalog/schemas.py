@@ -1,10 +1,28 @@
 import uuid
 from datetime import datetime
-from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from src.modules.catalog.enums import ProductType
+
+
+class ProductAttribute(BaseModel):
+    """Парная характеристика товара (label → value)."""
+
+    label: str = Field(
+        ...,
+        min_length=1,
+        max_length=255,
+        title="Название характеристики",
+        examples=["Объём"],
+    )
+    value: str = Field(
+        ...,
+        min_length=1,
+        max_length=255,
+        title="Значение характеристики",
+        examples=["19Л"],
+    )
 
 
 # --- БАЗОВАЯ СХЕМА ---
@@ -24,11 +42,19 @@ class ProductBase(BaseModel):
         description="Цена в сумах (UZS), целое число",
         examples=[20000],
     )
-    attributes: dict[str, Any] = Field(
-        default_factory=dict,
+    attributes: list[ProductAttribute] = Field(
+        default_factory=list,
         title="Характеристики",
-        description="JSON с физическими свойствами (volume, material)",
-        examples=[{"volume": 18.9, "material": "PC"}],
+        description=(
+            "Список парных характеристик товара"
+            " (объём, материал, мощность и т.д.)"
+        ),
+        examples=[
+            [
+                {"label": "Объём", "value": "19Л"},
+                {"label": "Материал", "value": "ПК"},
+            ]
+        ],
     )
     returnable_item_id: uuid.UUID | None = Field(
         default=None,
@@ -49,7 +75,7 @@ class ProductUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=255)
     type: ProductType | None = Field(default=None)
     price: int | None = Field(default=None, ge=0)
-    attributes: dict[str, Any] | None = Field(default=None)
+    attributes: list[ProductAttribute] | None = Field(default=None)
     returnable_item_id: uuid.UUID | None = Field(default=None)
 
 
