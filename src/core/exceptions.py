@@ -1,7 +1,20 @@
 # src/core/exceptions.py
+import uuid
 from typing import Any
 
 from fastapi import status  # Оставляем только статусы для удобства
+
+
+def _sanitize_details(
+    details: dict[str, Any] | None,
+) -> dict[str, Any]:
+    """UUID → str, чтобы json.dumps в JSONResponse не падал."""
+    if not details:
+        return {}
+    return {
+        k: str(v) if isinstance(v, uuid.UUID) else v
+        for k, v in details.items()
+    }
 
 
 class AppException(Exception):
@@ -17,7 +30,7 @@ class AppException(Exception):
         self.message: str = message
         self.status_code: int = status_code
         self.error_code: str = error_code
-        self.details: dict[str, Any] | None = details or {}
+        self.details: dict[str, Any] = _sanitize_details(details)
         super().__init__(self.message)
 
 
