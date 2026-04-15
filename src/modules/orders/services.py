@@ -1119,8 +1119,8 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
         """
         Автоматическое создание и проведение StockTransfer при доставке.
         1. [NEW] Корректировка заказа (если переданы actual_items)
-        2. Списание полной воды: Курьер -> Клиент
-        3. Начисление физической тары клиенту: VIRTUAL_VENDOR -> Клиент
+        2. Начисление тары курьеру: VIRTUAL_VENDOR -> Курьер
+        3. Доставка воды + тары: Курьер -> Клиент
         4. Забор пустой тары: Клиент -> Курьер
         """
         if not order.courier_id:
@@ -1214,12 +1214,28 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
         if stock_shortages:
             raise InsufficientStockError(shortages=stock_shortages)
 
-        # 1. Накладная на доставку (Full Water OUT): Курьер → Клиент
+        # 1. Начисляем тару курьеру из виртуального склада
+        returnable_items = self._build_returnable_items(order.items)
+        if returnable_items:
+            vendor_inv = await self.uow.inventories.get_vendor_inventory()
+            await self._create_stock_transfer(
+                from_id=vendor_inv.id,
+                to_id=courier_inventory.id,
+                transfer_type=TransferType.INITIAL_BALANCE,
+                items=returnable_items,
+                created_by_id=order.courier_id,
+                accepted_by_id=order.courier_id,
+                order_id=order.id,
+                reason="Container issued with delivery",
+            )
+
+        # 2. Накладная на доставку (вода + тара): Курьер → Клиент
         delivery_items = [
             {"product_id": i.product_id, "quantity": i.quantity}
             for i in order.items
             if i.quantity > 0
         ]
+        delivery_items.extend(returnable_items)
         await self._create_stock_transfer(
             from_id=courier_inventory.id,
             to_id=order.client_inventory_id,
@@ -1230,24 +1246,8 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
             order_id=order.id,
         )
 
-        # 2. Начисляем клиенту физическую тару, связанную с доставленной водой
-        returnable_items = self._build_returnable_items(order.items)
+        # 3. Возврат тары: Клиент → Курьер
         if returnable_items:
-            vendor_inv = await self.uow.inventories.get_vendor_inventory()
-
-            # б) VIRTUAL_VENDOR → Клиент (начисление физической тары)
-            await self._create_stock_transfer(
-                from_id=vendor_inv.id,
-                to_id=order.client_inventory_id,
-                transfer_type=TransferType.INITIAL_BALANCE,
-                items=returnable_items,
-                created_by_id=order.courier_id,
-                accepted_by_id=order.client_id,
-                order_id=order.id,
-                reason="Container issued with delivery",
-            )
-
-            # 3. в) Возврат тары: Клиент → Курьер
             await self._create_stock_transfer(
                 from_id=order.client_inventory_id,
                 to_id=courier_inventory.id,
@@ -1269,8 +1269,8 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
         """
         Складские перемещения при самовывозе:
         1. Проверка остатков на складе
-        2. WAREHOUSE_SALE: Warehouse → Client (товар)
-        3. VIRTUAL_VENDOR -> Client (физическая тара в полной бутыли)
+        2. INITIAL_BALANCE: VIRTUAL_VENDOR → Warehouse (тара)
+        3. WAREHOUSE_SALE: Warehouse → Client (товар + тара)
         4. WAREHOUSE_TARA_RETURN: Client → Warehouse (тара)
         5. Финансовая проводка
         """
@@ -1304,13 +1304,28 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
         if stock_shortages:
             raise InsufficientStockError(shortages=stock_shortages)
 
+        # 1. Начисляем тару на склад из виртуального склада
+        returnable_items = self._build_returnable_items(order.items)
+        if returnable_items:
+            vendor_inv = await self.uow.inventories.get_vendor_inventory()
+            await self._create_stock_transfer(
+                from_id=vendor_inv.id,
+                to_id=warehouse.id,
+                transfer_type=TransferType.INITIAL_BALANCE,
+                items=returnable_items,
+                created_by_id=completed_by_id,
+                accepted_by_id=completed_by_id,
+                order_id=order.id,
+                reason="Container issued with warehouse pickup",
+            )
+
+        # 2. WAREHOUSE_SALE: Warehouse → Client (товар + тара)
         sale_items = [
             {"product_id": i.product_id, "quantity": i.quantity}
             for i in order.items
             if i.quantity > 0
         ]
-
-        # 1. WAREHOUSE_SALE: Warehouse → Client
+        sale_items.extend(returnable_items)
         await self._create_stock_transfer(
             from_id=warehouse.id,
             to_id=order.client_inventory_id,
@@ -1321,23 +1336,7 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
             order_id=order.id,
         )
 
-        # 2. Начисляем клиенту физическую тару, связанную с выданной водой
-        returnable_items = self._build_returnable_items(order.items)
         if returnable_items:
-            vendor_inv = await self.uow.inventories.get_vendor_inventory()
-
-            # VIRTUAL_VENDOR → Client (начисление физической тары)
-            await self._create_stock_transfer(
-                from_id=vendor_inv.id,
-                to_id=order.client_inventory_id,
-                transfer_type=TransferType.INITIAL_BALANCE,
-                items=returnable_items,
-                created_by_id=completed_by_id,
-                accepted_by_id=order.client_id,
-                order_id=order.id,
-                reason="Container issued with warehouse pickup",
-            )
-
             # 3. WAREHOUSE_TARA_RETURN: Client → Warehouse
             await self._create_stock_transfer(
                 from_id=order.client_inventory_id,
@@ -1349,12 +1348,11 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
                 order_id=order.id,
             )
 
-        # 5. Cleanup: списание товара с Walk-in inventory
+        # 4. Cleanup: списание товара с Walk-in inventory
         # Анонимный покупатель забрал товар и ушёл — обнуляем его inventory.
-        # Тара включается в cleanup: в шаге 2 из VENDOR была выдана новая тара
-        # (полная бутыль), которую анонимный покупатель забрал. Она списывается
-        # в VIRTUAL_LOSS. Старая тара (из create_warehouse_sale) уже
-        # возвращена на склад в шаге 3.
+        # Списываем воду (из заказа) + тару (из capitalize_missing_tara при
+        # создании заказа); после возврата тары на склад (шаг 3) у walk-in
+        # остаётся только capitalize-тара, которая уходит в VIRTUAL_LOSS.
         if order.client_id == WALKIN_USER_ID:
             loss_inv = await self.uow.inventories.get_loss_inventory()
             cleanup_items = [
@@ -1373,7 +1371,7 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
                 order_id=order.id,
             )
 
-        # 6. Финансовое закрытие
+        # 5. Финансовое закрытие
         await self._process_pickup_settlement(order)
 
     async def _process_financial_settlement(self, order: Order) -> None:
