@@ -213,9 +213,7 @@ class InventoryRepository(BaseRepository[Inventory]):
                 self.model.is_active.is_(True),
             )
             .options(
-                selectinload(self.model.balances).joinedload(
-                    Balance.product
-                ),
+                selectinload(self.model.balances).joinedload(Balance.product),
             )
         )
         result = await self.session.execute(query)
@@ -399,6 +397,11 @@ class StockTransactionRepository(BaseRepository[StockTransaction]):
     async def archive(self, id: uuid.UUID) -> bool:
         raise NotImplementedError(
             "Strict Ledger: Нельзя скрывать (archive). История иммутабельна."
+        )
+
+    async def restore(self, id: uuid.UUID) -> bool:
+        raise NotImplementedError(
+            "Strict Ledger: Нельзя восстанавливать. История иммутабельна."
         )
 
     async def delete(self, id: uuid.UUID) -> bool:

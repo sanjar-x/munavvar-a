@@ -1720,6 +1720,50 @@
         }
       }
     },
+    "/api/v1/backoffice/catalog/{product_id}/restore": {
+      "patch": {
+        "tags": [
+          "Backoffice | Catalog"
+        ],
+        "summary": "Восстановить товар из архива",
+        "description": "Восстановление товара (перевод is_active=True).",
+        "operationId": "restore_product_api_v1_backoffice_catalog__product_id__restore_patch",
+        "security": [
+          {
+            "OAuth2PasswordBearer": [
+              "catalog:write"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "name": "product_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Product Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/backoffice/transports/": {
       "get": {
         "tags": [

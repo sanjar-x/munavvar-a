@@ -63,6 +63,13 @@ class BaseService[
                 await self.uow.commit()
             return is_deleted
 
+    async def restore(self, id: uuid.UUID) -> bool:
+        async with self.uow:
+            is_restored = await self._repo.restore(id)
+            if is_restored:
+                await self.uow.commit()
+            return is_restored
+
     async def delete(self, id: uuid.UUID) -> bool:
         async with self.uow:
             is_deleted = await self._repo.delete(id)

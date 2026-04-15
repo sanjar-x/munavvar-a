@@ -86,7 +86,24 @@ async def archive_product(
     catalog_service: Annotated[CatalogService, Depends(get_catalog_service)],
 ):
     """Мягкое удаление товара из каталога (перевод is_active=False)."""
-    await catalog_service.archive(id=product_id)
+    await catalog_service.archive(product_id=product_id)
+
+
+@catalog_router.patch(
+    "/{product_id}/restore",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Восстановить товар из архива",
+)
+async def restore_product(
+    product_id: uuid.UUID,
+    current_admin: Annotated[
+        User,
+        Security(get_current_user, scopes=[Scope.CATALOG_WRITE]),
+    ],
+    catalog_service: Annotated[CatalogService, Depends(get_catalog_service)],
+):
+    """Восстановление товара (перевод is_active=True)."""
+    await catalog_service.restore(product_id=product_id)
 
 
 @catalog_router.delete(

@@ -137,6 +137,40 @@ class CatalogService(
             await self.uow.commit()
             return product_to_dto(new_product)
 
+    async def archive(self, product_id: uuid.UUID) -> None:
+        """Мягкое удаление товара (is_active=False)."""
+        async with self.uow:
+            product = await self._repo.get(product_id, active_only=False)
+            if not product:
+                raise ProductNotFoundError(product_id=product_id)
+            await self._repo.archive(product_id)
+            await self.uow.commit()
+
+    async def restore(self, product_id: uuid.UUID) -> None:
+        """Восстановление товара из архива (is_active=True).
+
+        Если товар типа WATER — проверяем, что привязанная
+        тара (CONTAINER) существует и активна.
+        """
+        async with self.uow:
+            product = await self._repo.get(product_id, active_only=False)
+            if not product:
+                raise ProductNotFoundError(product_id=product_id)
+
+            if product.returnable_item_id:
+                container = await self._repo.get(product.returnable_item_id)
+                if not container or not container.is_active:
+                    raise InvalidReturnableItemError(
+                        message=(
+                            "Невозможно восстановить товар:"
+                            " привязанная тара архивирована"
+                            " или не найдена"
+                        ),
+                    )
+
+            await self._repo.restore(product_id)
+            await self.uow.commit()
+
     async def hard_delete(self, product_id: uuid.UUID) -> bool:
         """
         Полное удаление товара из БД.

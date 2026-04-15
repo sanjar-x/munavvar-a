@@ -599,3 +599,16 @@ class TransactionRepository(BaseRepository[Transaction]):
         )
         result = await self.session.execute(query)
         return result.scalars().all()
+
+    # — Strict Ledger: финансовая история иммутабельна —
+
+    async def archive(self, id: uuid.UUID) -> bool:
+        raise NotImplementedError("Strict Ledger: Нельзя скрывать транзакции.")
+
+    async def restore(self, id: uuid.UUID) -> bool:
+        raise NotImplementedError(
+            "Strict Ledger: Нельзя восстанавливать транзакции."
+        )
+
+    async def delete(self, id: uuid.UUID) -> bool:
+        raise NotImplementedError("Strict Ledger: Нельзя удалять транзакции.")

@@ -105,6 +105,15 @@ class BaseRepository[ModelType: BaseModel]:
         result = await self.session.execute(statement)
         return result.rowcount > 0
 
+    async def restore(self, id: uuid.UUID) -> bool:
+        statement = (
+            update(self.model)
+            .where(self.model.id == id)
+            .values(is_active=True)
+        )
+        result = await self.session.execute(statement)
+        return result.rowcount > 0
+
     async def delete(self, id: uuid.UUID) -> bool:
         statement = delete(self.model).where(self.model.id == id)
         result = await self.session.execute(statement)
