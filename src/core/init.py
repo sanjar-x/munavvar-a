@@ -21,6 +21,33 @@ from src.modules.users.enums import AuthProvider, Role
 logger: Any = structlog.get_logger(__name__)
 
 
+async def _ensure_account(
+    session: Any,
+    user_id: Any,
+    acc_type: AccountType,
+    acc_name: str,
+) -> None:
+    """Создаёт счёт если он ещё не существует."""
+    query = select(Account).where(
+        Account.user_id == user_id,
+        Account.type == acc_type,
+        Account.name == acc_name,
+    )
+    existing = (await session.execute(query)).scalar_one_or_none()
+
+    if not existing:
+        session.add(
+            Account(
+                user_id=user_id,
+                type=acc_type,
+                name=acc_name,
+            )
+        )
+        logger.info(f"Счёт '{acc_name}' ({acc_type.name}) создан.")
+    else:
+        logger.info(f"Счёт '{acc_name}' уже существует.")
+
+
 async def init_data() -> None:
     logger.info("Начало инициализации базы данных...")
 
@@ -45,33 +72,23 @@ async def init_data() -> None:
             logger.info("Системный пользователь уже существует.")
 
         # --- 2. СОЗДАНИЕ ФИНАНСОВЫХ СЧЕТОВ ---
-        required_accounts = {
-            AccountType.REVENUE: "Выручка",
-            AccountType.CASH: "Кассовый счёт",
-            AccountType.CARD: "Карта",
-            AccountType.BANK: "Банковский счёт",
-            AccountType.EXPENSE: "Расходы",
-        }
+        required_accounts = [
+            (AccountType.REVENUE, "Выручка"),
+            (AccountType.CASH, "Кассовый счёт"),
+            (AccountType.CARD, "Карта"),
+            (AccountType.BANK, "Банковский счёт"),
+            (AccountType.EXPENSE, "Расходы (Наличные)"),
+            (AccountType.EXPENSE, "Расходы (Карта)"),
+            (AccountType.EXPENSE, "Расходы (Банк)"),
+        ]
 
-        for acc_type, acc_name in required_accounts.items():
-            query_acc = select(Account).where(
-                Account.user_id == system_user.id,
-                Account.type == acc_type,
+        for acc_type, acc_name in required_accounts:
+            await _ensure_account(
+                session,
+                system_user.id,
+                acc_type,
+                acc_name,
             )
-            existing_acc = (
-                await session.execute(query_acc)
-            ).scalar_one_or_none()
-
-            if not existing_acc:
-                new_acc = Account(
-                    user_id=system_user.id,
-                    type=acc_type,
-                    name=acc_name,
-                )
-                session.add(new_acc)
-                logger.info(f"Счёт '{acc_name}' ({acc_type.name}) создан.")
-            else:
-                logger.info(f"Счёт '{acc_name}' уже существует.")
 
         # --- 3. СОЗДАНИЕ ВИРТУАЛЬНЫХ СКЛАДОВ ---
         required_inventories = {
@@ -189,17 +206,23 @@ async def init_data() -> None:
                 )
                 session.add(admin_identity)
 
-                admin_account = Account(
-                    user_id=admin_user.id,
-                    type=AccountType.ADMIN,
-                    name="Счёт администратора",
+                await _ensure_account(
+                    session,
+                    admin_user.id,
+                    AccountType.ADMIN,
+                    "Счёт администратора",
                 )
-                session.add(admin_account)
 
                 logger.info(
                     f"Администратор с номером {admin_phone} успешно создан."
                 )
             else:
+                await _ensure_account(
+                    session,
+                    existing_admin_identity.user_id,
+                    AccountType.ADMIN,
+                    "Счёт администратора",
+                )
                 logger.info(
                     f"Администратор с номером {admin_phone} уже существует."
                 )
