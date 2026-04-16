@@ -37,11 +37,12 @@ class ClientService:
 
     async def create_client(self, data: ClientCreate) -> ClientResponse:
         async with self.uow:
-            existing_identity = await self.uow.identities.get_local_by_id(
-                data.phone
-            )
-            if existing_identity:
-                raise ClientAlreadyExistsError(phone=data.phone)
+            if data.phone is not None:
+                existing_identity = await self.uow.identities.get_local_by_id(
+                    data.phone
+                )
+                if existing_identity:
+                    raise ClientAlreadyExistsError(phone=data.phone)
 
             client_data = {
                 "username": data.username,
@@ -50,10 +51,11 @@ class ClientService:
 
             client = await self.uow.users.add(client_data)
 
-            await self.uow.identities.add_local(
-                user_id=client.id,
-                provider_identity_id=data.phone,
-            )
+            if data.phone is not None:
+                await self.uow.identities.add_local(
+                    user_id=client.id,
+                    provider_identity_id=data.phone,
+                )
 
             await self.uow.accounts.create_client_account(
                 client_id=client.id,
@@ -158,11 +160,12 @@ class ClientService:
         """
         async with self.uow:
             # 1. Проверка дубликата телефона (Identity)
-            existing_identity = await self.uow.identities.get_local_by_id(
-                data.phone
-            )
-            if existing_identity:
-                raise ClientAlreadyExistsError(phone=data.phone)
+            if data.phone is not None:
+                existing_identity = await self.uow.identities.get_local_by_id(
+                    data.phone
+                )
+                if existing_identity:
+                    raise ClientAlreadyExistsError(phone=data.phone)
 
             # 2. Создание User (Role: CLIENT)
             user_data = {
@@ -171,11 +174,12 @@ class ClientService:
             }
             client = await self.uow.users.add(user_data)
 
-            # 3. Создание Identity
-            await self.uow.identities.add_local(
-                user_id=client.id,
-                provider_identity_id=data.phone,
-            )
+            # 3. Создание Identity (только если указан телефон)
+            if data.phone is not None:
+                await self.uow.identities.add_local(
+                    user_id=client.id,
+                    provider_identity_id=data.phone,
+                )
 
             # 4. Создание Финансового счета
             await self.uow.accounts.create_client_account(

@@ -3,7 +3,13 @@ import uuid
 from datetime import date, datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, computed_field
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    computed_field,
+    model_validator,
+)
 
 from src.modules.catalog.enums import ProductType
 from src.modules.contracts.enums import ContractStatus
@@ -19,8 +25,13 @@ class ClientRole(enum.StrEnum):
 
 class ClientCreate(BaseModel):
     username: str = Field(..., description="ФИО или Название компании")
-    phone: str = Field(
-        ..., description="Номер телефона клиента (будет Identity)"
+    phone: str | None = Field(
+        default=None,
+        min_length=1,
+        description=(
+            "Номер телефона клиента (будет Identity)."
+            " Обязателен для B2C, опционален для B2B."
+        ),
     )
     role: ClientRole = Field(
         default=ClientRole.CLIENT_B2C,
@@ -32,6 +43,12 @@ class ClientCreate(BaseModel):
     address_name: str | None = Field(
         default=None, description="Название первого адреса (Инвентаря)"
     )
+
+    @model_validator(mode="after")
+    def _b2c_requires_phone(self) -> "ClientCreate":
+        if self.role == ClientRole.CLIENT_B2C and self.phone is None:
+            raise ValueError("Номер телефона обязателен для клиентов B2C.")
+        return self
 
 
 class InventoryCreate(BaseModel):
@@ -191,7 +208,13 @@ class OnboardingOrderSchema(BaseModel):
 
 class ClientOnboardingRequest(BaseModel):
     username: str = Field(..., description="ФИО или Название компании")
-    phone: str = Field(..., description="Номер телефона клиента")
+    phone: str | None = Field(
+        default=None,
+        min_length=1,
+        description=(
+            "Номер телефона клиента. Обязателен для B2C, опционален для B2B."
+        ),
+    )
     address_name: str = Field(..., description="Название адреса доставки")
     role: ClientRole = Field(default=ClientRole.CLIENT_B2C)
 
@@ -205,3 +228,9 @@ class ClientOnboardingRequest(BaseModel):
 
     # Опциональный первый заказ
     order: OnboardingOrderSchema | None = None
+
+    @model_validator(mode="after")
+    def _b2c_requires_phone(self) -> "ClientOnboardingRequest":
+        if self.role == ClientRole.CLIENT_B2C and self.phone is None:
+            raise ValueError("Номер телефона обязателен для клиентов B2C.")
+        return self
