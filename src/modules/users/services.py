@@ -5,6 +5,7 @@ from typing import Any
 from sqlalchemy.exc import IntegrityError
 
 from src.common.service import BaseService
+from src.core.constants import PROTECTED_USER_IDS
 from src.core.exceptions import BadRequestError
 from src.core.security.password import get_password_hash
 from src.infrastructure.database.models import Identity, PhoneNumber, User
@@ -20,6 +21,7 @@ from src.modules.users.exceptions import (
     PhoneLimitExceededError,
     PhoneNotFoundError,
     StaffPasswordRequiredError,
+    SystemUserDeletionForbiddenError,
     UserAlreadyExistsError,
     UserNotFoundError,
     UserUpdateConflictError,
@@ -363,6 +365,9 @@ class UserService(BaseService[User, UserAdminCreate, UserUnitOfWork]):
 
     async def update(self, id: uuid.UUID, schema: UserAdminUpdate) -> User:
         data = schema.model_dump(exclude_unset=True)
+        if id in PROTECTED_USER_IDS and data.get("is_active") is False:
+            raise SystemUserDeletionForbiddenError(user_id=id)
+
         user_data = {
             key: value
             for key, value in data.items()
@@ -407,6 +412,9 @@ class UserService(BaseService[User, UserAdminCreate, UserUnitOfWork]):
             return result
 
     async def delete_staff(self, id: uuid.UUID) -> None:
+        if id in PROTECTED_USER_IDS:
+            raise SystemUserDeletionForbiddenError(user_id=id)
+
         async with self.uow:
             user = await self._repo.get(id=id, active_only=False)
             if not user or user.role not in STAFF_ROLES:
@@ -417,6 +425,16 @@ class UserService(BaseService[User, UserAdminCreate, UserUnitOfWork]):
                 raise UserNotFoundError(user_id=id)
 
             await self.uow.commit()
+
+    async def archive(self, id: uuid.UUID) -> bool:
+        if id in PROTECTED_USER_IDS:
+            raise SystemUserDeletionForbiddenError(user_id=id)
+        return await super().archive(id)
+
+    async def delete(self, id: uuid.UUID) -> bool:
+        if id in PROTECTED_USER_IDS:
+            raise SystemUserDeletionForbiddenError(user_id=id)
+        return await super().delete(id)
 
     # ==========================================
     # УПРАВЛЕНИЕ ДОПОЛНИТЕЛЬНЫМИ ТЕЛЕФОНАМИ

@@ -142,3 +142,12 @@ class PhoneLimitExceededError(UnprocessableEntityError):
             error_code="PHONE_LIMIT_EXCEEDED",
             details={"user_id": user_id, "limit": limit},
         )
+
+
+class SystemUserDeletionForbiddenError(ForbiddenError):
+    def __init__(self, user_id: uuid.UUID):
+        super().__init__(
+            message=("Удаление системного пользователя запрещено."),
+            error_code="SYSTEM_USER_DELETION_FORBIDDEN",
+            details={"user_id": user_id},
+        )
