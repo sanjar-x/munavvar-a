@@ -136,6 +136,7 @@ ROLE_SCOPES: dict[Role, list[str]] = {
     # Кассир (POS-терминал: создание заказов, прием денег, просмотр остатков)
     Role.CASHIER: BASE_SCOPES
     + [
+        Scope.USERS_READ,
         Scope.ORDERS_READ,
         Scope.ORDERS_CREATE,
         Scope.INVENTORY_READ,

@@ -716,6 +716,13 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
             new_total = order.total_amount + amount_to_add
             update_data: dict[str, Any] = {"total_amount": new_total}
 
+            # CONTRACT: ensure flag is set so cancel releases quota
+            if (
+                order.payment_method == PaymentMethod.CONTRACT
+                and order.contract_id is not None
+            ):
+                update_data["quantities_reserved"] = True
+
             await self.uow.orders.update(order_id, update_data)
 
             await self.uow.commit()
@@ -1162,6 +1169,8 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
                 item.product_id: item.quantity for item in actual_items_dto
             }
             new_total = 0
+            # CONTRACT: collect quota deltas before mutating quantities
+            quota_deltas: list[tuple[uuid.UUID, int]] = []
 
             # Обновляем строки заказа (с защитой от превышения)
             for item in order.items:
@@ -1182,6 +1191,10 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
                             actual=requested_quantity,
                         )
 
+                    diff = original_quantity - requested_quantity
+                    if diff > 0:
+                        quota_deltas.append((item.product_id, diff))
+
                     item.quantity = requested_quantity
                     await self.uow.order_items.update_quantity(
                         item.id, item.quantity
@@ -1189,6 +1202,17 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
 
                 # Только фактически доставленные позиции входят в сумму
                 new_total += item.unit_price * item.quantity
+
+            # CONTRACT: release unrealized quota for reduced items
+            if (
+                quota_deltas
+                and order.payment_method == PaymentMethod.CONTRACT
+                and order.contract_id is not None
+            ):
+                await self.uow.price_items.decrement_quantities_used(
+                    order.contract_id,
+                    quota_deltas,
+                )
 
             # Обновляем итоговую сумму заказа
             order.total_amount = new_total

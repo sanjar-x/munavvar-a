@@ -25,6 +25,21 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
+    # ── Preflight: fail if any contracts have non-zero credit ──
+    conn = op.get_bind()
+    row = conn.execute(
+        sa.text(
+            "SELECT count(*) FROM contracts"
+            " WHERE credit_used != 0 OR credit_limit != 0"
+        )
+    ).scalar()
+    if row and row > 0:
+        raise RuntimeError(
+            f"Cannot migrate: {row} contract(s) have non-zero"
+            " credit_limit or credit_used."
+            " Migrate credit data first."
+        )
+
     # ── contracts: drop credit columns ──────────────────────
     op.drop_constraint(
         "ck_contract_credit_used_le_limit",
@@ -86,7 +101,7 @@ def upgrade() -> None:
     )
 
     # ── orders: replace reserved_credit_amount → bool ───────
-    op.drop_column("orders", "reserved_credit_amount")
+    # First add the new column
     op.add_column(
         "orders",
         sa.Column(
@@ -100,6 +115,19 @@ def upgrade() -> None:
             ),
         ),
     )
+    # Backfill: mark non-settled orders with active reservations
+    conn = op.get_bind()
+    conn.execute(
+        sa.text(
+            "UPDATE orders SET quantities_reserved = true"
+            " WHERE reserved_credit_amount IS NOT NULL"
+            "   AND reserved_credit_amount > 0"
+            "   AND status NOT IN"
+            "       ('delivered', 'pickup_completed', 'cancelled')"
+        )
+    )
+    # Now drop the old column
+    op.drop_column("orders", "reserved_credit_amount")
 
 
 def downgrade() -> None:

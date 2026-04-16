@@ -327,6 +327,11 @@ class ContractService:
                     contract_id,
                     list(product_totals.items()),
                 )
+            # Clear flag AFTER successful decrement
+            for oid in reserved_ids:
+                await self.uow.orders.update(
+                    oid, {"quantities_reserved": False}
+                )
 
         for order_id, old_status, _ in cancelled:
             await self.uow.orders.update(

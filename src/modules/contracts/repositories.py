@@ -191,6 +191,11 @@ class ContractPriceItemRepository(BaseRepository[ContractPriceItem]):
         items: [(price_item_id, delta), ...]
         """
         for item_id, delta in items:
+            if delta <= 0:
+                raise ValueError(
+                    f"increment delta must be > 0, got {delta}"
+                    f" for price_item {item_id}"
+                )
             stmt = (
                 sa.update(ContractPriceItem)
                 .where(ContractPriceItem.id == item_id)
@@ -198,7 +203,17 @@ class ContractPriceItemRepository(BaseRepository[ContractPriceItem]):
                     quantity_used=(ContractPriceItem.quantity_used + delta)
                 )
             )
-            await self.session.execute(stmt)
+            result = await self.session.execute(stmt)
+            if result.rowcount == 0:
+                log.error(
+                    "increment_no_rows_affected",
+                    price_item_id=str(item_id),
+                    delta=delta,
+                )
+                raise ValueError(
+                    f"Price item {item_id} not found or"
+                    " inactive — quota leak risk"
+                )
 
     async def decrement_quantities_used(
         self,
@@ -210,6 +225,11 @@ class ContractPriceItemRepository(BaseRepository[ContractPriceItem]):
         Использует greatest(0) для защиты от underflow.
         """
         for product_id, delta in product_quantities:
+            if delta <= 0:
+                raise ValueError(
+                    f"decrement delta must be > 0, got {delta}"
+                    f" for product {product_id}"
+                )
             stmt = (
                 sa.update(ContractPriceItem)
                 .where(
@@ -224,7 +244,19 @@ class ContractPriceItemRepository(BaseRepository[ContractPriceItem]):
                     )
                 )
             )
-            await self.session.execute(stmt)
+            result = await self.session.execute(stmt)
+            if result.rowcount == 0:
+                log.error(
+                    "decrement_no_rows_affected",
+                    contract_id=str(contract_id),
+                    product_id=str(product_id),
+                    delta=delta,
+                )
+                raise ValueError(
+                    f"Price item for product {product_id}"
+                    f" in contract {contract_id} not found"
+                    " — quota leak risk"
+                )
 
 
 class InvoiceRepository(BaseRepository[Invoice]):

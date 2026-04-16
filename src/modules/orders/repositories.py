@@ -341,7 +341,6 @@ class OrderRepository(BaseRepository[Order]):
             .where(self.model.id.in_(ids))
             .values(
                 status=OrderStatus.CANCELLED,
-                quantities_reserved=False,
             )
         )
         await self.session.execute(update_stmt)

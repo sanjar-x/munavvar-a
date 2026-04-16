@@ -933,3 +933,190 @@ class TestQuantitiesReserved:
 
         order_add_call = uow.orders.add.call_args[0][0]
         assert order_add_call["quantities_reserved"] is False
+
+
+# ─── Tests: multi-product partial failure atomicity ──────
+
+
+class TestMultiProductPartialFailure:
+    @pytest.mark.asyncio
+    async def test_multi_product_partial_failure_no_increment(
+        self,
+    ):
+        """Product A has quota. Product B exceeds.
+        Entire order fails. Product A quota unchanged."""
+        product_a = make_product(price=20_000)
+        product_b = make_product(price=20_000)
+        active = make_contract(status=ContractStatus.ACTIVE)
+
+        pi_a = make_price_item(
+            contract_id=active.id,
+            product_id=product_a.id,
+            price=20_000,
+            quantity=100,
+            quantity_used=0,
+        )
+        pi_b = make_price_item(
+            contract_id=active.id,
+            product_id=product_b.id,
+            price=20_000,
+            quantity=5,
+            quantity_used=5,  # fully used → 0 available
+        )
+        uow = _make_fake_uow(
+            contract=active,
+            price_items=[pi_a, pi_b],
+        )
+        catalog_svc = _make_catalog_service(
+            [product_a, product_b],
+        )
+
+        user_svc = _make_user_service(role=Role.CLIENT_B2B)
+        svc = BaseOrderService(
+            uow=uow,
+            catalog_service=catalog_svc,
+            user_service=user_svc,
+        )
+        dto = OrderCreate(
+            items=[
+                Item(product_id=product_a.id, quantity=3),
+                Item(product_id=product_b.id, quantity=1),
+            ],
+            payment_method=PaymentMethod.CONTRACT,
+            client_inventory_id=uuid.uuid4(),
+        )
+
+        with pytest.raises(QuantityLimitExceededError):
+            await svc.create_order(
+                client_id=uuid.uuid4(),
+                dto=dto,
+            )
+
+        # No increments should have been called —
+        # check fails before any reservation
+        uow.price_items.increment_quantities_used.assert_not_awaited()
+
+
+# ─── Tests: cancel delivered order ───────────────────────
+
+
+class TestCancelDeliveredOrder:
+    @pytest.mark.asyncio
+    async def test_cancel_delivered_order_is_rejected(
+        self,
+    ):
+        """DELIVERED → CANCELLED is rejected by status transition
+        guard — quota is never touched."""
+        from src.modules.orders.enums import SaleType
+        from src.modules.orders.exceptions import (
+            InvalidOrderStatusError,
+        )
+
+        contract_id = uuid.uuid4()
+        order_id = uuid.uuid4()
+
+        order = SimpleNamespace(
+            id=order_id,
+            status=OrderStatus.DELIVERED,
+            payment_method=PaymentMethod.CONTRACT,
+            contract_id=contract_id,
+            total_amount=60_000,
+            quantities_reserved=True,
+            items=[],
+            sale_type=SaleType.DELIVERY,
+            courier_id=None,
+            client_id=uuid.uuid4(),
+        )
+
+        uow = _make_fake_uow()
+        uow.orders.get_with_details = AsyncMock(
+            return_value=order,
+        )
+        uow.orders.update_status = AsyncMock(
+            return_value=order,
+        )
+        uow.orders.update = AsyncMock()
+
+        catalog_svc = _make_catalog_service([])
+        user_svc = _make_user_service()
+        svc = BaseOrderService(
+            uow=uow,
+            catalog_service=catalog_svc,
+            user_service=user_svc,
+        )
+
+        with pytest.raises(InvalidOrderStatusError):
+            await svc.update_status(
+                order_id=order_id,
+                new_status=OrderStatus.CANCELLED,
+            )
+
+        # Transition rejected → no quota release attempted
+        uow.price_items.decrement_quantities_used.assert_not_awaited()
+
+
+# ─── Tests: add_product_to_order sets reserved flag ──────
+
+
+class TestAddProductSetsReservedFlag:
+    @pytest.mark.asyncio
+    async def test_add_product_sets_quantities_reserved(self):
+        """add_product_to_order on CONTRACT order sets
+        quantities_reserved=True on the order."""
+        product_id = uuid.uuid4()
+        product = make_product(product_id=product_id, price=20_000)
+        contract_id = uuid.uuid4()
+        contract = make_contract(
+            contract_id=contract_id,
+            status=ContractStatus.ACTIVE,
+        )
+        pi = make_price_item(
+            contract_id=contract_id,
+            product_id=product_id,
+            price=15_000,
+            quantity=0,
+            quantity_used=0,
+        )
+
+        order = make_order(
+            status=OrderStatus.NEW,
+            payment_method=PaymentMethod.CONTRACT,
+            contract_id=contract_id,
+            quantities_reserved=False,
+            total_amount=0,
+        )
+
+        uow = _make_fake_uow()
+        uow.orders.get_with_details = AsyncMock(
+            return_value=order,
+        )
+        uow.contracts.get = AsyncMock(return_value=contract)
+        uow.price_items.get_for_products_locked = AsyncMock(
+            return_value=[pi],
+        )
+        uow.order_items.get_by_order_and_product = AsyncMock(
+            return_value=None,
+        )
+        uow.order_items.add = AsyncMock()
+        uow.orders.update = AsyncMock(return_value=order)
+
+        catalog_svc = _make_catalog_service([product])
+        user_svc = _make_user_service(role=Role.CLIENT_B2B)
+        svc = BaseOrderService(
+            uow=uow,
+            catalog_service=catalog_svc,
+            user_service=user_svc,
+        )
+
+        await svc.add_product_to_order(
+            order_id=order.id,
+            product_id=product_id,
+            quantity=2,
+        )
+
+        # Verify quantities_reserved=True is in update call
+        update_call = uow.orders.update.call_args
+        assert update_call[0][1]["quantities_reserved"] is True
+
+        # Verify increment was called
+        uow.price_items.increment_quantities_used.assert_awaited_once()

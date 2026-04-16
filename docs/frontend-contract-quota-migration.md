@@ -25,43 +25,43 @@
 Эти поля **больше НЕ возвращаются** бэкендом и **не принимаются** в запросах.
 Все обращения к ним нужно удалить из фронтенда.
 
-| Схема / Эндпоинт                 | Удалённое поле              | Тип          |
-|----------------------------------|-----------------------------|--------------|
-| `ContractCreate` (запрос)        | `credit_limit`              | `int`        |
-| `ContractUpdate` (запрос)        | `credit_limit`              | `int \| null`|
-| `ContractResponse` (ответ)       | `credit_limit`              | `int`        |
-| `ContractResponse` (ответ)       | `credit_used`               | `int`        |
-| `ContractBrief` (внутри заказа)  | `credit_limit`              | `int`        |
-| `ContractBrief` (внутри заказа)  | `credit_used`               | `int`        |
-| `ContractSummary` (карточка)     | `credit_limit`              | `int`        |
-| `ContractSummary` (карточка)     | `credit_used`               | `int`        |
-| `OrderResponse` (ответ)          | `reserved_credit_amount`    | `int \| null`|
-| `DashboardTotals` (дашборд)      | `total_b2b_credit_used`     | `int`        |
-| `B2BContractDebt` (задолженности)| `credit_limit`              | `int`        |
-| `B2BContractDebt` (задолженности)| `credit_used`               | `int`        |
-| `B2BContractDebt` (задолженности)| `total_exposure`            | `int`        |
-| `B2BContractDebt` (задолженности)| `limit_utilization_pct`     | `float`      |
-| `B2BContractDebtsResponse`       | `total_exposure`            | `int`        |
+| Схема / Эндпоинт                  | Удалённое поле           | Тип           |
+| --------------------------------- | ------------------------ | ------------- |
+| `ContractCreate` (запрос)         | `credit_limit`           | `int`         |
+| `ContractUpdate` (запрос)         | `credit_limit`           | `int \| null` |
+| `ContractResponse` (ответ)        | `credit_limit`           | `int`         |
+| `ContractResponse` (ответ)        | `credit_used`            | `int`         |
+| `ContractBrief` (внутри заказа)   | `credit_limit`           | `int`         |
+| `ContractBrief` (внутри заказа)   | `credit_used`            | `int`         |
+| `ContractSummary` (карточка)      | `credit_limit`           | `int`         |
+| `ContractSummary` (карточка)      | `credit_used`            | `int`         |
+| `OrderResponse` (ответ)           | `reserved_credit_amount` | `int \| null` |
+| `DashboardTotals` (дашборд)       | `total_b2b_credit_used`  | `int`         |
+| `B2BContractDebt` (задолженности) | `credit_limit`           | `int`         |
+| `B2BContractDebt` (задолженности) | `credit_used`            | `int`         |
+| `B2BContractDebt` (задолженности) | `total_exposure`         | `int`         |
+| `B2BContractDebt` (задолженности) | `limit_utilization_pct`  | `float`       |
+| `B2BContractDebtsResponse`        | `total_exposure`         | `int`         |
 
 ---
 
 ## 2. Новые поля (NEW)
 
-| Схема / Эндпоинт           | Новое поле           | Тип     | Описание                                          |
-|-----------------------------|----------------------|---------|---------------------------------------------------|
-| `PriceItemCreate` (запрос)  | `quantity`           | `int`   | Макс. кол-во единиц. `0` = без ограничений        |
-| `PriceItemResponse` (ответ) | `quantity`           | `int`   | Макс. кол-во единиц. `0` = без ограничений        |
-| `PriceItemResponse` (ответ) | `quantity_used`      | `int`   | Использовано единиц                                |
-| `OrderResponse` (ответ)     | `quantities_reserved`| `bool`  | `true` если квоты зарезервированы по договору      |
+| Схема / Эндпоинт            | Новое поле            | Тип    | Описание                                      |
+| --------------------------- | --------------------- | ------ | --------------------------------------------- |
+| `PriceItemCreate` (запрос)  | `quantity`            | `int`  | Макс. кол-во единиц. `0` = без ограничений    |
+| `PriceItemResponse` (ответ) | `quantity`            | `int`  | Макс. кол-во единиц. `0` = без ограничений    |
+| `PriceItemResponse` (ответ) | `quantity_used`       | `int`  | Использовано единиц                           |
+| `OrderResponse` (ответ)     | `quantities_reserved` | `bool` | `true` если квоты зарезервированы по договору |
 
 ---
 
 ## 3. Переименования / изменения (MODIFIED)
 
-| Схема                        | Поле              | Было                                 | Стало                    |
-|------------------------------|--------------------|---------------------------------------|--------------------------|
-| `B2BContractDebtsResponse`   | `total_exposure`→  | `total_exposure: int`                 | `total_debt: int`        |
-| `B2BContractDebt`            | `due_date_status`  | `"ok" \| "overdue" \| "no_limit"`     | `"ok" \| "overdue"`     |
+| Схема                      | Поле              | Было                              | Стало               |
+| -------------------------- | ----------------- | --------------------------------- | ------------------- |
+| `B2BContractDebtsResponse` | `total_exposure`→ | `total_exposure: int`             | `total_debt: int`   |
+| `B2BContractDebt`          | `due_date_status` | `"ok" \| "overdue" \| "no_limit"` | `"ok" \| "overdue"` |
 
 ---
 
@@ -235,9 +235,9 @@
 
 ### Удалённый код ошибки
 
-| Старый код                    | Замена                        |
-|-------------------------------|-------------------------------|
-| `CREDIT_LIMIT_EXCEEDED`       | `QUANTITY_LIMIT_EXCEEDED`     |
+| Старый код              | Замена                    |
+| ----------------------- | ------------------------- |
+| `CREDIT_LIMIT_EXCEEDED` | `QUANTITY_LIMIT_EXCEEDED` |
 
 ---
 
@@ -287,8 +287,8 @@
 
 ```
 ┌──────────────────────────────────┐
-│ Цена: [15 000] сум              │
-│ Квота: [100] ед.  (0 = безлим.) │
+│ Цена: [15 000] сум               │
+│ Квота: [100] ед.  (0 = безлим.)  │
 │            [Сохранить]           │
 └──────────────────────────────────┘
 ```
