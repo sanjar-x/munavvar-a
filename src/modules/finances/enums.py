@@ -9,6 +9,8 @@ class AccountType(enum.StrEnum):
     DISCOUNT = "discount"
     CLIENT = "client"
     COURIER = "courier"
+    EXPENSE = "expense"
+    ADMIN = "admin"
 
 
 class TransactionStatus(enum.StrEnum):

@@ -50,6 +50,7 @@ async def init_data() -> None:
             AccountType.CASH: "Кассовый счёт",
             AccountType.CARD: "Карта",
             AccountType.BANK: "Банковский счёт",
+            AccountType.EXPENSE: "Расходы",
         }
 
         for acc_type, acc_name in required_accounts.items():
@@ -187,6 +188,14 @@ async def init_data() -> None:
                     password_hash=hashed_password,
                 )
                 session.add(admin_identity)
+
+                admin_account = Account(
+                    user_id=admin_user.id,
+                    type=AccountType.ADMIN,
+                    name="Счёт администратора",
+                )
+                session.add(admin_account)
+
                 logger.info(
                     f"Администратор с номером {admin_phone} успешно создан."
                 )
