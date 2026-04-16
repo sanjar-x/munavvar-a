@@ -126,6 +126,7 @@ ROLE_SCOPES: dict[Role, list[str]] = {
     # Кладовщик (Только склад и логистика)
     Role.STOREKEEPER: BASE_SCOPES
     + [
+        Scope.USERS_READ,
         Scope.TRANSPORTS_READ,
         Scope.INVENTORY_READ,
         Scope.INVENTORY_WRITE,
