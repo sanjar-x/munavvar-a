@@ -84,6 +84,107 @@ class SelfTransferError(ConflictError):
         )
 
 
+class SearchTooShortError(BadRequestError):
+    """`q` короче минимальной длины (2)."""
+
+    def __init__(self, length: int):
+        super().__init__(
+            message=(
+                "Поисковый запрос слишком короткий. "
+                "Минимальная длина — 2 символа."
+            ),
+            error_code="SEARCH_TOO_SHORT",
+            details={"length": length, "min_length": 2},
+        )
+
+
+class SearchTooLongError(BadRequestError):
+    """`q` длиннее максимальной длины (100)."""
+
+    def __init__(self, length: int):
+        super().__init__(
+            message=(
+                "Поисковый запрос слишком длинный. "
+                "Максимальная длина — 100 символов."
+            ),
+            error_code="SEARCH_TOO_LONG",
+            details={"length": length, "max_length": 100},
+        )
+
+
+class SearchUuidNotAllowedError(BadRequestError):
+    """В `q` передан UUID / длинный hex — искать по id нужно явно."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            message=(
+                "В поиске запрещён UUID. Используйте прямые фильтры "
+                "(account_id, order_id, client_id и т.д.)."
+            ),
+            error_code="SEARCH_UUID_NOT_ALLOWED",
+        )
+
+
+class DateRangeInvalidError(BadRequestError):
+    """`date_from > date_to`."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            message="Некорректный диапазон дат: date_from позже date_to.",
+            error_code="DATE_RANGE_INVALID",
+        )
+
+
+class AmountRangeInvalidError(BadRequestError):
+    """`amount_from > amount_to`."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            message=(
+                "Некорректный диапазон суммы: amount_from больше amount_to."
+            ),
+            error_code="AMOUNT_RANGE_INVALID",
+        )
+
+
+class AmountConflictError(BadRequestError):
+    """Одновременно `amount_eq` и `amount_from/to`."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            message=(
+                "Параметр amount_eq нельзя сочетать с amount_from / amount_to."
+            ),
+            error_code="AMOUNT_CONFLICT",
+        )
+
+
+class DatePresetConflictError(BadRequestError):
+    """Одновременно `date_preset` и `date_from/to`."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            message=(
+                "Параметр date_preset нельзя сочетать с date_from / date_to."
+            ),
+            error_code="DATE_PRESET_CONFLICT",
+        )
+
+
+class PaginationTooDeepError(BadRequestError):
+    """`page * size > 10_000` — требуется cursor (v2)."""
+
+    def __init__(self, page: int, size: int):
+        super().__init__(
+            message=(
+                "Слишком глубокая пагинация. "
+                "Уточните фильтры или дождитесь cursor-пагинации."
+            ),
+            error_code="PAGINATION_TOO_DEEP",
+            details={"page": page, "size": size, "limit": 10_000},
+        )
+
+
 class InvalidTransactionStatusError(ConflictError):
     """Выбрасывается при попытке подтвердить/отменить
     транзакцию в неверном статусе."""

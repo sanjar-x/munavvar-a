@@ -1,6 +1,6 @@
 # src/modules/finances/services.py
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import text
 
@@ -10,12 +10,18 @@ from src.modules.finances.enums import (
 )
 from src.modules.finances.exceptions import (
     AccountNotFoundError,
+    AmountConflictError,
+    AmountRangeInvalidError,
+    DatePresetConflictError,
+    DateRangeInvalidError,
     InvalidTransactionStatusError,
+    PaginationTooDeepError,
     SelfTransferError,
     TransactionNotFoundError,
 )
 from src.modules.finances.schemas import (
     AccountDetail,
+    AccountFilter,
     AccountResponse,
     AccountShort,
     AccountStatement,
@@ -27,14 +33,150 @@ from src.modules.finances.schemas import (
     CouriersSummaryResponse,
     DashboardTotals,
     FinanceDashboard,
+    OffsetPaginationMeta,
     StatementEntry,
     StatementPeriod,
     SystemAccountSummary,
     TransactionCreate,
     TransactionDetail,
+    TransactionFilter,
     TransactionResponse,
 )
 from src.modules.finances.uow import FinancesUnitOfWork
+
+MAX_PAGE_DEPTH = 10_000
+
+
+def _check_pagination(page: int, size: int) -> None:
+    if page * size > MAX_PAGE_DEPTH:
+        raise PaginationTooDeepError(page=page, size=size)
+
+
+def _total_pages(total: int, size: int) -> int:
+    if size <= 0:
+        return 0
+    return (total + size - 1) // size
+
+
+def _validate_transaction_filter(f: TransactionFilter) -> None:
+    if f.amount_eq is not None and (
+        f.amount_from is not None or f.amount_to is not None
+    ):
+        raise AmountConflictError()
+    if (
+        f.amount_from is not None
+        and f.amount_to is not None
+        and f.amount_from > f.amount_to
+    ):
+        raise AmountRangeInvalidError()
+    if f.date_preset is not None and (
+        f.date_from is not None or f.date_to is not None
+    ):
+        raise DatePresetConflictError()
+    if (
+        f.date_from is not None
+        and f.date_to is not None
+        and f.date_from > f.date_to
+    ):
+        raise DateRangeInvalidError()
+
+
+def _account_short(acc) -> AccountShort:
+    """Построить AccountShort из ORM Account с подгруженным user."""
+    data = AccountShort.model_validate(acc)
+    try:
+        data.user_name = acc.user.username if acc.user else None
+    except Exception:
+        data.user_name = None
+    return data
+
+
+def _build_transaction_detail(t) -> TransactionDetail:
+    """Обогатить TransactionDetail связанными данными (from/to/verified_by)."""
+    verified_by_name: str | None = None
+    try:
+        if t.verified_by is not None:
+            verified_by_name = t.verified_by.username
+    except Exception:
+        verified_by_name = None
+
+    order_short_id: str | None = None
+    if t.order_id is not None:
+        order_short_id = str(t.order_id)[-8:]
+
+    return TransactionDetail(
+        id=t.id,
+        from_account=_account_short(t.from_account),
+        to_account=_account_short(t.to_account),
+        amount=t.amount,
+        status=t.status,
+        reason=t.reason,
+        order_id=t.order_id,
+        order_short_id=order_short_id,
+        verified_by_id=t.verified_by_id,
+        verified_by_name=verified_by_name,
+        created_at=t.created_at,
+    )
+
+
+def _resolve_date_preset(f: TransactionFilter) -> TransactionFilter:
+    """Развернуть `date_preset` в конкретные `date_from` / `date_to`.
+
+    Возвращает новый объект фильтра (неизменяющая операция).
+    Все границы считаются в TZ `Asia/Tashkent`.
+    """
+    if f.date_preset is None:
+        return f
+    try:
+        from zoneinfo import ZoneInfo
+    except ImportError:  # pragma: no cover
+        return f
+
+    tz = ZoneInfo("Asia/Tashkent")
+    now_local = datetime.now(tz)
+    today = now_local.replace(hour=0, minute=0, second=0, microsecond=0)
+
+    start_local: datetime
+    end_local: datetime
+    preset = f.date_preset
+    if preset == "today":
+        start_local = today
+        end_local = today + timedelta(days=1)
+    elif preset == "yesterday":
+        start_local = today - timedelta(days=1)
+        end_local = today
+    elif preset == "this_week":
+        start_local = today - timedelta(days=today.weekday())
+        end_local = start_local + timedelta(days=7)
+    elif preset == "last_week":
+        this_monday = today - timedelta(days=today.weekday())
+        start_local = this_monday - timedelta(days=7)
+        end_local = this_monday
+    elif preset == "this_month":
+        start_local = today.replace(day=1)
+        if start_local.month == 12:
+            end_local = start_local.replace(year=start_local.year + 1, month=1)
+        else:
+            end_local = start_local.replace(month=start_local.month + 1)
+    elif preset == "last_month":
+        first_this = today.replace(day=1)
+        if first_this.month == 1:
+            start_local = first_this.replace(
+                year=first_this.year - 1, month=12
+            )
+        else:
+            start_local = first_this.replace(month=first_this.month - 1)
+        end_local = first_this
+    else:
+        return f
+
+    return f.model_copy(
+        update={
+            "date_preset": None,
+            "date_from": start_local.astimezone(UTC),
+            "date_to": end_local.astimezone(UTC),
+        }
+    )
 
 
 class BillingService:
@@ -186,29 +328,49 @@ class BillingService:
 
     async def get_accounts(
         self,
-        skip: int,
-        limit: int,
-        type: AccountType | None = None,
-        search: str | None = None,
-        has_debt: bool | None = None,
+        filters: AccountFilter,
+        page: int,
+        size: int,
     ) -> dict:
-        """Пагинированный список счетов с фильтрами."""
+        """Пагинированный список счетов с фильтрами + summary.
+
+        Возвращает dict с ключами:
+          - `items`       — list[AccountResponse]
+          - `pagination`  — OffsetPaginationMeta
+          - `summary`     — AccountSummary
+          - `accounts`    — alias для items (deprecated)
+          - `total_count` — alias для pagination.total_count (deprecated)
+        """
+        _check_pagination(page, size)
+        skip = (page - 1) * size
         async with self.uow:
             total, items = await self.uow.accounts.get_accounts_with_filters(
-                type=type,
-                search=search,
-                has_debt=has_debt,
+                filters=filters,
                 skip=skip,
-                limit=limit,
+                limit=size,
             )
-            accounts = []
+            summary = await self.uow.accounts.get_accounts_summary(
+                filters=filters,
+            )
+            accounts: list[AccountResponse] = []
             for acc in items:
                 resp = AccountResponse.model_validate(acc)
                 resp.user_name = acc.user.username if acc.user else None
                 accounts.append(resp)
+
+            pagination = OffsetPaginationMeta(
+                page=page,
+                size=size,
+                total_count=total,
+                total_pages=_total_pages(total, size),
+            )
             return {
-                "total_count": total,
+                "items": accounts,
+                "pagination": pagination,
+                "summary": summary,
+                # backward-compat
                 "accounts": accounts,
+                "total_count": total,
             }
 
     async def get_account_detail(self, account_id: uuid.UUID) -> AccountDetail:
@@ -398,26 +560,15 @@ class BillingService:
 
     async def get_transactions(
         self,
-        skip: int,
-        limit: int,
-        status: TransactionStatus | None = None,
-        account_id: uuid.UUID | None = None,
-        order_id: uuid.UUID | None = None,
-        date_from: datetime | None = None,
-        date_to: datetime | None = None,
-        min_amount: int | None = None,
-        max_amount: int | None = None,
+        filters: TransactionFilter,
+        page: int,
+        size: int,
     ) -> dict:
-        """Пагинированный список транзакций с фильтрами."""
-        filters = {
-            "status": status,
-            "account_id": account_id,
-            "order_id": order_id,
-            "date_from": date_from,
-            "date_to": date_to,
-            "min_amount": min_amount,
-            "max_amount": max_amount,
-        }
+        """Пагинированный список транзакций + summary по тем же фильтрам."""
+        _validate_transaction_filter(filters)
+        filters = _resolve_date_preset(filters)
+        _check_pagination(page, size)
+        skip = (page - 1) * size
         async with self.uow:
             (
                 total,
@@ -425,29 +576,25 @@ class BillingService:
             ) = await self.uow.transactions.get_transactions_with_filters(
                 filters=filters,
                 skip=skip,
-                limit=limit,
+                limit=size,
             )
-            transactions = [
-                TransactionDetail(
-                    id=t.id,
-                    from_account=AccountShort.model_validate(
-                        t.from_account,
-                    ),
-                    to_account=AccountShort.model_validate(
-                        t.to_account,
-                    ),
-                    amount=t.amount,
-                    status=t.status,
-                    reason=t.reason,
-                    order_id=t.order_id,
-                    verified_by_id=t.verified_by_id,
-                    created_at=t.created_at,
-                )
-                for t in items
-            ]
+            summary = await self.uow.transactions.get_transactions_summary(
+                filters=filters,
+            )
+            transactions = [_build_transaction_detail(t) for t in items]
+            pagination = OffsetPaginationMeta(
+                page=page,
+                size=size,
+                total_count=total,
+                total_pages=_total_pages(total, size),
+            )
             return {
-                "total_count": total,
+                "items": transactions,
+                "pagination": pagination,
+                "summary": summary,
+                # backward-compat
                 "transactions": transactions,
+                "total_count": total,
             }
 
     async def create_transaction(

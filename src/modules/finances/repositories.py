@@ -2,14 +2,24 @@ import uuid
 from collections.abc import Sequence
 from datetime import UTC, datetime
 
-from sqlalchemy import and_, func, or_, select
+from sqlalchemy import and_, case, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased, joinedload
+from sqlalchemy.sql import Select
 
 from src.common.repository import BaseRepository
 from src.core.constants import SYSTEM_USER_ID
 from src.infrastructure.database.models import Account, Transaction, User
+from src.modules.contracts.models import Contract
 from src.modules.finances.enums import AccountType, TransactionStatus
+from src.modules.finances.schemas import (
+    AccountFilter,
+    AccountSummary,
+    TransactionFilter,
+    TransactionSummary,
+)
+from src.modules.finances.search import ilike_pattern, normalize_q
+from src.modules.orders.models import Order
 
 
 class AccountRepository(BaseRepository[Account]):
@@ -145,50 +155,82 @@ class AccountRepository(BaseRepository[Account]):
         result = await self.session.execute(query)
         return result.scalars().all()
 
+    def _apply_account_filters(
+        self,
+        select_from: Select,
+        user_alias,
+        filters: AccountFilter,
+    ) -> Select:
+        """Наложить WHERE по фильтру счетов на готовый SELECT ... FROM ... ."""
+        stmt = select_from.where(Account.is_active.is_(True))
+
+        if filters.type_in:
+            stmt = stmt.where(Account.type.in_(filters.type_in))
+
+        if filters.user_id is not None:
+            stmt = stmt.where(Account.user_id == filters.user_id)
+
+        if filters.user_role_in:
+            stmt = stmt.where(user_alias.role.in_(filters.user_role_in))
+
+        if filters.balance_from is not None:
+            stmt = stmt.where(Account.balance >= filters.balance_from)
+        if filters.balance_to is not None:
+            stmt = stmt.where(Account.balance <= filters.balance_to)
+
+        if filters.is_in_credit is True:
+            stmt = stmt.where(Account.balance < 0)
+        elif filters.is_in_credit is False:
+            stmt = stmt.where(Account.balance >= 0)
+
+        if filters.zero_balance is True:
+            stmt = stmt.where(Account.balance == 0)
+
+        if filters.has_debt is True:
+            stmt = stmt.where(
+                and_(
+                    Account.type == AccountType.CLIENT,
+                    Account.balance > 0,
+                )
+            )
+
+        if filters.created_from is not None:
+            stmt = stmt.where(Account.created_at >= filters.created_from)
+        if filters.created_to is not None:
+            stmt = stmt.where(Account.created_at <= filters.created_to)
+
+        q = normalize_q(filters.q)
+        if q is not None:
+            pat = ilike_pattern(q)
+            stmt = stmt.where(
+                or_(
+                    Account.name.ilike(pat),
+                    user_alias.username.ilike(pat),
+                )
+            )
+
+        return stmt
+
     async def get_accounts_with_filters(
         self,
-        type: AccountType | None,
-        search: str | None,
-        has_debt: bool | None,
+        filters: AccountFilter,
         skip: int,
         limit: int,
     ) -> tuple[int, Sequence[Account]]:
-        """Пагинированный список счетов с фильтрами.
+        """Пагинированный список счетов по новому фильтру."""
+        user_alias = aliased(User)
 
-        JOIN User для поиска по имени пользователя.
-        """
-        base = (
-            select(Account)
-            .join(User, Account.user_id == User.id)
-            .where(Account.is_active.is_(True))
+        base = select(Account).join(
+            user_alias, Account.user_id == user_alias.id
         )
+        base = self._apply_account_filters(base, user_alias, filters)
+
         count_q = (
             select(func.count())
             .select_from(Account)
-            .join(User, Account.user_id == User.id)
-            .where(Account.is_active.is_(True))
+            .join(user_alias, Account.user_id == user_alias.id)
         )
-
-        if type is not None:
-            base = base.where(Account.type == type)
-            count_q = count_q.where(Account.type == type)
-
-        if search:
-            pattern = f"%{search}%"
-            search_cond = or_(
-                Account.name.ilike(pattern),
-                User.username.ilike(pattern),
-            )
-            base = base.where(search_cond)
-            count_q = count_q.where(search_cond)
-
-        if has_debt is True:
-            debt_cond = and_(
-                Account.type == AccountType.CLIENT,
-                Account.balance > 0,
-            )
-            base = base.where(debt_cond)
-            count_q = count_q.where(debt_cond)
+        count_q = self._apply_account_filters(count_q, user_alias, filters)
 
         total = (await self.session.execute(count_q)).scalar() or 0
 
@@ -199,9 +241,39 @@ class AccountRepository(BaseRepository[Account]):
             .limit(limit)
         )
         result = await self.session.execute(query)
-        accounts = result.scalars().unique().all()
+        return total, result.scalars().unique().all()
 
-        return total, accounts
+    async def get_accounts_summary(
+        self,
+        filters: AccountFilter,
+    ) -> AccountSummary:
+        """Агрегаты по тому же фильтру: SUM(balance), COUNT GROUP BY type."""
+        user_alias = aliased(User)
+
+        sum_q = (
+            select(func.coalesce(func.sum(Account.balance), 0))
+            .select_from(Account)
+            .join(user_alias, Account.user_id == user_alias.id)
+        )
+        sum_q = self._apply_account_filters(sum_q, user_alias, filters)
+        sum_balance = int((await self.session.execute(sum_q)).scalar() or 0)
+
+        count_q = (
+            select(Account.type, func.count())
+            .select_from(Account)
+            .join(user_alias, Account.user_id == user_alias.id)
+        )
+        count_q = self._apply_account_filters(
+            count_q, user_alias, filters
+        ).group_by(Account.type)
+        rows = (await self.session.execute(count_q)).all()
+        count_by_type: dict[str, int] = {
+            str(r[0].value): int(r[1]) for r in rows
+        }
+        return AccountSummary(
+            sum_balance=sum_balance,
+            count_by_type=count_by_type,
+        )
 
     async def get_total_client_debt(self) -> int:
         """Сумма balance для всех CLIENT-счетов где balance > 0."""
@@ -353,77 +425,279 @@ class TransactionRepository(BaseRepository[Transaction]):
 
     # --- Новые методы для BillingService ---
 
+    def _apply_transaction_filters(
+        self,
+        stmt: Select,
+        from_acc,
+        to_acc,
+        from_user,
+        to_user,
+        order_alias,
+        contract_alias,
+        filters: TransactionFilter,
+    ) -> Select:
+        """Наложить WHERE по фильтру транзакций.
+
+        Все JOIN (aliased) должны быть применены к stmt _до_ вызова.
+        """
+        stmt = stmt.where(Transaction.is_active.is_(True))
+
+        if filters.status_in:
+            stmt = stmt.where(Transaction.status.in_(filters.status_in))
+
+        if filters.account_id is not None:
+            direction = filters.direction
+            if direction == "incoming":
+                stmt = stmt.where(Transaction.to_id == filters.account_id)
+            elif direction == "outgoing":
+                stmt = stmt.where(Transaction.from_id == filters.account_id)
+            elif direction == "internal":
+                stmt = stmt.where(
+                    and_(
+                        Transaction.from_id == filters.account_id,
+                        Transaction.to_id == filters.account_id,
+                    )
+                )
+            else:
+                stmt = stmt.where(
+                    or_(
+                        Transaction.from_id == filters.account_id,
+                        Transaction.to_id == filters.account_id,
+                    )
+                )
+
+        if filters.from_account_id is not None:
+            stmt = stmt.where(Transaction.from_id == filters.from_account_id)
+        if filters.to_account_id is not None:
+            stmt = stmt.where(Transaction.to_id == filters.to_account_id)
+
+        if filters.from_account_type_in:
+            stmt = stmt.where(from_acc.type.in_(filters.from_account_type_in))
+        if filters.to_account_type_in:
+            stmt = stmt.where(to_acc.type.in_(filters.to_account_type_in))
+
+        if filters.order_id is not None:
+            stmt = stmt.where(Transaction.order_id == filters.order_id)
+        if filters.has_order is True:
+            stmt = stmt.where(Transaction.order_id.is_not(None))
+        elif filters.has_order is False:
+            stmt = stmt.where(Transaction.order_id.is_(None))
+
+        if filters.order_status_in:
+            stmt = stmt.where(order_alias.status.in_(filters.order_status_in))
+        if filters.order_payment_method_in:
+            stmt = stmt.where(
+                order_alias.payment_method.in_(filters.order_payment_method_in)
+            )
+        if filters.order_sale_type_in:
+            stmt = stmt.where(
+                order_alias.sale_type.in_(filters.order_sale_type_in)
+            )
+
+        if filters.contract_id is not None:
+            stmt = stmt.where(order_alias.contract_id == filters.contract_id)
+        if filters.contract_number:
+            pat = ilike_pattern(filters.contract_number)
+            stmt = stmt.where(contract_alias.number.ilike(pat))
+
+        if filters.client_id is not None:
+            stmt = stmt.where(
+                or_(
+                    from_acc.user_id == filters.client_id,
+                    to_acc.user_id == filters.client_id,
+                )
+            )
+        if filters.courier_id is not None:
+            stmt = stmt.where(
+                or_(
+                    from_acc.user_id == filters.courier_id,
+                    to_acc.user_id == filters.courier_id,
+                )
+            )
+
+        if filters.user_role_in:
+            stmt = stmt.where(
+                or_(
+                    from_user.role.in_(filters.user_role_in),
+                    to_user.role.in_(filters.user_role_in),
+                )
+            )
+
+        if filters.verified_by_id is not None:
+            stmt = stmt.where(
+                Transaction.verified_by_id == filters.verified_by_id
+            )
+        if filters.verified is True:
+            stmt = stmt.where(Transaction.verified_by_id.is_not(None))
+        elif filters.verified is False:
+            stmt = stmt.where(Transaction.verified_by_id.is_(None))
+
+        if filters.reason_search:
+            pat = ilike_pattern(filters.reason_search.strip())
+            stmt = stmt.where(Transaction.reason.ilike(pat))
+
+        if filters.amount_eq is not None:
+            stmt = stmt.where(Transaction.amount == filters.amount_eq)
+        if filters.amount_from is not None:
+            stmt = stmt.where(Transaction.amount >= filters.amount_from)
+        if filters.amount_to is not None:
+            stmt = stmt.where(Transaction.amount <= filters.amount_to)
+
+        if filters.date_from is not None:
+            stmt = stmt.where(Transaction.created_at >= filters.date_from)
+        if filters.date_to is not None:
+            stmt = stmt.where(Transaction.created_at <= filters.date_to)
+
+        q = normalize_q(filters.q)
+        if q is not None:
+            pat = ilike_pattern(q)
+            stmt = stmt.where(
+                or_(
+                    Transaction.reason.ilike(pat),
+                    from_acc.name.ilike(pat),
+                    to_acc.name.ilike(pat),
+                    from_user.username.ilike(pat),
+                    to_user.username.ilike(pat),
+                )
+            )
+
+        return stmt
+
+    def _transaction_base_joins(self):
+        """Вернуть (aliases..., base_select) с применёнными JOIN.
+
+        base_select = select(Transaction) с LEFT/INNER JOIN на:
+          - from_acc / to_acc (aliased Account),
+          - from_user / to_user (aliased User) — через accounts.user_id,
+          - order_alias (aliased Order, LEFT),
+          - contract_alias (aliased Contract, LEFT).
+        """
+        from_acc = aliased(Account)
+        to_acc = aliased(Account)
+        from_user = aliased(User)
+        to_user = aliased(User)
+        order_alias = aliased(Order)
+        contract_alias = aliased(Contract)
+
+        stmt = (
+            select(Transaction)
+            .join(from_acc, Transaction.from_id == from_acc.id)
+            .join(to_acc, Transaction.to_id == to_acc.id)
+            .join(from_user, from_acc.user_id == from_user.id)
+            .join(to_user, to_acc.user_id == to_user.id)
+            .outerjoin(order_alias, Transaction.order_id == order_alias.id)
+            .outerjoin(
+                contract_alias, order_alias.contract_id == contract_alias.id
+            )
+        )
+        return (
+            from_acc,
+            to_acc,
+            from_user,
+            to_user,
+            order_alias,
+            contract_alias,
+            stmt,
+        )
+
     async def get_transactions_with_filters(
         self,
-        filters: dict,
+        filters: TransactionFilter,
         skip: int,
         limit: int,
     ) -> tuple[int, Sequence[Transaction]]:
-        """Пагинированные транзакции с фильтрами.
+        """Пагинированный список транзакций по новому фильтру."""
+        (
+            from_acc,
+            to_acc,
+            from_user,
+            to_user,
+            order_alias,
+            contract_alias,
+            base,
+        ) = self._transaction_base_joins()
 
-        Eager-load from_account и to_account.
-        """
-        base = select(Transaction).where(Transaction.is_active.is_(True))
-        count_q = (
-            select(func.count())
-            .select_from(Transaction)
-            .where(Transaction.is_active.is_(True))
+        base = self._apply_transaction_filters(
+            base,
+            from_acc,
+            to_acc,
+            from_user,
+            to_user,
+            order_alias,
+            contract_alias,
+            filters,
         )
 
-        if filters.get("status") is not None:
-            cond = Transaction.status == filters["status"]
-            base = base.where(cond)
-            count_q = count_q.where(cond)
+        # COUNT отдельным подзапросом (не таскаем joinedload).
+        count_stmt = select(func.count()).select_from(
+            base.with_only_columns(Transaction.id).subquery()
+        )
+        total = (await self.session.execute(count_stmt)).scalar() or 0
 
-        if filters.get("account_id") is not None:
-            acc_id = filters["account_id"]
-            cond = or_(
-                Transaction.from_id == acc_id,
-                Transaction.to_id == acc_id,
-            )
-            base = base.where(cond)
-            count_q = count_q.where(cond)
-
-        if filters.get("order_id") is not None:
-            cond = Transaction.order_id == filters["order_id"]
-            base = base.where(cond)
-            count_q = count_q.where(cond)
-
-        if filters.get("date_from") is not None:
-            cond = Transaction.created_at >= filters["date_from"]
-            base = base.where(cond)
-            count_q = count_q.where(cond)
-
-        if filters.get("date_to") is not None:
-            cond = Transaction.created_at <= filters["date_to"]
-            base = base.where(cond)
-            count_q = count_q.where(cond)
-
-        if filters.get("min_amount") is not None:
-            cond = Transaction.amount >= filters["min_amount"]
-            base = base.where(cond)
-            count_q = count_q.where(cond)
-
-        if filters.get("max_amount") is not None:
-            cond = Transaction.amount <= filters["max_amount"]
-            base = base.where(cond)
-            count_q = count_q.where(cond)
-
-        total = (await self.session.execute(count_q)).scalar() or 0
+        order_col = Transaction.created_at
+        order_expr = (
+            order_col.asc() if filters.order == "asc" else (order_col.desc())
+        )
 
         query = (
             base.options(
-                joinedload(Transaction.from_account),
-                joinedload(Transaction.to_account),
+                joinedload(Transaction.from_account).joinedload(Account.user),
+                joinedload(Transaction.to_account).joinedload(Account.user),
+                joinedload(Transaction.verified_by),
             )
-            .order_by(Transaction.created_at.desc())
+            .order_by(order_expr, Transaction.id.desc())
             .offset(skip)
             .limit(limit)
         )
         result = await self.session.execute(query)
-        transactions = result.scalars().unique().all()
+        return total, result.scalars().unique().all()
 
-        return total, transactions
+    async def get_transactions_summary(
+        self,
+        filters: TransactionFilter,
+    ) -> TransactionSummary:
+        """Агрегаты по тому же фильтру (без пагинации)."""
+        (
+            from_acc,
+            to_acc,
+            from_user,
+            to_user,
+            order_alias,
+            contract_alias,
+            base,
+        ) = self._transaction_base_joins()
+        base = self._apply_transaction_filters(
+            base,
+            from_acc,
+            to_acc,
+            from_user,
+            to_user,
+            order_alias,
+            contract_alias,
+            filters,
+        )
+
+        agg_stmt = select(
+            func.coalesce(func.sum(Transaction.amount), 0),
+            func.count(
+                case((Transaction.status == TransactionStatus.PENDING, 1))
+            ),
+            func.count(
+                case((Transaction.status == TransactionStatus.COMPLETED, 1))
+            ),
+            func.count(
+                case((Transaction.status == TransactionStatus.REJECTED, 1))
+            ),
+        ).select_from(base.subquery())
+        row = (await self.session.execute(agg_stmt)).one()
+        return TransactionSummary(
+            sum_amount=int(row[0]),
+            count_by_status={
+                TransactionStatus.PENDING.value: int(row[1]),
+                TransactionStatus.COMPLETED.value: int(row[2]),
+                TransactionStatus.REJECTED.value: int(row[3]),
+            },
+        )
 
     async def get_pending_count(self) -> int:
         """Количество PENDING-транзакций."""

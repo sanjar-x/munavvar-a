@@ -1,6 +1,7 @@
 # src/modules/finances/schemas.py
 import uuid
 from datetime import date, datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -72,6 +73,7 @@ class AccountShort(BaseModel):
     id: uuid.UUID
     name: str
     type: AccountType
+    user_name: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -182,7 +184,9 @@ class TransactionDetail(BaseModel):
     status: TransactionStatus
     reason: str
     order_id: uuid.UUID | None
+    order_short_id: str | None = None
     verified_by_id: uuid.UUID | None
+    verified_by_name: str | None = None
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
@@ -308,20 +312,110 @@ class AcceptPaymentRequest(BaseModel):
 # =====================================================================
 
 
+DatePreset = Literal[
+    "today",
+    "yesterday",
+    "this_week",
+    "last_week",
+    "this_month",
+    "last_month",
+]
+TransactionDirection = Literal["incoming", "outgoing", "internal"]
+SortOrder = Literal["asc", "desc"]
+
+
 class TransactionFilter(BaseModel):
-    status: TransactionStatus | None = None
+    """Фильтры для `GET /backoffice/finances/transactions`.
+
+    Использовать напрямую в сервисе/репозитории. Сбор из query-параметров
+    — в отдельной dependency (`build_transaction_filter`).
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
+    q: str | None = None
+
+    status_in: list[TransactionStatus] | None = None
+    direction: TransactionDirection | None = None
+
     account_id: uuid.UUID | None = None
+    from_account_id: uuid.UUID | None = None
+    to_account_id: uuid.UUID | None = None
+    from_account_type_in: list[AccountType] | None = None
+    to_account_type_in: list[AccountType] | None = None
+
     order_id: uuid.UUID | None = None
+    order_status_in: list[str] | None = None
+    order_payment_method_in: list[str] | None = None
+    order_sale_type_in: list[str] | None = None
+    has_order: bool | None = None
+
+    contract_id: uuid.UUID | None = None
+    contract_number: str | None = None
+
+    client_id: uuid.UUID | None = None
+    courier_id: uuid.UUID | None = None
+    user_role_in: list[str] | None = None
+
+    verified_by_id: uuid.UUID | None = None
+    verified: bool | None = None
+
+    reason_search: str | None = None
+
+    amount_eq: int | None = None
+    amount_from: int | None = None
+    amount_to: int | None = None
+
+    date_preset: DatePreset | None = None
     date_from: datetime | None = None
     date_to: datetime | None = None
-    min_amount: int | None = None
-    max_amount: int | None = None
+
+    sort: Literal["created_at"] = "created_at"
+    order: SortOrder = "desc"
 
 
 class AccountFilter(BaseModel):
-    type: AccountType | None = None
-    search: str | None = None
-    has_debt: bool | None = None
+    """Фильтры для `GET /backoffice/finances/accounts`."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    q: str | None = None
+
+    type_in: list[AccountType] | None = None
+    user_id: uuid.UUID | None = None
+    user_role_in: list[str] | None = None
+
+    balance_from: int | None = None
+    balance_to: int | None = None
+    is_in_credit: bool | None = None
+    zero_balance: bool | None = None
+    has_debt: bool | None = None  # legacy alias
+
+    created_from: datetime | None = None
+    created_to: datetime | None = None
+
+
+class PaginationParams(BaseModel):
+    page: int = 1
+    size: int = 50
+
+
+class OffsetPaginationMeta(BaseModel):
+    mode: Literal["offset"] = "offset"
+    page: int
+    size: int
+    total_count: int
+    total_pages: int
+
+
+class TransactionSummary(BaseModel):
+    sum_amount: int
+    count_by_status: dict[str, int]
+
+
+class AccountSummary(BaseModel):
+    sum_balance: int
+    count_by_type: dict[str, int]
 
 
 # =====================================================================
