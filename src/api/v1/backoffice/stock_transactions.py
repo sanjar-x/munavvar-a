@@ -9,7 +9,7 @@ ACCOUNTANT, COURIER).
 
 import uuid
 from datetime import datetime
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, Query, Security
 
@@ -39,7 +39,7 @@ def build_stock_transaction_filter(
     to_id: Annotated[uuid.UUID | None, Query()] = None,
     inventory_id: Annotated[uuid.UUID | None, Query()] = None,
     direction: Annotated[
-        str | None,
+        Literal["incoming", "outgoing", "any"] | None,
         Query(
             description="incoming | outgoing | any (only with inventory_id)",
         ),
@@ -56,7 +56,7 @@ def build_stock_transaction_filter(
     date_preset: Annotated[DatePreset | None, Query()] = None,
     date_from: Annotated[datetime | None, Query()] = None,
     date_to: Annotated[datetime | None, Query()] = None,
-    sort: Annotated[str, Query()] = "created_at",
+    sort: Annotated[Literal["created_at", "quantity"], Query()] = "created_at",
     order: Annotated[SortOrder, Query()] = "desc",
 ) -> StockTransactionFilter:
     return StockTransactionFilter(
