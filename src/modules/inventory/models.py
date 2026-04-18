@@ -256,6 +256,16 @@ class Balance(BaseModel):
     inventory: Mapped[Inventory] = relationship(back_populates="balances")
     product: Mapped[Product] = relationship()
 
+    # ВАЖНО: глобальный CHECK (quantity >= 0) намеренно НЕ
+    # объявлен. Виртуальные инвентари VIRTUAL_VENDOR /
+    # VIRTUAL_LOSS по дизайну держат отрицательный/растущий
+    # баланс (источник оприходования и яма списаний).
+    # Партиальная проверка «non-virtual ⇒ quantity >= 0»
+    # реализована в триггере `update_inventory_balances`
+    # (`scripts/update_inventory_balances.sql`). PostgreSQL не
+    # поддерживает CHECK с подзапросом — поэтому DDL CHECK
+    # эквивалент построить нельзя, и триггер остаётся единственным
+    # местом enforcement.
     __table_args__ = (
         UniqueConstraint(
             "inventory_id", "product_id", name="uq_inventory_product_balance"

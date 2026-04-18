@@ -115,6 +115,9 @@ ROLE_SCOPES: dict[Role, list[str]] = {
         Scope.SETTINGS_WRITE,
     ],
     # Бухгалтер (Только деньги, документы и персонал)
+    # INVENTORY_READ выдан для read-only доступа к stock-ledger
+    # (`/backoffice/stock-transactions`, `/backoffice/balances`).
+    # См. INVENTORY_SEARCH_FILTERS_FRD §13 Q2.
     Role.ACCOUNTANT: BASE_SCOPES
     + [
         Scope.USERS_READ,
@@ -122,6 +125,7 @@ ROLE_SCOPES: dict[Role, list[str]] = {
         Scope.FINANCES_WRITE,
         Scope.BILLS_READ,
         Scope.CONTRACTS_READ,
+        Scope.INVENTORY_READ,
     ],
     # Кладовщик (Только склад и логистика)
     Role.STOREKEEPER: BASE_SCOPES
@@ -151,6 +155,7 @@ ROLE_SCOPES: dict[Role, list[str]] = {
         Scope.ORDERS_DELIVER,
         Scope.ROUTES_READ,
         Scope.PAYMENTS_CREATE,
+        Scope.INVENTORY_READ,
     ],
     # Физ. лицо (Свои заказы)
     Role.CLIENT_B2C: BASE_SCOPES

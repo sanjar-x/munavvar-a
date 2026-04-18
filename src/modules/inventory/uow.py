@@ -6,6 +6,7 @@ from src.modules.finances.repositories import (
     TransactionRepository as FinancialTransactionRepository,
 )
 from src.modules.inventory.repositories import (
+    BalanceRepository,
     InventoryRepository,
     StockTransactionRepository,
     StockTransferItemRepository,
@@ -19,6 +20,7 @@ class IInventoryUnitOfWork(IUnitOfWork):
     transfers: StockTransferRepository
     transfer_items: StockTransferItemRepository
     transactions: StockTransactionRepository
+    balances: BalanceRepository
     accounts: AccountRepository
     financial_transactions: FinancialTransactionRepository
 
@@ -36,6 +38,7 @@ class InventoryUnitOfWork(BaseSQLAlchemyUoW, IInventoryUnitOfWork):
         self.transfers = StockTransferRepository(session=self.session)
         self.transfer_items = StockTransferItemRepository(session=self.session)
         self.transactions = StockTransactionRepository(session=self.session)
+        self.balances = BalanceRepository(session=self.session)
         self.accounts = AccountRepository(session=self.session)
         self.financial_transactions = FinancialTransactionRepository(
             session=self.session

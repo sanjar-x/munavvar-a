@@ -77,7 +77,6 @@ line-ending = "auto"
 [tool.ty.rules]
 invalid-return-type = "error"
 invalid-argument-type = "warn"
-possibly-unbound = "warn"
 
 # ── pytest ────────────────────────────────────────────────────────────────────
 

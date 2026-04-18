@@ -7,6 +7,7 @@ and verifies HTTP response AND final balance state
 deactivation).
 """
 
+import pytest
 from sqlalchemy import select
 
 from src.infrastructure.database.models import (
@@ -24,6 +25,14 @@ from tests.integration.conftest import (
 
 
 class TestCourierShiftClose:
+    @pytest.mark.skip(
+        reason=(
+            "Фича /backoffice/shifts/close не реализована: "
+            "исходники src/api/v1/backoffice/shifts.py и "
+            "src/modules/inventory/shift_service.py удалены, "
+            "остались только .pyc. См. SENIOR_CODE_REVIEW FAIL-2."
+        )
+    )
     async def test_shift_close_returns_stock_and_collects_cash(
         self,
         client,

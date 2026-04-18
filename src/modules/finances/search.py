@@ -14,11 +14,14 @@ from __future__ import annotations
 
 import re
 
+from src.common.search import ilike_pattern as _common_ilike_pattern
 from src.modules.finances.exceptions import (
     SearchTooLongError,
     SearchTooShortError,
     SearchUuidNotAllowedError,
 )
+
+__all__ = ["normalize_q", "ilike_pattern"]
 
 MIN_LEN = 2
 MAX_LEN = 100
@@ -55,6 +58,9 @@ def normalize_q(raw: str | None) -> str | None:
 
 
 def ilike_pattern(q: str) -> str:
-    """Безопасный ILIKE-шаблон: экранируем `%`/`_` во вводе."""
-    escaped = q.replace("\\", "\\\\").replace("%", r"\%").replace("_", r"\_")
-    return f"%{escaped}%"
+    """Безопасный ILIKE-шаблон: экранируем `%`/`_` во вводе.
+
+    Реэкспорт из `src.common.search` — сохраняется для совместимости
+    с тестами и прежним публичным API модуля финансов.
+    """
+    return _common_ilike_pattern(q)

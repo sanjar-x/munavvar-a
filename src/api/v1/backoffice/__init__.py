@@ -1,5 +1,6 @@
 from fastapi import APIRouter
 
+from src.api.v1.backoffice.balances import balances_router
 from src.api.v1.backoffice.catalog import catalog_router
 from src.api.v1.backoffice.clients import clients_router
 from src.api.v1.backoffice.contracts import contracts_router
@@ -11,6 +12,9 @@ from src.api.v1.backoffice.finances import finances_router
 from src.api.v1.backoffice.inventories import inventories_router
 from src.api.v1.backoffice.orders import orders_router
 from src.api.v1.backoffice.profile import profile_router
+from src.api.v1.backoffice.stock_transactions import (
+    stock_transactions_router,
+)
 from src.api.v1.backoffice.system import system_router
 from src.api.v1.backoffice.transfers import transfers_router
 from src.api.v1.backoffice.transport import transport_router
@@ -47,6 +51,16 @@ backoffice.include_router(
 )
 backoffice.include_router(
     transfers_router, prefix="/transfers", tags=["Backoffice | Transfers"]
+)
+backoffice.include_router(
+    stock_transactions_router,
+    prefix="/stock-transactions",
+    tags=["Backoffice | Stock Transactions"],
+)
+backoffice.include_router(
+    balances_router,
+    prefix="/balances",
+    tags=["Backoffice | Balances"],
 )
 backoffice.include_router(
     orders_router, prefix="/orders", tags=["Backoffice | Orders"]

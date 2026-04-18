@@ -24,7 +24,7 @@ users_router = APIRouter()
 
 
 @users_router.post(
-    "/",
+    "",
     response_model=UserResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Создать нового сотрудника или пользователя",
@@ -44,7 +44,7 @@ async def create_user(
 
 
 @users_router.get(
-    "/",
+    "",
     response_model=UserResponseList,
     summary="Получить список сотрудников",
 )

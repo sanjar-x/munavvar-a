@@ -72,6 +72,13 @@ class Account(BaseModel):
     )
 
     # --- Meta ---
+    # ВАЖНО: глобальный CHECK (balance >= 0) намеренно НЕ
+    # объявлен. Часть счетов (CLIENT/COURIER) легитимно уходят
+    # в минус в credit-сценариях — см. фильтр `is_in_credit`
+    # (`finances/repositories.py`). Если в будущем потребуется
+    # запретить overdraft для конкретных типов — реализовать
+    # партиальную проверку в триггере `update_account_balances`
+    # с условием по `accounts.type`.
     __table_args__ = (
         Index("idx_account_user_type", "user_id", "type"),
         {

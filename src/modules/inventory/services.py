@@ -4,6 +4,12 @@ from datetime import datetime
 
 from sqlalchemy.exc import IntegrityError
 
+from src.common.pagination import (
+    CursorInvalidError,
+    CursorPaginationMeta,
+    build_cursor_meta,
+    decode_cursor,
+)
 from src.core.exceptions import (
     BadRequestError,
     ConflictError,
@@ -327,6 +333,53 @@ class WarehouseService:
                 limit=limit,
             )
 
+    async def search_inventories_cursor(
+        self,
+        search_query: str,
+        inv_type: InventoryType | None = None,
+        size: int = 50,
+        cursor_token: str | None = None,
+    ) -> tuple[Sequence[Inventory], CursorPaginationMeta]:
+        """Cursor-вариант ``search_inventories`` (FRD §15.2)."""
+        cursor: tuple[str, uuid.UUID] | None = None
+        if cursor_token:
+            sort_value, last_id = decode_cursor(cursor_token)
+            if not isinstance(sort_value, str):
+                raise CursorInvalidError()
+            cursor = (sort_value, last_id)
+        async with self.uow:
+            rows = await self.uow.inventories.search_inventories_cursor(
+                search_query=search_query,
+                inv_type=inv_type,
+                size=size,
+                cursor=cursor,
+            )
+        page, meta = build_cursor_meta(list(rows), size, lambda r: r.name)
+        return page, meta
+
+    async def get_warehouses_with_balances_cursor(
+        self,
+        owner_id: uuid.UUID | None = None,
+        size: int = 50,
+        cursor_token: str | None = None,
+    ) -> tuple[Sequence[Inventory], CursorPaginationMeta]:
+        """Cursor-вариант ``get_warehouses_with_balances`` (FRD §15.2)."""
+        cursor: tuple[str, uuid.UUID] | None = None
+        if cursor_token:
+            sort_value, last_id = decode_cursor(cursor_token)
+            if not isinstance(sort_value, str):
+                raise CursorInvalidError()
+            cursor = (sort_value, last_id)
+        async with self.uow:
+            repo = self.uow.inventories
+            rows = await repo.get_all_warehouses_with_balances_cursor(
+                owner_id=owner_id,
+                size=size,
+                cursor=cursor,
+            )
+        page, meta = build_cursor_meta(list(rows), size, lambda r: r.name)
+        return page, meta
+
 
 # Типы накладных, требующие расширенного права logistics:adjustment.
 # Кладовщик с logistics:transfer не может их создавать.
@@ -374,6 +427,44 @@ class StockTransferService:
                 warehouse_owner_id=warehouse_owner_id,
                 warehouse_id=warehouse_id,
             )
+
+    async def search_transfers_cursor(
+        self,
+        size: int = 50,
+        cursor_token: str | None = None,
+        status: TransferStatus | None = None,
+        transfer_type: TransferType | None = None,
+        from_inventory_id: uuid.UUID | None = None,
+        to_inventory_id: uuid.UUID | None = None,
+        date_from: datetime | None = None,
+        date_to: datetime | None = None,
+        warehouse_owner_id: uuid.UUID | None = None,
+        warehouse_id: uuid.UUID | None = None,
+    ) -> tuple[Sequence[StockTransfer], CursorPaginationMeta]:
+        """Cursor-вариант ``search_transfers`` (FRD §15.2)."""
+        cursor: tuple[datetime, uuid.UUID] | None = None
+        if cursor_token:
+            sort_value, last_id = decode_cursor(cursor_token)
+            if not isinstance(sort_value, datetime):
+                raise CursorInvalidError()
+            cursor = (sort_value, last_id)
+        async with self.uow:
+            rows = await self.uow.transfers.search_transfers_cursor(
+                size=size,
+                cursor=cursor,
+                status=status,
+                transfer_type=transfer_type,
+                from_inventory_id=from_inventory_id,
+                to_inventory_id=to_inventory_id,
+                date_from=date_from,
+                date_to=date_to,
+                warehouse_owner_id=warehouse_owner_id,
+                warehouse_id=warehouse_id,
+            )
+        page, meta = build_cursor_meta(
+            list(rows), size, lambda r: r.created_at
+        )
+        return page, meta
 
     async def create_transfer(
         self,
@@ -781,3 +872,252 @@ class CapitalizeTaraService:
                     for ci in items_to_capitalize
                 ],
             }
+
+
+# =====================================================================
+# НОВЫЕ СЕРВИСЫ: StockLedger / Balances (FRD §6, §9)
+# =====================================================================
+
+from datetime import UTC, timedelta  # noqa: E402
+
+from src.modules.inventory.exceptions import (  # noqa: E402
+    DatePresetConflictError,
+    DateRangeInvalidError,
+    PaginationTooDeepError,
+    QuantityConflictError,
+    QuantityRangeInvalidError,
+)
+from src.modules.inventory.schemas import (  # noqa: E402
+    BalanceFilter,
+    BalanceRowItem,
+    BalancesListResponse,
+    BalanceSummary,
+    InventoryShortRef,
+    OffsetPaginationMeta,
+    ProductSimpleResponse,
+    StockTransactionFilter,
+    StockTransactionItem,
+    StockTransactionsListResponse,
+    StockTransactionSummary,
+)
+
+MAX_PAGE_DEPTH = 10_000
+
+
+def _check_pagination(page: int, size: int) -> None:
+    if page * size > MAX_PAGE_DEPTH:
+        raise PaginationTooDeepError(page=page, size=size)
+
+
+def _total_pages(total: int, size: int) -> int:
+    if size <= 0:
+        return 0
+    return (total + size - 1) // size
+
+
+def _validate_stock_transaction_filter(f: StockTransactionFilter) -> None:
+    if f.quantity_eq is not None and (
+        f.quantity_from is not None or f.quantity_to is not None
+    ):
+        raise QuantityConflictError()
+    if (
+        f.quantity_from is not None
+        and f.quantity_to is not None
+        and f.quantity_from > f.quantity_to
+    ):
+        raise QuantityRangeInvalidError()
+    if f.date_preset is not None and (
+        f.date_from is not None or f.date_to is not None
+    ):
+        raise DatePresetConflictError()
+    if (
+        f.date_from is not None
+        and f.date_to is not None
+        and f.date_from > f.date_to
+    ):
+        raise DateRangeInvalidError()
+
+
+def _validate_balance_filter(f: BalanceFilter) -> None:
+    if (
+        f.quantity_from is not None
+        and f.quantity_to is not None
+        and f.quantity_from > f.quantity_to
+    ):
+        raise QuantityRangeInvalidError()
+
+
+def _resolve_date_preset(
+    f: StockTransactionFilter,
+) -> StockTransactionFilter:
+    """Развернуть `date_preset` в `date_from`/`date_to`.
+
+    TZ — `Asia/Tashkent`. Возвращает новый объект фильтра.
+    """
+    if f.date_preset is None:
+        return f
+    try:
+        from zoneinfo import ZoneInfo
+    except ImportError:  # pragma: no cover
+        return f
+
+    tz = ZoneInfo("Asia/Tashkent")
+    now_local = datetime.now(tz)
+    today = now_local.replace(hour=0, minute=0, second=0, microsecond=0)
+
+    preset = f.date_preset
+    if preset == "today":
+        start_local = today
+        end_local = today + timedelta(days=1)
+    elif preset == "yesterday":
+        start_local = today - timedelta(days=1)
+        end_local = today
+    elif preset == "this_week":
+        start_local = today - timedelta(days=today.weekday())
+        end_local = start_local + timedelta(days=7)
+    elif preset == "last_week":
+        this_monday = today - timedelta(days=today.weekday())
+        start_local = this_monday - timedelta(days=7)
+        end_local = this_monday
+    elif preset == "this_month":
+        start_local = today.replace(day=1)
+        if start_local.month == 12:
+            end_local = start_local.replace(year=start_local.year + 1, month=1)
+        else:
+            end_local = start_local.replace(month=start_local.month + 1)
+    elif preset == "last_month":
+        first_this = today.replace(day=1)
+        if first_this.month == 1:
+            start_local = first_this.replace(
+                year=first_this.year - 1, month=12
+            )
+        else:
+            start_local = first_this.replace(month=first_this.month - 1)
+        end_local = first_this
+    else:
+        return f
+
+    return f.model_copy(
+        update={
+            "date_preset": None,
+            "date_from": start_local.astimezone(UTC),
+            "date_to": end_local.astimezone(UTC),
+        }
+    )
+
+
+def _normalize_stock_q(filters):
+    """Применить нормализацию `q` (FRD §4.6) к полю фильтра."""
+    from src.modules.inventory.search import normalize_q
+
+    if filters.q is None:
+        return filters
+    return filters.model_copy(update={"q": normalize_q(filters.q)})
+
+
+def _normalize_balance_q(filters):
+    from src.modules.inventory.search import normalize_q
+
+    if filters.q is None:
+        return filters
+    return filters.model_copy(update={"q": normalize_q(filters.q)})
+
+
+def _to_inventory_short(inv) -> InventoryShortRef:
+    return InventoryShortRef.model_validate(inv)
+
+
+def _stock_transaction_to_item(st) -> StockTransactionItem:
+    return StockTransactionItem(
+        id=st.id,
+        product_id=st.product_id,
+        product=ProductSimpleResponse.model_validate(st.product),
+        quantity=st.quantity,
+        from_inventory=_to_inventory_short(st.from_inventory),
+        to_inventory=_to_inventory_short(st.to_inventory),
+        transfer_id=st.transfer_id,
+        transfer_type=st.transfer.type,
+        created_at=st.created_at,
+    )
+
+
+class StockLedgerService:
+    """Read-only сервис для журнала движений (FRD §6)."""
+
+    def __init__(self, uow: InventoryUnitOfWork):
+        self.uow = uow
+
+    async def list(
+        self,
+        filters: StockTransactionFilter,
+        page: int,
+        size: int,
+    ) -> StockTransactionsListResponse:
+        _check_pagination(page, size)
+        filters = _normalize_stock_q(filters)
+        _validate_stock_transaction_filter(filters)
+        filters = _resolve_date_preset(filters)
+
+        async with self.uow as uow:
+            total, rows = await uow.transactions.search_with_filters(
+                filters=filters,
+                skip=(page - 1) * size,
+                limit=size,
+            )
+            agg = await uow.transactions.summarize_with_filters(filters)
+
+        items = [_stock_transaction_to_item(st) for st in rows]
+        return StockTransactionsListResponse(
+            items=items,
+            pagination=OffsetPaginationMeta(
+                page=page,
+                size=size,
+                total_count=total,
+                total_pages=_total_pages(total, size),
+            ),
+            summary=StockTransactionSummary(**agg),
+        )
+
+
+class BalanceService:
+    """Read-only сервис для остатков (FRD §9)."""
+
+    def __init__(self, uow: InventoryUnitOfWork):
+        self.uow = uow
+
+    async def list(
+        self,
+        filters: BalanceFilter,
+        page: int,
+        size: int,
+    ) -> BalancesListResponse:
+        _check_pagination(page, size)
+        filters = _normalize_balance_q(filters)
+        _validate_balance_filter(filters)
+
+        async with self.uow as uow:
+            total, rows = await uow.balances.search_with_filters(
+                filters=filters,
+                skip=(page - 1) * size,
+                limit=size,
+            )
+            agg = await uow.balances.summarize_with_filters(filters)
+
+        items = [
+            BalanceRowItem(
+                product=ProductSimpleResponse.model_validate(b.product),
+                inventory=_to_inventory_short(b.inventory),
+                quantity=b.quantity,
+            )
+            for b in rows
+        ]
+        return BalancesListResponse(
+            items=items,
+            pagination=OffsetPaginationMeta(
+                page=page,
+                size=size,
+                total_count=total,
+                total_pages=_total_pages(total, size),
+            ),
+            summary=BalanceSummary(**agg),
+        )

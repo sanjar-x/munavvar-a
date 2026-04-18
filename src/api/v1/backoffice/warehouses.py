@@ -2,7 +2,7 @@
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Security, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Security, status
 
 from src.core.security.permissions import Scope
 from src.infrastructure.database.models import User
@@ -12,6 +12,7 @@ from src.modules.inventory.schemas import (
     InventoryResponse,
     WarehouseCreate,
     WarehouseDetailResponse,
+    WarehousesCursorListResponse,
     WarehouseUpdate,
 )
 from src.modules.inventory.services import WarehouseService
@@ -22,7 +23,9 @@ warehouses_router = APIRouter()
 
 @warehouses_router.get(
     "/",
-    response_model=list[WarehouseDetailResponse],
+    response_model=(
+        list[WarehouseDetailResponse] | WarehousesCursorListResponse
+    ),
     summary="Список всех складов с актуальными остатками",
 )
 async def get_warehouses_with_balances(
@@ -32,11 +35,34 @@ async def get_warehouses_with_balances(
     warehouse_service: Annotated[
         WarehouseService, Depends(get_warehouse_service)
     ],
+    cursor: Annotated[
+        str | None,
+        Query(
+            description=(
+                "Cursor-режим (FRD §15.2). Если задан — ответ"
+                " оборачивается в `WarehousesCursorListResponse`."
+            )
+        ),
+    ] = None,
+    size: int = Query(50, ge=1, le=100),
 ):
     # Storekeeper sees only their own warehouse(s); admin sees all
     owner_id = (
         current_admin.id if current_admin.role == Role.STOREKEEPER else None
     )
+    if cursor is not None:
+        (
+            items,
+            meta,
+        ) = await warehouse_service.get_warehouses_with_balances_cursor(
+            owner_id=owner_id,
+            size=size,
+            cursor_token=cursor,
+        )
+        return WarehousesCursorListResponse(
+            items=[WarehouseDetailResponse.model_validate(it) for it in items],
+            pagination=meta,
+        )
     return await warehouse_service.get_warehouses_with_balances(
         owner_id=owner_id
     )

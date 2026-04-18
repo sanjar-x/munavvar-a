@@ -1,10 +1,11 @@
 # src/modules/inventory/schemas.py
 import uuid
 from datetime import datetime
-from typing import Self
+from typing import Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from src.common.pagination import CursorPaginationMeta
 from src.modules.catalog.enums import ProductType
 from src.modules.catalog.schemas import ProductResponse
 from src.modules.inventory.enums import (
@@ -396,3 +397,173 @@ class InventorySearchResult(BaseModel):
     user_id: uuid.UUID
 
     model_config = ConfigDict(from_attributes=True)
+
+
+# =====================================================================
+# SEARCH / FILTER / PAGINATION (FRD §6, §9)
+# Документация: research/INVENTORY_SEARCH_FILTERS_FRD.md
+# =====================================================================
+
+DatePreset = Literal[
+    "today",
+    "yesterday",
+    "this_week",
+    "last_week",
+    "this_month",
+    "last_month",
+]
+SortOrder = Literal["asc", "desc"]
+
+
+class StockTransactionFilter(BaseModel):
+    """Фильтры для `GET /backoffice/stock-transactions/` (FRD §6.1)."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    q: str | None = None
+
+    product_id: uuid.UUID | None = None
+    product_id_in: list[uuid.UUID] | None = None
+    product_type_in: list[ProductType] | None = None
+
+    from_id: uuid.UUID | None = None
+    to_id: uuid.UUID | None = None
+    inventory_id: uuid.UUID | None = None
+    direction: Literal["incoming", "outgoing", "any"] | None = None
+
+    from_type_in: list[InventoryType] | None = None
+    to_type_in: list[InventoryType] | None = None
+
+    transfer_id: uuid.UUID | None = None
+    transfer_type_in: list[TransferType] | None = None
+    order_id: uuid.UUID | None = None
+    created_by_id: uuid.UUID | None = None
+
+    quantity_eq: int | None = None
+    quantity_from: int | None = None
+    quantity_to: int | None = None
+
+    date_preset: DatePreset | None = None
+    date_from: datetime | None = None
+    date_to: datetime | None = None
+
+    sort: Literal["created_at", "quantity"] = "created_at"
+    order: SortOrder = "desc"
+
+
+class BalanceFilter(BaseModel):
+    """Фильтры для `GET /backoffice/balances/` (FRD §9.1)."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    q: str | None = None
+
+    product_id: uuid.UUID | None = None
+    product_id_in: list[uuid.UUID] | None = None
+    product_type_in: list[ProductType] | None = None
+
+    inventory_type_in: list[InventoryType] | None = None
+    inventory_id_in: list[uuid.UUID] | None = None
+    user_id: uuid.UUID | None = None
+
+    quantity_from: int | None = None
+    quantity_to: int | None = None
+    nonzero_only: bool = True
+
+    sort: Literal["quantity", "product_name", "inventory_name"] = "quantity"
+    order: SortOrder = "desc"
+
+
+class OffsetPaginationMeta(BaseModel):
+    mode: Literal["offset"] = "offset"
+    page: int
+    size: int
+    total_count: int
+    total_pages: int
+
+
+class StockTransactionSummary(BaseModel):
+    """Агрегаты для `/stock-transactions` (FRD §6.5)."""
+
+    total_transactions: int
+    total_quantity: int
+    by_transfer_type: dict[str, int]
+
+
+class BalanceSummary(BaseModel):
+    """Агрегаты для `/balances` (FRD §9.4)."""
+
+    total_quantity: int
+    by_inventory_type: dict[str, int]
+
+
+class InventoryShortRef(BaseModel):
+    id: uuid.UUID
+    name: str
+    type: InventoryType
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class StockTransactionItem(BaseModel):
+    """Расширенный ответ для строки леджера (FRD §6.5)."""
+
+    id: uuid.UUID
+    product_id: uuid.UUID
+    product: ProductSimpleResponse
+    quantity: int
+    from_inventory: InventoryShortRef
+    to_inventory: InventoryShortRef
+    transfer_id: uuid.UUID
+    transfer_type: TransferType
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class StockTransactionsListResponse(BaseModel):
+    """Ответ `GET /backoffice/stock-transactions/`."""
+
+    items: list[StockTransactionItem]
+    pagination: OffsetPaginationMeta
+    summary: StockTransactionSummary
+
+
+class BalanceRowItem(BaseModel):
+    """Строка ответа `/balances/`."""
+
+    product: ProductSimpleResponse
+    inventory: InventoryShortRef
+    quantity: int
+
+
+class BalancesListResponse(BaseModel):
+    """Ответ `GET /backoffice/balances/`."""
+
+    items: list[BalanceRowItem]
+    pagination: OffsetPaginationMeta
+    summary: BalanceSummary
+
+
+# --- Cursor-pagination wrappers (FRD §15.2) ---
+
+
+class TransfersCursorListResponse(BaseModel):
+    """Cursor-режим ответа `GET /backoffice/transfers/`."""
+
+    items: list[TransferResponse]
+    pagination: CursorPaginationMeta
+
+
+class WarehousesCursorListResponse(BaseModel):
+    """Cursor-режим ответа `GET /backoffice/warehouses/`."""
+
+    items: list[WarehouseDetailResponse]
+    pagination: CursorPaginationMeta
+
+
+class InventoriesSearchCursorListResponse(BaseModel):
+    """Cursor-режим ответа `GET /backoffice/inventories/search`."""
+
+    items: list[InventorySearchResult]
+    pagination: CursorPaginationMeta

@@ -13,6 +13,7 @@ from src.modules.inventory.enums import TransferType
 from src.modules.inventory.schemas import (
     CreateTransferRequest,
     TransferResponse,
+    TransfersCursorListResponse,
 )
 from src.modules.inventory.services import StockTransferService
 from src.modules.users.enums import Role
@@ -30,7 +31,7 @@ def date_to_datetime_end(d: date) -> datetime:
 
 @transfers_router.get(
     "/",
-    response_model=list[TransferResponse],
+    response_model=list[TransferResponse] | TransfersCursorListResponse,
     summary="Журнал всех накладных",
 )
 async def get_transfers(
@@ -42,6 +43,16 @@ async def get_transfers(
     ],
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
+    cursor: Annotated[
+        str | None,
+        Query(
+            description=(
+                "Cursor-режим (FRD §15.2). Если задан — `page`"
+                " игнорируется, ответ оборачивается в"
+                " `TransfersCursorListResponse`."
+            )
+        ),
+    ] = None,
     type: Annotated[
         TransferType | None, Query(description="Фильтр по типу")
     ] = None,
@@ -55,7 +66,6 @@ async def get_transfers(
         uuid.UUID | None, Query(description="Склад (from или to)")
     ] = None,
 ):
-    skip = (page - 1) * size
     # Storekeeper sees only transfers touching their
     # warehouse(s); admin sees all
     warehouse_owner_id = (
@@ -66,6 +76,23 @@ async def get_transfers(
         date_to_datetime_start(from_date) if from_date is not None else None
     )
     date_to_ = date_to_datetime_end(to_date) if to_date is not None else None
+
+    if cursor is not None:
+        items, meta = await transfer_service.search_transfers_cursor(
+            size=size,
+            cursor_token=cursor,
+            transfer_type=type,
+            date_from=date_from,
+            date_to=date_to_,
+            warehouse_id=warehouse_id,
+            warehouse_owner_id=warehouse_owner_id,
+        )
+        return TransfersCursorListResponse(
+            items=[TransferResponse.model_validate(it) for it in items],
+            pagination=meta,
+        )
+
+    skip = (page - 1) * size
     return await transfer_service.search_transfers(
         skip=skip,
         limit=size,
@@ -75,6 +102,14 @@ async def get_transfers(
         warehouse_id=warehouse_id,
         warehouse_owner_id=warehouse_owner_id,
     )
+
+
+def _has_cursor_format_request() -> bool:
+    """Hook для будущего расширения (`?format=cursor`).
+
+    Сейчас активирующий триггер — наличие `?cursor=...`.
+    """
+    return False
 
 
 @transfers_router.post(

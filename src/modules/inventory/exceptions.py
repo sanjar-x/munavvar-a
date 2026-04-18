@@ -444,3 +444,112 @@ class ReversalNotAllowedError(ForbiddenError):
                 "transfer_type": t_type,
             },
         )
+
+
+# ==========================================
+# 6. SEARCH / FILTER / PAGINATION (422)
+# ==========================================
+# См. research/INVENTORY_SEARCH_FILTERS_FRD.md §4.6, §6.1.
+
+
+class SearchTooShortError(BadRequestError):
+    """Параметр `q` короче минимально допустимой длины (2 символа)."""
+
+    def __init__(self, length: int):
+        super().__init__(
+            message=(
+                "Поисковый запрос слишком короткий. "
+                "Минимальная длина — 2 символа."
+            ),
+            error_code="SEARCH_TOO_SHORT",
+            details={"length": length, "min_length": 2},
+        )
+
+
+class SearchTooLongError(BadRequestError):
+    """Параметр `q` длиннее максимально допустимой длины (100 символов)."""
+
+    def __init__(self, length: int):
+        super().__init__(
+            message=(
+                "Поисковый запрос слишком длинный. "
+                "Максимальная длина — 100 символов."
+            ),
+            error_code="SEARCH_TOO_LONG",
+            details={"length": length, "max_length": 100},
+        )
+
+
+class SearchUuidNotAllowedError(BadRequestError):
+    """В `q` передан UUID или его hex-фрагмент (≥ 8 hex)."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            message=(
+                "В поиске запрещён UUID. Используйте структурные фильтры "
+                "(inventory_id, transfer_id, product_id и т.д.)."
+            ),
+            error_code="SEARCH_UUID_NOT_ALLOWED",
+        )
+
+
+class DateRangeInvalidError(BadRequestError):
+    """`date_from > date_to`."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            message="Некорректный диапазон дат: date_from позже date_to.",
+            error_code="DATE_RANGE_INVALID",
+        )
+
+
+class DatePresetConflictError(BadRequestError):
+    """Одновременно `date_preset` и `date_from`/`date_to`."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            message=(
+                "Параметр date_preset нельзя сочетать с date_from / date_to."
+            ),
+            error_code="DATE_PRESET_CONFLICT",
+        )
+
+
+class QuantityRangeInvalidError(BadRequestError):
+    """`quantity_from > quantity_to`."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            message=(
+                "Некорректный диапазон количества: "
+                "quantity_from больше quantity_to."
+            ),
+            error_code="QUANTITY_RANGE_INVALID",
+        )
+
+
+class QuantityConflictError(BadRequestError):
+    """Одновременно `quantity_eq` и `quantity_from`/`quantity_to`."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            message=(
+                "Параметр quantity_eq нельзя сочетать с "
+                "quantity_from / quantity_to."
+            ),
+            error_code="QUANTITY_CONFLICT",
+        )
+
+
+class PaginationTooDeepError(BadRequestError):
+    """`page * size > 10_000` — требуется уточнить фильтры."""
+
+    def __init__(self, page: int, size: int):
+        super().__init__(
+            message=(
+                "Слишком глубокая пагинация. Уточните фильтры или "
+                "перейдите на cursor-режим."
+            ),
+            error_code="PAGINATION_TOO_DEEP",
+            details={"page": page, "size": size, "limit": 10_000},
+        )

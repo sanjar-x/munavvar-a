@@ -27,7 +27,7 @@ async def get_my_vehicle_stock(
         User,
         Security(
             get_current_courier,
-            scopes=[Scope.CATALOG_READ],
+            scopes=[Scope.INVENTORY_READ],
         ),
     ],
     uow: Annotated[
