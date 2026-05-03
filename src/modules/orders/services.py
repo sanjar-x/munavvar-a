@@ -1355,21 +1355,37 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
         if stock_shortages:
             raise InsufficientStockError(shortages=stock_shortages)
 
-        # Walk-in (анонимный покупатель) не приносит пустую тару, не
-        # сдаёт её и не списывает товар после ухода — он просто
-        # покупает бутыль и уходит. Поэтому INITIAL_BALANCE,
-        # WAREHOUSE_TARA_RETURN и LOSS_WRITE_OFF к нему не применяются;
-        # выполняется только WAREHOUSE_SALE: WAREHOUSE → CLIENT.
-        # Walk-in CLIENT inventory ("Самовывоз") при этом служит
-        # журналом продаж со склада анонимам и накапливает положительные
-        # балансы — это допустимо, на него никакая бизнес-логика не
-        # завязана.
         is_walkin = order.client_id == WALKIN_USER_ID
         returnable_items = self._build_returnable_items(order.items)
 
+        # Walk-in: правило возврата тары выводится автоматически из items.
+        # Пользовательские бизнес-правила (3 сценария):
+        #   A. items = [вода]            → клиент покупает воду в своей таре,
+        #                                   сдаёт пустую → WAREHOUSE_TARA_RETURN
+        #                                   на returnable_item_id воды.
+        #   B. items = [вода, тара]      → клиент покупает полную бутыль И
+        #                                   доп. пустую тару → ничего не сдаёт
+        #                                   (returnable_item_id уже куплен).
+        #   C. items = [тара]            → клиент покупает только пустую тару
+        #                                   → returnable_items пустой, нечего
+        #                                   возвращать.
+        # Правило: walk-in возвращает только те returnable_items, чей
+        # product_id НЕ присутствует в order.items как самостоятельная
+        # позиция (она бы означала, что тара куплена, не сдана).
+        if is_walkin:
+            ordered_product_ids = {i.product_id for i in order.items}
+            returnable_for_pickup = [
+                r for r in returnable_items
+                if r["product_id"] not in ordered_product_ids
+            ]
+        else:
+            # Именованные клиенты: вся returnable-тара возвращается на склад
+            # (исторический сценарий обмена).
+            returnable_for_pickup = list(returnable_items)
+
         # 1. Виртуальное оприходование тары на склад из VIRTUAL_VENDOR.
-        # Для walk-in пропускается: склад не должен «получать» тару из
-        # ниоткуда при анонимной продаже.
+        # Только для именованных клиентов (склад не должен «получать» тару
+        # из ниоткуда при анонимной продаже).
         if returnable_items and not is_walkin:
             vendor_inv = await self.uow.inventories.get_vendor_inventory()
             await self._create_stock_transfer(
@@ -1383,13 +1399,19 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
                 reason="Container issued with warehouse pickup",
             )
 
-        # 2. WAREHOUSE_SALE: Warehouse → Client (товар + тара) — всегда.
+        # 2. WAREHOUSE_SALE: Warehouse → Client (всё, что физически уносит
+        # клиент). Для walk-in это order.items + только та returnable-тара,
+        # которая НЕ куплена явно как item (иначе будет двойной счёт).
+        # Для именованных — order.items + все returnable-тары (исторически).
         sale_items = [
             {"product_id": i.product_id, "quantity": i.quantity}
             for i in order.items
             if i.quantity > 0
         ]
-        sale_items.extend(returnable_items)
+        if is_walkin:
+            sale_items.extend(returnable_for_pickup)
+        else:
+            sale_items.extend(returnable_items)
         await self._create_stock_transfer(
             from_id=warehouse.id,
             to_id=order.client_inventory_id,
@@ -1401,14 +1423,14 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
         )
 
         # 3. WAREHOUSE_TARA_RETURN: Client → Warehouse.
-        # Только для именованных клиентов: они физически сдают пустую
-        # тару, которую принесли с собой. Walk-in ничего не приносил.
-        if returnable_items and not is_walkin:
+        # Walk-in: только для returnable, которые клиент сдал (см. правила
+        # выше). Именованные: вся returnable-тара (как было).
+        if returnable_for_pickup:
             await self._create_stock_transfer(
                 from_id=order.client_inventory_id,
                 to_id=warehouse.id,
                 transfer_type=TransferType.WAREHOUSE_TARA_RETURN,
-                items=returnable_items,
+                items=returnable_for_pickup,
                 created_by_id=completed_by_id,
                 accepted_by_id=completed_by_id,
                 order_id=order.id,
