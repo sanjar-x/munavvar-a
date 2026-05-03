@@ -204,7 +204,8 @@ A B2B/B2C water delivery management platform that automates the full cycle: from
 - Used by: API layer routers (primarily backoffice)
 - Purpose: Single-domain business logic, each module owns its data model and rules
 - Location: `src/modules/`
-- Contains: 6 modules -- `auth`, `users`, `catalog`, `orders`, `inventory`, `finances`
+- Contains: **7 modules** -- `auth`, `users`, `catalog`, `orders`, `inventory`, `finances`, `contracts`
+- `contracts/` owns the B2B domain: договоры, прайс-листы с per-product-quantity-квотами, инвойсы, акты сверки (`Reconciliation`), журнал статусов (`ContractStatusLog`), доп. соглашения (`ContractAmendment`). Самый активно меняющийся модуль на сегодня.
 - Depends on: `src/common/` base classes, `src/infrastructure/database/` session/base model
 - Used by: Application layer, API layer
 - Purpose: Base classes and interfaces shared across all modules
@@ -255,7 +256,8 @@ A B2B/B2C water delivery management platform that automates the full cycle: from
 - Responsibilities: Creates FastAPI app, registers middleware (RequestID -> AccessLogger -> CORS), exception handlers, mounts `api_v1_router` at `/api/v1`
 - Location: `alembic/env.py`, `alembic/versions/`
 - Triggers: `make upgrade` / `make migrate m="name"`
-- Responsibilities: Schema evolution. Two migrations: `cefde77d7774_init.py` (tables), `c650cec7ccb0_triggers.py` (PG trigger functions)
+- Responsibilities: Schema evolution. Migration chain (head: `d4e5f6a7b8c9_soft_quota_limits`):
+  `109a87243062_init` → `014cf8e85d99_triggers` → `a1b2c3d4e5f6_contract_quantity_quotas` → `1d156127d709_add_expense_and_admin_account_types` → `b2c4e8f1a7d3_finances_search_indexes` → `c3f8a9d4e2b1_inventory_search_indexes` → `d4e5f6a7b8c9_soft_quota_limits`
 - Location: `src/core/init.py` (`init_data()`)
 - Triggers: Called at app startup (via lifespan or seeder)
 - Responsibilities: Creates system user, system financial accounts (Revenue, Cash, Card, Discount), virtual inventories (VIRTUAL_VENDOR, VIRTUAL_LOSS), admin user, walk-in user with client inventory
@@ -288,5 +290,88 @@ A B2B/B2C water delivery management platform that automates the full cycle: from
 - `update_account_balances()` -- on `transactions` INSERT/UPDATE: atomically adjusts `accounts.balance` with deadlock-safe row locking
 - `update_inventory_balances()` -- on `stock_transactions` INSERT: upserts `inventory_balances.quantity` via conflict resolution
 - Both enforce strict append-only ledger (block DELETE and certain UPDATEs)
-- Defined in `alembic/versions/c650cec7ccb0_triggers.py`, SQL source in `src/infrastructure/database/scripts/`
+- Defined in `alembic/versions/014cf8e85d99_triggers.py`, SQL source in `src/infrastructure/database/scripts/`
 <!-- GSD:architecture-end -->
+
+## ⛔ Sacred Rules (нарушение = автоматический 🔴 Critical в Code Review)
+
+### Леджеры — append-only, навсегда
+
+`transactions` (финансовый леджер) и `stock_transactions` (складской леджер) —
+**неизменяемые таблицы**. PostgreSQL-триггеры активно блокируют DELETE и
+большинство UPDATE на этих таблицах.
+
+- **НИКОГДА** не пиши `session.execute(update(StockTransaction)...)`,
+  `session.execute(delete(Transaction)...)`, `session.delete(tx)` — это
+  упадёт на триггере и/или нарушит инвариант двойной записи.
+- **НИКОГДА** не предлагай «исправить» неверную проводку правкой записи.
+- **Коррекция = новая компенсирующая запись** (reversal/adjustment), которая
+  ссылается на исходную через `parent_id` или метаданные. Только так баланс
+  остаётся аудируемым.
+- Балансы (`accounts.balance`, `inventory_balances.quantity`) — это
+  материализованный кеш, обновляемый триггерами. Не пытайся его править руками.
+- Если триггер упал на INSERT — это *именно* тот случай, когда нужно понять
+  бизнес-инвариант, а не глушить ошибку try/except.
+
+### Другие фиксированные инварианты
+
+- `lazy="raise"` на bulk-рисковых relationships не убирать — без явного
+  `selectinload`/`joinedload` загрузка должна падать, а не молча делать N+1.
+- `ondelete="RESTRICT"` на критических FK не менять на CASCADE — каскадное
+  удаление пользователя/договора/склада снесёт леджер.
+- Soft-delete (`is_active=False` через `archive()`) — единственный способ
+  «удалить» доменную сущность. Hard `DELETE` на не-леджерных таблицах
+  допустим только в миграциях/seeder.
+
+## 🚧 Active Feature: Soft Quota Limits
+
+В working tree сейчас идёт фича «мягкие квоты» (B2B-договоры).
+
+- Untracked миграция: `alembic/versions/d4e5f6a7b8c9_soft_quota_limits.py` —
+  снимает CHECK-constraint `ck_contract_price_item_quantity_used_le_limit`
+  и добавляет `Order.quota_exceeded` (boolean).
+- Семантика: `quantity_used` теперь может превышать `quantity_limit`
+  (overspend разрешён); факт перерасхода поднимает флаг на заказе.
+- Связанные modified-файлы (15 шт.) затрагивают `contracts/`, `orders/`,
+  `inventory/` сервисы/схемы/репозитории и API-роутеры
+  (`backoffice/{clients,contracts,orders}.py`, `courier/orders.py`).
+- UI-спека: `research/CONTRACT_QUOTA_ADJUSTMENT_FRONTEND.md`.
+
+**Правило на время фичи:** не предлагать рефакторингов / переименований /
+извлечений хелперов в этих файлах, пока коммит не закрыт. Допустимы только
+точечные правки в рамках самой фичи. После закрытия коммита — этот блок
+удалить из CLAUDE.md.
+
+## 📝 API Changelog (single source of truth)
+
+`/CHANGELOG.md` в корне backend-репозитория — **единственный авторитетный
+файл** для трекинга API-изменений. Каждое API-breaking или -extending
+изменение фиксируется здесь.
+
+- Frontend (submodule `frontend/`) синхронизируется через symlink
+  `frontend/CHANGELOG.md → ../CHANGELOG.md`.
+- Скрипт верификации: `scripts/check-changelog-sync.sh` — проверяет, что
+  symlink жив и указывает на корневой файл (запускается в pre-commit).
+- Workflow для разработчика: меняешь публичный контракт (схема, эндпоинт,
+  enum-значение, error-code) → обязательно правишь `/CHANGELOG.md` в том
+  же коммите. Pre-commit hook падает, если есть `.py`-изменения в
+  `src/modules/*/schemas.py` или `src/api/v1/**/*.py` без правки CHANGELOG.
+
+## 🧩 Frontend как git submodule
+
+`frontend/` — git submodule на `https://github.com/Yokubjanovichh/MunnavarA.git`
+(ветки `main` + `dev`). Это и **submodule в backend-монорепе**, и
+**самостоятельный репозиторий** для Vercel-деплоя.
+
+- Backend-репа фиксирует commit-pin frontend-сабмодуля в `.gitmodules` и
+  индексе. `git status` родителя показывает submodule как одну строку
+  с указанием SHA, не как `??` директорию.
+- Команды внутри `frontend/` работают на frontend-репе:
+  `cd frontend && git checkout dev`, `git pull`, `git push origin dev`.
+- Команды в корне backend-репы НЕ затрагивают содержимое frontend, кроме
+  обновления pin: `git submodule update --remote frontend` подтягивает
+  свежую `main` в pin.
+- Клонирование монорепы: `git clone --recurse-submodules <url>` или
+  `git submodule update --init --recursive` после обычного клона.
+- CI на Vercel деплоит из frontend-репы напрямую (submodule-pin в
+  backend-репе не влияет на Vercel build).

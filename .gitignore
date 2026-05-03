@@ -73,3 +73,10 @@ Thumbs.db
 
 # --- Project Specific ---
 # Если ты создаешь временные папки для генерации изображений или других артефактов, добавь их сюда
+
+# --- Frontend ---
+# Папка frontend/ — отдельный git-репозиторий (Yokubjanovichh/MunnavarA),
+# временно не подключён как submodule. Backend git его не отслеживает.
+# После запуска scripts/migrate-frontend-to-submodule.sh эта строка должна
+# быть удалена, а frontend появится в .gitmodules как полноценный submodule.
+/frontend/

@@ -23,7 +23,7 @@ Four layers with strict dependency direction: **API → Application → Modules 
 
 - **`src/api/`** — FastAPI routers grouped by audience: `backoffice/`, `client/`, `courier/`, `auth/`. Handles HTTP, auth enforcement, response serialization. Never contains business logic.
 - **`src/application/`** — Cross-domain orchestration (client onboarding, order creation with tara auto-provisioning). Composes repositories from multiple modules via composite UoWs.
-- **`src/modules/`** — Six bounded contexts: `auth`, `users`, `catalog`, `orders`, `inventory`, `finances`. Each owns its `models.py`, `repositories.py`, `services.py`, `schemas.py`, `uow.py`, `dependencies.py`, `exceptions.py`, `enums.py`.
+- **`src/modules/`** — **Seven** bounded contexts: `auth`, `users`, `catalog`, `orders`, `inventory`, `finances`, **`contracts`**. Each owns its `models.py`, `repositories.py`, `services.py`, `schemas.py`, `uow.py`, `dependencies.py`, `exceptions.py`, `enums.py`. `contracts/` covers B2B: договоры, прайс-листы с per-product-quantity квотами, инвойсы, акты сверки, журнал статусов, доп. соглашения — самый активный модуль.
 - **`src/common/`** — `BaseRepository[ModelType]`, `BaseService[Model, Schema, UoW]`, `IUnitOfWork` interface.
 - **`src/infrastructure/database/`** — `BaseModel` (UUIDv7 PK, `is_active`, timestamps), `BaseSQLAlchemyUoW`, engine/session factory.
 - **`src/core/`** — Config, JWT, password hashing, RBAC permissions, structured logging, exception hierarchy, system constants.
@@ -31,6 +31,28 @@ Four layers with strict dependency direction: **API → Application → Modules 
 ### Ledger integrity is paramount
 
 Both the **Stock Ledger** (`stock_transactions`) and **Financial Ledger** (`transactions`) are append-only. PostgreSQL triggers enforce balance materialization and block DELETE/UPDATE on ledger tables. Application code cannot bypass this — do not attempt to modify or delete ledger entries.
+
+⛔ **Sacred rules — нарушение = автоматический 🔴 Critical в Code Review:**
+
+- **НИКОГДА** не пиши `session.execute(update(StockTransaction)...)`, `session.execute(delete(Transaction)...)`, `session.delete(tx)` — упадёт на триггере и/или нарушит инвариант двойной записи.
+- **НИКОГДА** не «исправляй» неверную проводку правкой существующей записи.
+- **Коррекция = новая компенсирующая запись** (reversal/adjustment), которая ссылается на исходную через `parent_id` или метаданные.
+- Балансы (`accounts.balance`, `inventory_balances.quantity`) — это материализованный кеш, обновляемый триггерами. Не пытайся его править руками.
+- Если триггер упал на INSERT — значит, бизнес-инвариант нарушен. Понять почему, не глушить try/except.
+
+### 🚧 Active Feature: Soft Quota Limits (untracked)
+
+Идёт фича мягких квот по B2B-договорам. Untracked миграция `alembic/versions/d4e5f6a7b8c9_soft_quota_limits.py` снимает CHECK на `quantity_used <= quantity_limit` и добавляет `Order.quota_exceeded`. 15 modified-файлов в working tree (`src/modules/{contracts,orders,inventory}/...`, `src/api/v1/{backoffice,courier}/...`, `src/core/init.py`) относятся к этой фиче.
+
+**Правило:** не предлагай рефакторингов / переименований / extract-хелперов в перечисленных файлах, пока коммит не закрыт. Допустимы только точечные правки в рамках самой фичи.
+
+### 📝 API Changelog
+
+Authoritative file: `/CHANGELOG.md` (root). Frontend submodule синхронизируется через symlink `frontend/CHANGELOG.md → ../CHANGELOG.md`. Любое API-breaking/extending изменение фиксируется в `/CHANGELOG.md` в том же коммите. Pre-commit hook (`scripts/check-changelog-sync.sh`) падает, если меняется `src/api/v1/**` или `src/modules/*/schemas.py` без правки CHANGELOG.
+
+### 🧩 Frontend as git submodule
+
+`frontend/` is both a git submodule of this monorepo and a standalone GitHub repo (`Yokubjanovichh/MunnavarA`, branches `main` + `dev`) deployed on Vercel. Backend repo pins the frontend SHA via `.gitmodules`. Commands inside `frontend/` operate on the frontend repo; commands at backend root only update the pin via `git submodule update --remote frontend`. Clone with `git clone --recurse-submodules` or run `git submodule update --init` post-clone.
 
 ## Key Patterns
 

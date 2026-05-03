@@ -23,3 +23,17 @@ repos:
         args: [--fix]
       # Запуск форматтера (делает код красивым, выравнивает кавычки и отступы)
       - id: ruff-format
+
+  # 3. СИНХРОНИЗАЦИЯ API-CHANGELOG С ПУБЛИЧНЫМ КОНТРАКТОМ
+  # Если меняются публичные контракты (роуты, схемы, enums, миграции),
+  # коммит должен содержать правку /CHANGELOG.md. Также проверяет, что
+  # frontend/CHANGELOG.md — symlink на ../CHANGELOG.md.
+  - repo: local
+    hooks:
+      - id: check-changelog-sync
+        name: Sync API CHANGELOG.md with public contract changes
+        entry: scripts/check-changelog-sync.sh
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit]

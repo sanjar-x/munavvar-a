@@ -120,10 +120,10 @@ src/
     courier/              # Онбординг курьера (User + Identity + Account + Transport)
     inventories/          # Склады, транспорт, перемещения, оприходование тары
     order/                # Создание заказов с автооприходованием
-  modules/                # Доменные модули (DDD bounded contexts)
+  modules/                # 7 доменных модулей (DDD bounded contexts)
     auth/                 # Аутентификация
     catalog/              # Каталог продуктов (WATER, CONTAINER, EQUIPMENT)
-    contracts/            # Договоры B2B, прайс-листы, счета-фактуры
+    contracts/            # Договоры B2B, квоты, прайс-листы, инвойсы, акт сверки, доп. соглашения
     orders/               # Жизненный цикл заказа, FSM, логика тары
     inventory/            # Складской леджер, перемещения, остатки
     finances/             # Финансовый леджер, счета, транзакции
@@ -324,3 +324,47 @@ Entrypoint (`scripts/entrypoint.sh`): миграции → запуск серв
 # Production startup:
 alembic upgrade head → fastapi run src/main.py
 ```
+
+---
+
+## Frontend (git submodule)
+
+Папка `frontend/` — это **git submodule** на отдельный репозиторий
+[`Yokubjanovichh/MunnavarA`](https://github.com/Yokubjanovichh/MunnavarA)
+(ветки `main` + `dev`). Один и тот же код — и часть монорепы (для удобства
+кросс-стэка), и самостоятельный репозиторий для Vercel-деплоя.
+
+```bash
+# Клонирование монорепы вместе с фронтом:
+git clone --recurse-submodules <backend-url>
+
+# Если уже клонировал без --recurse:
+git submodule update --init --recursive
+
+# Подтянуть свежий main фронта (обновит pin в backend):
+git submodule update --remote frontend
+
+# Работа внутри фронта (push идёт во ФРОНТ-репу, не в backend):
+cd frontend && git checkout dev && git pull && ... && git push origin dev
+```
+
+Backend-репа фиксирует SHA фронта в `.gitmodules` и индексе. Vercel
+деплоит из frontend-репы напрямую — submodule-pin в backend ни на что
+там не влияет.
+
+---
+
+## API Changelog (single source of truth)
+
+`/CHANGELOG.md` в корне backend — **единственный авторитетный файл**
+для трекинга API-изменений. Формат — [Keep a Changelog 1.1](https://keepachangelog.com/en/1.1.0/).
+
+- `frontend/CHANGELOG.md` — symlink на `../CHANGELOG.md` (через submodule),
+  фронтендеры читают тот же файл.
+- Скрипт `scripts/check-changelog-sync.sh` (pre-commit hook) проверяет,
+  что symlink жив и указывает на корневой CHANGELOG.
+- **Правило:** любое изменение в `src/api/v1/**` или `src/modules/*/schemas.py`
+  должно сопровождаться правкой `/CHANGELOG.md` в том же коммите.
+
+Это заменяет старый формат с двумя независимыми копиями
+(`CHANGELOG_A.md` + `frontend/CHANGELOG.md`).

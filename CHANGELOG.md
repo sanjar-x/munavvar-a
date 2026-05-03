@@ -1,8 +1,16 @@
-# CHANGELOG
+# CHANGELOG (HOD API)
 
-Документ для фронтенд-команды: все breaking и не-breaking изменения бэкенд API HOD.
+**Single source of truth** для всех breaking и не-breaking изменений
+бэкенд-API HOD. Этот файл читают и фронтенд, и интеграции.
 
-Формат: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+- Backend-репа: `/CHANGELOG.md` — авторитетный файл.
+- Frontend-репа (`Yokubjanovichh/MunnavarA`): `frontend/CHANGELOG.md` —
+  symlink на `../CHANGELOG.md` через git-submodule.
+- Pre-commit hook `scripts/check-changelog-sync.sh` блокирует коммит, если
+  изменены публичные контракты (`src/api/v1/**`, `src/modules/*/schemas.py`,
+  `src/modules/*/enums.py`, `alembic/versions/*.py`) без правки этого файла.
+
+Формат: [Keep a Changelog 1.1](https://keepachangelog.com/en/1.1.0/).
 Версионирование не семантическое — привязано к итерациям FRD.
 
 ---
