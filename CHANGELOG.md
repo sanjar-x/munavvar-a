@@ -15,6 +15,29 @@
 
 ---
 
+## [Unreleased] — Soft quota limits: схема под фичу мягких квот (только DB)
+
+Источник: миграция `d4e5f6a7b8c9_soft_quota_limits` — выкатывается раньше
+бизнес-логики, чтобы prod alembic не падал на отсутствующем revision-id.
+
+### Database (без изменения публичного API)
+
+- `contract_price_items`: снят CHECK
+  `ck_contract_price_item_quantity_used_le_limit` —
+  `quantity_used` теперь может превышать `quantity` (soft-лимит).
+- `orders`: добавлены поля `quota_exceeded BOOLEAN NOT NULL DEFAULT FALSE`
+  и `quota_overspend JSONB NULL` (детализация перерасхода).
+- Голова Alembic: **`d4e5f6a7b8c9`** (предыдущая — `c3f8a9d4e2b1`).
+
+### Frontend impact
+
+На сегодня — **нет**. API-схемы заказов и договоров поля ещё не
+возвращают (бэкенд-логика в working tree, не закоммичена). Когда
+бизнес-логика выйдет, поля `quota_exceeded` и `quota_overspend`
+появятся в `OrderResponse` отдельной записью в этом CHANGELOG.
+
+---
+
 ## [Unreleased] — Ledger CHECK-constraints rollback (внутренний фикс схемы)
 
 Источник: ревью миграции `d7a2f91c4e68_ledger_check_constraints` —
