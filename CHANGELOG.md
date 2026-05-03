@@ -15,6 +15,33 @@
 
 ---
 
+## [Unreleased] — Walk-in warehouse-sale: автокапитализация тары (hotfix)
+
+Источник: prod-инцидент — `POST /api/v1/backoffice/orders/warehouse-sale`
+для анонимного покупателя (walk-in, без `clientId`) падал на 409
+`INSUFFICIENT_TARA`, потому что у walk-in-клиента физически нет
+отслеживаемого баланса пустой тары.
+
+### Changed
+
+- `POST /backoffice/orders/warehouse-sale` без `clientId` (walk-in)
+  теперь **всегда** включает автооприходование недостающей тары из
+  `VIRTUAL_VENDOR`, независимо от значения `capitalize_missing_tara`
+  в payload. Семантика: анонимный покупатель не приносит пустую тару,
+  и кассир не может «сдать» её от его имени — поэтому дефицит
+  закрывается виртуальной поставкой автоматически.
+
+### Frontend impact
+
+- Можно по-прежнему слать `capitalize_missing_tara: false` для walk-in
+  — бэкенд это проигнорирует. Для **именованного** клиента
+  (`clientId` передан) поведение не изменилось: 409 при дефиците,
+  кассир должен либо сначала вызвать
+  `/orders/warehouse-sale/capitalize-tara`, либо передать
+  `capitalize_missing_tara: true`.
+
+---
+
 ## [Unreleased] — Soft quota limits: схема под фичу мягких квот (только DB)
 
 Источник: миграция `d4e5f6a7b8c9_soft_quota_limits` — выкатывается раньше

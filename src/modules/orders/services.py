@@ -379,6 +379,14 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
         Если client_id не передан — используется WALKIN_USER_ID.
         """
         effective_client_id = client_id or WALKIN_USER_ID
+        # Walk-in (анонимный покупатель) физически не имеет отслеживаемого
+        # баланса пустой тары — он впервые приходит на склад. Принудительно
+        # включаем автооприходование из VIRTUAL_VENDOR, иначе любая продажа
+        # бутыли с возвратной тарой walk-in-клиенту падает с
+        # INSUFFICIENT_TARA. Кассир семантически не может "сдать" пустую
+        # тару от имени анонима — её просто нет.
+        is_walkin = effective_client_id == WALKIN_USER_ID
+        capitalize_missing_tara = dto.capitalize_missing_tara or is_walkin
 
         if not dto.items:
             raise EmptyCartError()
@@ -467,10 +475,10 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
                             }
                         )
 
-                if shortages and not dto.capitalize_missing_tara:
+                if shortages and not capitalize_missing_tara:
                     raise InsufficientTaraError(shortages=shortages)
 
-                if shortages and dto.capitalize_missing_tara:
+                if shortages and capitalize_missing_tara:
                     vendor_inv = (
                         await self.uow.inventories.get_vendor_inventory()
                     )
