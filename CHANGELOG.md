@@ -15,6 +15,37 @@
 
 ---
 
+## [Unreleased] — Walk-in CLIENT-account dedup (hotfix)
+
+Источник: prod-инцидент. После выкатки walk-in autocapitalize (см. ниже)
+`POST /api/v1/backoffice/orders/warehouse-sale` без `clientId` падал на
+500 `MultipleResultsFound` в `_process_pickup_settlement`, потому что у
+`WALKIN_USER_ID` оказалось несколько активных CLIENT-аккаунтов в БД
+(legacy data corruption из старых версий `init.py`).
+
+### Database
+
+- Новая миграция `e5f6a7b8c9d0_walkin_dedupe_client_accounts`: для
+  walk-in юзера оставляет один (старейший по `created_at`) активный
+  CLIENT-аккаунт, остальные помечает `is_active=FALSE`. Если у
+  дубликатов есть транзакции с ненулевым балансом — миграция
+  **намеренно падает** и требует ручной сверки. Ledger-таблицы
+  (`transactions`, `stock_transactions`) не трогаются.
+- Голова Alembic: **`e5f6a7b8c9d0`** (предыдущая — `d4e5f6a7b8c9`).
+
+### Changed (defensive)
+
+- `AccountRepository.get_user_account_by_type()` теперь делает
+  `ORDER BY created_at ASC, id ASC LIMIT 1` — детерминированно
+  возвращает старейший активный счёт, даже если в БД появились
+  дубликаты. Защита от `MultipleResultsFound` на будущее.
+
+### Frontend impact
+
+- Нет — поведение API наблюдаемо такое же, ошибка 500 пропадает.
+
+---
+
 ## [Unreleased] — Walk-in warehouse-sale: автокапитализация тары (hotfix)
 
 Источник: prod-инцидент — `POST /api/v1/backoffice/orders/warehouse-sale`

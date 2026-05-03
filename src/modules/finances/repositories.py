@@ -86,10 +86,21 @@ class AccountRepository(BaseRepository[Account]):
         user_id: uuid.UUID,
         account_type: AccountType,
     ) -> Account | None:
-        query = select(self.model).where(
-            self.model.user_id == user_id,
-            self.model.type == account_type,
-            self.model.is_active.is_(True),
+        # ORDER BY created_at + LIMIT 1 — детерминированно возвращаем
+        # старейший активный счёт. Историческая инвариант "1 active
+        # account на (user_id, type)" поддерживается init.py, но без
+        # уникального индекса в БД возможны дубликаты (data-fix
+        # выполняется миграцией e5f6a7b8c9d0_walkin_dedupe_client_accounts);
+        # лимит защищает от MultipleResultsFound в проде.
+        query = (
+            select(self.model)
+            .where(
+                self.model.user_id == user_id,
+                self.model.type == account_type,
+                self.model.is_active.is_(True),
+            )
+            .order_by(self.model.created_at.asc(), self.model.id.asc())
+            .limit(1)
         )
         result = await self.session.execute(query)
         return result.scalar_one_or_none()
