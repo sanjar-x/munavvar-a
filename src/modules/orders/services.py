@@ -438,7 +438,14 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
 
             capitalization_applied = False
 
-            if exchange_items:
+            # Walk-in (анонимный покупатель) не несёт пустую тару и не
+            # имеет персонального баланса — проверять «достаточно ли
+            # старой тары для обмена» не нужно. Он просто покупает
+            # бутыль воды (вместе с тарой как составной частью товара).
+            # Шаги INITIAL_BALANCE / WAREHOUSE_TARA_RETURN / LOSS_WRITE_OFF
+            # для walk-in также не выполняются в _handle_warehouse_pickup —
+            # см. там же.
+            if exchange_items and not is_walkin:
                 inventory = (
                     await self.uow.inventories.get_inventory_with_balances(
                         client_inventory.id, with_for_update=True
@@ -1348,9 +1355,22 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
         if stock_shortages:
             raise InsufficientStockError(shortages=stock_shortages)
 
-        # 1. Начисляем тару на склад из виртуального склада
+        # Walk-in (анонимный покупатель) не приносит пустую тару, не
+        # сдаёт её и не списывает товар после ухода — он просто
+        # покупает бутыль и уходит. Поэтому INITIAL_BALANCE,
+        # WAREHOUSE_TARA_RETURN и LOSS_WRITE_OFF к нему не применяются;
+        # выполняется только WAREHOUSE_SALE: WAREHOUSE → CLIENT.
+        # Walk-in CLIENT inventory ("Самовывоз") при этом служит
+        # журналом продаж со склада анонимам и накапливает положительные
+        # балансы — это допустимо, на него никакая бизнес-логика не
+        # завязана.
+        is_walkin = order.client_id == WALKIN_USER_ID
         returnable_items = self._build_returnable_items(order.items)
-        if returnable_items:
+
+        # 1. Виртуальное оприходование тары на склад из VIRTUAL_VENDOR.
+        # Для walk-in пропускается: склад не должен «получать» тару из
+        # ниоткуда при анонимной продаже.
+        if returnable_items and not is_walkin:
             vendor_inv = await self.uow.inventories.get_vendor_inventory()
             await self._create_stock_transfer(
                 from_id=vendor_inv.id,
@@ -1363,7 +1383,7 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
                 reason="Container issued with warehouse pickup",
             )
 
-        # 2. WAREHOUSE_SALE: Warehouse → Client (товар + тара)
+        # 2. WAREHOUSE_SALE: Warehouse → Client (товар + тара) — всегда.
         sale_items = [
             {"product_id": i.product_id, "quantity": i.quantity}
             for i in order.items
@@ -1380,8 +1400,10 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
             order_id=order.id,
         )
 
-        if returnable_items:
-            # 3. WAREHOUSE_TARA_RETURN: Client → Warehouse
+        # 3. WAREHOUSE_TARA_RETURN: Client → Warehouse.
+        # Только для именованных клиентов: они физически сдают пустую
+        # тару, которую принесли с собой. Walk-in ничего не приносил.
+        if returnable_items and not is_walkin:
             await self._create_stock_transfer(
                 from_id=order.client_inventory_id,
                 to_id=warehouse.id,
@@ -1392,30 +1414,7 @@ class BaseOrderService(BaseService[Order, OrderCreate, BaseOrderUnitOfWork]):
                 order_id=order.id,
             )
 
-        # 4. Cleanup: списание товара с Walk-in inventory
-        # Анонимный покупатель забрал товар и ушёл — обнуляем его inventory.
-        # Списываем воду (из заказа) + тару (из capitalize_missing_tara при
-        # создании заказа); после возврата тары на склад (шаг 3) у walk-in
-        # остаётся только capitalize-тара, которая уходит в VIRTUAL_LOSS.
-        if order.client_id == WALKIN_USER_ID:
-            loss_inv = await self.uow.inventories.get_loss_inventory()
-            cleanup_items = [
-                {"product_id": i.product_id, "quantity": i.quantity}
-                for i in order.items
-                if i.quantity > 0
-            ]
-            cleanup_items.extend(returnable_items)
-            await self._create_stock_transfer(
-                from_id=order.client_inventory_id,
-                to_id=loss_inv.id,
-                transfer_type=TransferType.LOSS_WRITE_OFF,
-                items=cleanup_items,
-                created_by_id=completed_by_id,
-                accepted_by_id=completed_by_id,
-                order_id=order.id,
-            )
-
-        # 5. Финансовое закрытие
+        # 4. Финансовое закрытие
         await self._process_pickup_settlement(order)
 
     async def _process_financial_settlement(self, order: Order) -> None:

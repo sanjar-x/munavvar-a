@@ -15,6 +15,56 @@
 
 ---
 
+## [Unreleased] — Walk-in warehouse-pickup: убрать паразитные движения тары (fix)
+
+Источник: ручной анализ ответа `POST /backoffice/orders/warehouse-sale`
+для walk-in. На каждый заказ создавалось 4 stock_transfer-записи,
+из которых **3 не имели бизнес-смысла**:
+
+1. `INITIAL_BALANCE` VENDOR → WAREHOUSE — мнимое пополнение склада
+   тарой «из ниоткуда» (анонимный клиент тару не приносил, склад не
+   должен её «получать»).
+2. `WAREHOUSE_SALE` WAREHOUSE → CLIENT — корректно, остаётся.
+3. `WAREHOUSE_TARA_RETURN` CLIENT → WAREHOUSE — мнимый возврат
+   (анонимный клиент тару не возвращает: он купил полную бутыль и ушёл).
+4. `LOSS_WRITE_OFF` CLIENT → VIRTUAL_LOSS — списывал воду+тару,
+   причём тара уже ушла в шаге 3, что давало `-1` на CLIENT-балансе
+   и `+1` мусорной воды в VIRTUAL_LOSS.
+
+### Changed
+
+- `BaseOrderService._handle_warehouse_pickup`: для walk-in оставлен
+  единственный шаг `WAREHOUSE_SALE` (склад → walk-in CLIENT inventory
+  «Самовывоз»). Шаги 1, 3 и 4 пропускаются. Walk-in CLIENT теперь
+  играет роль журнала продаж со склада анонимам и копит положительные
+  балансы — на эти балансы нигде не завязано бизнес-логики.
+- `BaseOrderService.create_warehouse_sale`: tara-shortage check тоже
+  пропускается для walk-in (его inventory заведомо пустой и
+  семантически нерелевантен).
+
+### Frontend impact
+
+- В ответе `/backoffice/orders/warehouse-sale` для walk-in теперь
+  ровно **один** элемент в `stock_transfers` (`WAREHOUSE_SALE`) вместо
+  четырёх. Если фронт где-то полагался на наличие 4 элементов — это
+  место надо проверить (но скорее это просто отображалось в журнале
+  склада «как есть», и теперь записей в журнале станет меньше).
+- Финансовая часть не менялась.
+
+### Историческое легаси
+
+Заказы walk-in, созданные до этого фикса, оставили в `stock_transactions`
+четвёрки записей (ledger append-only — переписать нельзя). Балансы
+`inventory_balances` для VIRTUAL_VENDOR / WAREHOUSE / walk-in CLIENT /
+VIRTUAL_LOSS на проде содержат «исторический мусор». Сами по себе они
+не блокируют дальнейшую работу: новые заказы будут чистыми. Если
+бухгалтерии понадобится отчёт без шума — фильтровать
+`stock_transactions` по `order.client_id != WALKIN_USER_ID` или по
+типам `INITIAL_BALANCE/WAREHOUSE_TARA_RETURN/LOSS_WRITE_OFF` с
+`order.client_id = WALKIN_USER_ID` (чтобы исключить).
+
+---
+
 ## [Unreleased] — Walk-in CLIENT-account dedup (hotfix)
 
 Источник: prod-инцидент. После выкатки walk-in autocapitalize (см. ниже)
