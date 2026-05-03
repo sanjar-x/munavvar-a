@@ -63,7 +63,7 @@ def upgrade() -> None:
             SELECT id INTO survivor_id
             FROM accounts
             WHERE user_id = '{WALKIN_USER_ID}'
-              AND type = 'CLIENT'
+              AND type = 'client'
               AND is_active = TRUE
             ORDER BY created_at ASC, id ASC
             LIMIT 1;
@@ -77,7 +77,7 @@ def upgrade() -> None:
             SELECT COUNT(*) INTO bad_count
             FROM accounts
             WHERE user_id = '{WALKIN_USER_ID}'
-              AND type = 'CLIENT'
+              AND type = 'client'
               AND is_active = TRUE
               AND id <> survivor_id
               AND balance <> 0;
@@ -93,7 +93,7 @@ def upgrade() -> None:
             UPDATE accounts
                SET is_active = FALSE
              WHERE user_id = '{WALKIN_USER_ID}'
-               AND type = 'CLIENT'
+               AND type = 'client'
                AND is_active = TRUE
                AND id <> survivor_id;
 

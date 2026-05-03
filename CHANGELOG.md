@@ -33,6 +33,14 @@
   (`transactions`, `stock_transactions`) не трогаются.
 - Голова Alembic: **`e5f6a7b8c9d0`** (предыдущая — `d4e5f6a7b8c9`).
 
+> **Patch (in-place):** первая ревизия миграции пыталась сравнить
+> `accounts.type = 'CLIENT'` (uppercase), а PostgreSQL-enum
+> `account_type_enum` использует lowercase значения (`'client'`,
+> `'cash'`, …). Миграция падала на `InvalidTextRepresentationError`,
+> alembic откатывал транзакцию — БД оставалась на `d4e5f6a7b8c9`,
+> старт контейнера не проходил. Исправлено в том же revision-id
+> (`e5f6a7b8c9d0`) — заменены все три места `'CLIENT'` → `'client'`.
+
 ### Changed (defensive)
 
 - `AccountRepository.get_user_account_by_type()` теперь делает
